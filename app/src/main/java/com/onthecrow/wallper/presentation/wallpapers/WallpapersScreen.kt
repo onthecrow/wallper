@@ -32,7 +32,7 @@ fun WallpapersScreen() {
             )
             context.startActivity(intent)
         },
-        onAddClick = {},
+        onAddClick = { viewModel.addWallpaper() },
     )
 
     HandleUiActions(viewModel) { _ ->

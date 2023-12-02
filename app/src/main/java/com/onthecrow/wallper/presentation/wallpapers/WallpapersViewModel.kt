@@ -4,6 +4,7 @@ import androidx.lifecycle.viewModelScope
 import com.onthecrow.wallper.core.viewmodel.BaseViewModel
 import com.onthecrow.wallper.domain.ActivateWallpaperUseCase
 import com.onthecrow.wallper.domain.GetWallpapersUseCase
+import com.onthecrow.wallper.presentation.picker.ImagePicker
 import com.onthecrow.wallper.presentation.wallpapers.models.Wallpaper
 import com.onthecrow.wallper.presentation.wallpapers.models.WallpapersAction
 import com.onthecrow.wallper.presentation.wallpapers.models.WallpapersEvent
@@ -26,12 +27,24 @@ class WallpapersViewModel @Inject constructor(
 ) : BaseViewModel<WallpapersState, WallpapersAction, WallpapersEvent>(WallpapersState()) {
 
     init {
+        ImagePicker.setListener {
+            // TODO implement crop logic
+        }
         getWallpapersUseCase()
             .map { wallpapers -> wallpapers.map(Wallpaper::mapFromDomain) }
             .onEach { wallpapers -> updateUiState { copy(items = wallpapers) } }
             .catch { updateUiState { copy(error = it.message ?: "") } }
             .flowOn(Dispatchers.IO)
             .launchIn(viewModelScope)
+    }
+
+    fun addWallpaper() {
+        ImagePicker.launch()
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        ImagePicker.removeListener()
     }
 
     override fun sendEvent(uiEvent: WallpapersEvent) = when (uiEvent) {
