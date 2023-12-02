@@ -9,19 +9,21 @@ import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
-import com.onthecrow.wallper.WallperApplication
 import com.onthecrow.wallper.data.WallpaperEntity
+import com.onthecrow.wallper.domain.GetActiveWallpaperUseCase
+import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
+import javax.inject.Inject
 
 
+@AndroidEntryPoint
 class WallperWallpaperService : WallpaperService() {
 
-    val db = WallperApplication.db
-        ?.wallpaperDao()
-        ?.getActive()
+    @Inject
+    lateinit var getActiveWallpaperUseCase: GetActiveWallpaperUseCase
 
     override fun onCreateEngine(): Engine {
         return GLEngine()
@@ -31,9 +33,10 @@ class WallperWallpaperService : WallpaperService() {
     inner class GLEngine : Engine() {
 
         private var mediaPlayer: ExoPlayer? = null
-        private val watcher = db?.onEach {
-            recreatePlayer(it)
-        }?.stateIn(MainScope(), SharingStarted.Eagerly, null)
+        // TODO inject scope
+        private val watcher = getActiveWallpaperUseCase()
+            .onEach { recreatePlayer(it) }
+            .stateIn(MainScope(), SharingStarted.Eagerly, null)
 
         private fun recreatePlayer(wallpaperEntity: WallpaperEntity) {
             mediaPlayer?.run { release() }
@@ -67,7 +70,7 @@ class WallperWallpaperService : WallpaperService() {
 
         override fun onSurfaceCreated(holder: SurfaceHolder?) {
             super.onSurfaceCreated(holder)
-            watcher?.value?.let { recreatePlayer(it) }
+            watcher.value?.let { recreatePlayer(it) }
         }
     }
 }

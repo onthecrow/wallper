@@ -27,4 +27,7 @@ interface WallpaperDao {
 
     @Update
     suspend fun update(wallpaper: WallpaperEntity)
+
+    @Update
+    suspend fun updateWallpapers(vararg wallpapers: WallpaperEntity)
 }

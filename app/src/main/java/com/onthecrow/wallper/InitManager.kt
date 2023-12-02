@@ -5,26 +5,38 @@ import android.graphics.Bitmap
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import androidx.annotation.RawRes
-import com.onthecrow.wallper.data.WallpaperDao
+import com.onthecrow.wallper.data.AppDatabase
 import com.onthecrow.wallper.data.WallpaperEntity
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import java.io.File
 import java.io.FileOutputStream
+import javax.inject.Inject
 
-object InitManager {
+class InitManager @Inject constructor(
+    @ApplicationContext val context: Context,
+    appDatabase: AppDatabase
+) {
 
+    private val wallpaperDao = appDatabase.wallpaperDao()
     private var applicationDir: File? = null
 
-    suspend fun populateDbIfNeeded(context: Context, wallpaperDao: WallpaperDao) {
-        if (wallpaperDao.getAll().first().isNotEmpty()) return
-        val list = listOf(
-            createWallpaperEntity(context, R.raw.video1, false),
-            createWallpaperEntity(context, R.raw.video2, false),
-            createWallpaperEntity(context, R.raw.video3, true),
-            createWallpaperEntity(context, R.raw.video5, false),
-            createWallpaperEntity(context, R.raw.video9, false),
-        )
-        wallpaperDao.insertAll(*list.toTypedArray())
+    fun populateDbIfNeeded() {
+        // TODO inject scope and dispatcher
+        MainScope().launch(Dispatchers.IO) {
+            if (wallpaperDao.getAll().first().isNotEmpty()) return@launch
+            val list = listOf(
+                createWallpaperEntity(context, R.raw.video1, false),
+                createWallpaperEntity(context, R.raw.video2, false),
+                createWallpaperEntity(context, R.raw.video3, true),
+                createWallpaperEntity(context, R.raw.video5, false),
+                createWallpaperEntity(context, R.raw.video9, false),
+            )
+            wallpaperDao.insertAll(*list.toTypedArray())
+        }
     }
 
     private fun createWallpaperEntity(context: Context, @RawRes rawRes: Int, isActive: Boolean): WallpaperEntity {
