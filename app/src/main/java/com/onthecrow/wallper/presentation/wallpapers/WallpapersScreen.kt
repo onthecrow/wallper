@@ -6,10 +6,11 @@ import android.content.Intent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.platform.LocalContext
-import androidx.core.content.ContextCompat.startActivity
 import androidx.hilt.navigation.compose.hiltViewModel
-import androidx.lifecycle.viewmodel.compose.viewModel
 import com.onthecrow.wallper.core.actions.HandleUiActions
+import com.onthecrow.wallper.navigation.LocalNavController
+import com.onthecrow.wallper.presentation.crop.navigateToCropperScreen
+import com.onthecrow.wallper.presentation.wallpapers.models.WallpapersAction
 import com.onthecrow.wallper.presentation.wallpapers.models.WallpapersEvent
 import com.onthecrow.wallper.service.WallperWallpaperService
 
@@ -18,6 +19,7 @@ fun WallpapersScreen() {
     val viewModel = hiltViewModel<WallpapersViewModel>()
     val uiState = viewModel.uiState.collectAsState().value
     val context = LocalContext.current
+    val navController = LocalNavController.current
 
     WallpapersUi(
         uiState = uiState,
@@ -35,8 +37,9 @@ fun WallpapersScreen() {
         onAddClick = { viewModel.addWallpaper() },
     )
 
-    HandleUiActions(viewModel) { _ ->
-        TODO("Actions are not implemented yet")
+    HandleUiActions(viewModel) { action ->
+        when (action) {
+            is WallpapersAction.NavigateToCropper -> navController.navigateToCropperScreen(action.uri)
+        }
     }
 }
-

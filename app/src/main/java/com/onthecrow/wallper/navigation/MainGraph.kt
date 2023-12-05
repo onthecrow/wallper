@@ -4,6 +4,7 @@ import androidx.navigation.NavController
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavOptions
 import androidx.navigation.navigation
+import com.onthecrow.wallper.presentation.crop.cropperScreen
 import com.onthecrow.wallper.presentation.wallpapers.WALLPAPERS_SCREEN
 import com.onthecrow.wallper.presentation.wallpapers.wallpapersScreen
 
@@ -15,6 +16,7 @@ fun NavGraphBuilder.mainGraph() {
         route = MAIN_GRAPH
     ) {
         wallpapersScreen()
+        cropperScreen()
     }
 }
 

@@ -1,3 +1,5 @@
+@file:OptIn(ExperimentalEncodingApi::class)
+
 package com.onthecrow.wallper.presentation.wallpapers
 
 import androidx.lifecycle.viewModelScope
@@ -18,6 +20,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import javax.inject.Inject
+import kotlin.io.encoding.ExperimentalEncodingApi
 
 
 @HiltViewModel
@@ -27,8 +30,10 @@ class WallpapersViewModel @Inject constructor(
 ) : BaseViewModel<WallpapersState, WallpapersAction, WallpapersEvent>(WallpapersState()) {
 
     init {
-        ImagePicker.setListener {
-            // TODO implement crop logic
+        ImagePicker.setListener { uri ->
+            if (uri != null) {
+                performAction(WallpapersAction.NavigateToCropper(uri.toString()))
+            }
         }
         getWallpapersUseCase()
             .map { wallpapers -> wallpapers.map(Wallpaper::mapFromDomain) }
