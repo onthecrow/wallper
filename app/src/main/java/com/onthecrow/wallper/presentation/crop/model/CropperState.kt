@@ -7,4 +7,6 @@ data class CropperState(
     val originalFilePath: String = "",
     val isVideo: Boolean = false,
     val thumbnailPath: String = "",
+    val screenWidth: Float = 1f,
+    val screenHeight: Float = 1f,
 ) : BaseState<CropperAction>()

@@ -3,6 +3,7 @@ package com.onthecrow.wallper.presentation.crop
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.onthecrow.wallper.core.viewmodel.BaseViewModel
+import com.onthecrow.wallper.domain.GetScreenResolutionUseCase
 import com.onthecrow.wallper.domain.PrepareFileUseCase
 import com.onthecrow.wallper.presentation.crop.model.CropperAction
 import com.onthecrow.wallper.presentation.crop.model.CropperEvent
@@ -16,6 +17,7 @@ import javax.inject.Inject
 class CropperViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
     prepareFileUseCase: PrepareFileUseCase,
+    getScreenResolutionUseCase: GetScreenResolutionUseCase,
 ) : BaseViewModel<CropperState, CropperAction, CropperEvent>(
     CropperState(checkNotNull(savedStateHandle[CROPPER_SCREEN_NAV_ARGUMENT_URI]))
 ) {
@@ -23,11 +25,14 @@ class CropperViewModel @Inject constructor(
     init {
         viewModelScope.launch(Dispatchers.IO) {
             val preparedFile = prepareFileUseCase(uiState.value.uri)
+            val screenResolution = getScreenResolutionUseCase()
             updateUiState {
                 copy(
                     originalFilePath = preparedFile.originalFilePath,
                     isVideo = preparedFile.isVideo,
                     thumbnailPath = preparedFile.thumbnailPath,
+                    screenWidth = screenResolution.width,
+                    screenHeight = screenResolution.height
                 )
             }
 

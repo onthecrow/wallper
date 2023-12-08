@@ -16,7 +16,6 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -44,11 +43,11 @@ import kotlinx.coroutines.launch
 @Composable
 fun CropperUi(uiState: CropperState) {
     val imageBitmapLarge = remember { mutableStateOf<ImageBitmap?>(null) }
-    val aspectRatio = remember { mutableFloatStateOf(1f) }
     val context = LocalContext.current
 
     LaunchedEffect(uiState) {
         launch {
+            // todo move to somewhere else
             if (uiState.originalFilePath.isEmpty()) return@launch
             val loader = ImageLoader(context)
             val request = ImageRequest.Builder(context)
@@ -97,7 +96,7 @@ fun CropperUi(uiState: CropperState) {
                                 zoomable = false,
                                 overlayRatio = 1f,
                                 fling = false,
-                                aspectRatio = AspectRatio(aspectRatio.floatValue),
+                                aspectRatio = AspectRatio(uiState.screenWidth / uiState.screenHeight),
                                 fixedAspectRatio = true,
                                 handleSize = handleSize
                             )

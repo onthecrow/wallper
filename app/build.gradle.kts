@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.jetbrainsKotlinAndroid)
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
+    alias(libs.plugins.parcelize)
 }
 
 android {
@@ -71,6 +72,7 @@ dependencies {
     implementation(libs.hilt.navigation)
     implementation(libs.coil)
     implementation(libs.timber)
+    implementation(libs.data.store)
     ksp(libs.room.compiler)
     ksp(libs.hilt.compiler)
     testImplementation(libs.junit)
