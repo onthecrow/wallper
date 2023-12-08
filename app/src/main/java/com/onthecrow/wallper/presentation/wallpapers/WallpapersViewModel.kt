@@ -36,9 +36,12 @@ class WallpapersViewModel @Inject constructor(
     init {
         ImagePicker.setListener { uri ->
             viewModelScope.launch(Dispatchers.IO) {
-                val isValid = fileValidationUseCase(uri.toString())
-                withContext(Dispatchers.Main) {
-                    Toast.makeText(context, "Is valid: $isValid", Toast.LENGTH_LONG).show()
+                if (fileValidationUseCase(uri.toString())) {
+                    performAction(WallpapersAction.NavigateToCropper(uri.toString()))
+                } else {
+                    withContext(Dispatchers.Main) {
+                        Toast.makeText(context, "File isn't supported", Toast.LENGTH_LONG).show()
+                    }
                 }
             }
         }

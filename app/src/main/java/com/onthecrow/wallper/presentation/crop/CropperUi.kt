@@ -16,6 +16,7 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
@@ -39,16 +40,19 @@ import com.onthecrow.wallper.presentation.components.cropper.settings.CropOutlin
 import com.onthecrow.wallper.presentation.crop.model.CropperState
 import kotlinx.coroutines.launch
 
+
 @Composable
 fun CropperUi(uiState: CropperState) {
     val imageBitmapLarge = remember { mutableStateOf<ImageBitmap?>(null) }
+    val aspectRatio = remember { mutableFloatStateOf(1f) }
     val context = LocalContext.current
 
-    LaunchedEffect(uiState.uri) {
+    LaunchedEffect(uiState) {
         launch {
+            if (uiState.originalFilePath.isEmpty()) return@launch
             val loader = ImageLoader(context)
             val request = ImageRequest.Builder(context)
-                .data(uiState.uri)
+                .data(if (uiState.isVideo) uiState.thumbnailPath else uiState.originalFilePath)
                 .allowHardware(false) // Disable hardware bitmaps.
                 .build()
 
@@ -93,7 +97,7 @@ fun CropperUi(uiState: CropperState) {
                                 zoomable = false,
                                 overlayRatio = 1f,
                                 fling = false,
-                                aspectRatio = AspectRatio(bitmap.width.toFloat() / bitmap.height.toFloat()),
+                                aspectRatio = AspectRatio(aspectRatio.floatValue),
                                 fixedAspectRatio = true,
                                 handleSize = handleSize
                             )
