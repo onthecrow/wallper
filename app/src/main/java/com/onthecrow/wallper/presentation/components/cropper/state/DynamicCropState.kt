@@ -170,6 +170,7 @@ class DynamicCropState internal constructor(
                 rectTemp = calculateOverlayRectInBounds(rectBounds, overlayRect)
 
                 // Animate overlay to new bounds inside container
+                rectTemp = correctRectAspectRatio(rectTemp, touchRegion)
                 animateOverlayRectTo(rectTemp)
             }
 
@@ -355,6 +356,54 @@ class DynamicCropState internal constructor(
         }
 
         return rect
+    }
+
+    private fun correctRectAspectRatio(rectTemp: Rect, touchRegion: TouchRegion): Rect {
+        var resultRect = rectTemp.copy()
+        if (resultRect.width / resultRect.height != aspectRatio.value) {
+            val widthHeight = if (resultRect.width / resultRect.height > aspectRatio.value) {
+                aspectRatio.value * resultRect.height to resultRect.height
+            } else {
+                resultRect.width to resultRect.width / aspectRatio.value
+            }
+            when (touchRegion) {
+                TouchRegion.TopLeft -> {
+                    resultRect = resultRect.copy(
+                        right = resultRect.left + widthHeight.first,
+                        bottom = resultRect.top + widthHeight.second,
+                    )
+                }
+                TouchRegion.TopRight -> {
+                    resultRect = resultRect.copy(
+                        left = resultRect.right - widthHeight.first,
+                        bottom = resultRect.top + widthHeight.second,
+                    )
+                }
+                TouchRegion.BottomLeft -> {
+                    resultRect = resultRect.copy(
+                        right = resultRect.left + widthHeight.first,
+                        top = resultRect.bottom - widthHeight.second,
+                    )
+                }
+                TouchRegion.BottomRight -> {
+                    resultRect = resultRect.copy(
+                        left = resultRect.right - widthHeight.first,
+                        top = resultRect.bottom - widthHeight.second,
+                    )
+                }
+                TouchRegion.Inside, TouchRegion.None -> {
+                    val widthDiff = resultRect.width - widthHeight.first
+                    val heightDiff = resultRect.height - widthHeight.second
+                    resultRect = resultRect.copy(
+                        left = resultRect.left + widthDiff / 2,
+                        bottom = resultRect.bottom - heightDiff / 2,
+                        right = resultRect.right - widthDiff / 2,
+                        top = resultRect.top + heightDiff / 2,
+                    )
+                }
+            }
+        }
+        return resultRect
     }
 
     /**
