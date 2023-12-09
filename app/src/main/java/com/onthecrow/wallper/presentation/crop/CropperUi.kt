@@ -2,6 +2,7 @@
 
 package com.onthecrow.wallper.presentation.crop
 
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
@@ -50,59 +51,62 @@ fun CropperUi(
                 .padding(
                     bottom = it.calculateBottomPadding(),
                     top = it.calculateTopPadding(),
-                )
+                ),
+            verticalArrangement = Arrangement.Bottom,
         ) {
             val rect = remember { mutableStateOf(Rect(0f, 0f, 0f, 0f)) }
 
-            Box(
-                modifier = Modifier
-                    .padding(32.dp)
-                    .weight(1f)
-                    .aspectRatio(uiState.bitmap.width.toFloat() / uiState.bitmap.height.toFloat())
-                    .align(Alignment.CenterHorizontally)
-            ) {
+            if (uiState.screenHeight != 1f) {
+                Box(
+                    modifier = Modifier
+                        .padding(32.dp)
+                        .weight(1f)
+                        .aspectRatio(uiState.bitmap.width.toFloat() / uiState.bitmap.height.toFloat())
+                        .align(Alignment.CenterHorizontally)
+                ) {
 
-                val handleSize: Float = LocalDensity.current.run { 20.dp.toPx() }
+                    val handleSize: Float = LocalDensity.current.run { 20.dp.toPx() }
 
-                val cropProperties by remember {
-                    mutableStateOf(
-                        CropDefaults.properties(
-                            cropOutlineProperty = CropOutlineProperty(
-                                OutlineType.Rect,
-                                RectCropShape(0, "Rect")
-                            ),
-                            pannable = false,
-                            zoomable = false,
-                            overlayRatio = 1f,
-                            fling = false,
-                            aspectRatio = AspectRatio(uiState.screenWidth / uiState.screenHeight),
-                            fixedAspectRatio = true,
-                            handleSize = handleSize
+                    val cropProperties by remember {
+                        mutableStateOf(
+                            CropDefaults.properties(
+                                cropOutlineProperty = CropOutlineProperty(
+                                    OutlineType.Rect,
+                                    RectCropShape(0, "Rect")
+                                ),
+                                pannable = false,
+                                zoomable = false,
+                                overlayRatio = 1f,
+                                fling = false,
+                                aspectRatio = AspectRatio(uiState.screenWidth / uiState.screenHeight),
+                                fixedAspectRatio = true,
+                                handleSize = handleSize
+                            )
                         )
+                    }
+                    val cropStyle by remember { mutableStateOf(CropDefaults.style()) }
+
+                    val crop by remember { mutableStateOf(false) }
+
+                    ImageCropper(
+                        modifier = Modifier
+                            .fillMaxSize(),
+                        imageBitmap = uiState.bitmap,
+                        contentDescription = "Image Cropper",
+                        cropStyle = cropStyle,
+                        cropProperties = cropProperties,
+                        crop = crop,
+                        cropRect = {
+                            rect.value = it
+                        },
+                        onCropStart = {
+
+                        },
+                        onCropSuccess = {
+
+                        },
                     )
                 }
-                val cropStyle by remember { mutableStateOf(CropDefaults.style()) }
-
-                val crop by remember { mutableStateOf(false) }
-
-                ImageCropper(
-                    modifier = Modifier
-                        .fillMaxSize(),
-                    imageBitmap = uiState.bitmap,
-                    contentDescription = "Image Cropper",
-                    cropStyle = cropStyle,
-                    cropProperties = cropProperties,
-                    crop = crop,
-                    cropRect = {
-                        rect.value = it
-                    },
-                    onCropStart = {
-
-                    },
-                    onCropSuccess = {
-
-                    },
-                )
             }
             Button(
                 modifier = Modifier
