@@ -5,18 +5,27 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.platform.LocalContext
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.onthecrow.wallper.core.actions.HandleUiActions
+import com.onthecrow.wallper.navigation.LocalNavController
+import com.onthecrow.wallper.presentation.crop.model.CropperAction
+import com.onthecrow.wallper.presentation.crop.model.CropperEvent
+import com.onthecrow.wallper.presentation.wallpapers.popUpToWallpapersScreen
 
 @Composable
 fun CropperScreen() {
     val viewModel = hiltViewModel<CropperViewModel>()
     val uiState = viewModel.uiState.collectAsState().value
     val context = LocalContext.current
+    val navController = LocalNavController.current
 
     CropperUi(
         uiState = uiState,
+        onCreateClick = { viewModel.sendEvent(CropperEvent.CreateWallpaper(it)) }
     )
 
-    HandleUiActions(viewModel) { _ ->
-        TODO("Actions are not implemented yet")
+    HandleUiActions(viewModel) { action ->
+        when (action) {
+            CropperAction.NavigateToWallpapersScreen ->
+                navController.popUpToWallpapersScreen()
+        }
     }
 }

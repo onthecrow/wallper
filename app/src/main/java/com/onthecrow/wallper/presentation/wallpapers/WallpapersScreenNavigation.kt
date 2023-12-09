@@ -16,3 +16,7 @@ fun NavGraphBuilder.wallpapersScreen() {
 fun NavController.navigateToWallpapersScreen(navOptions: NavOptions? = null) =
     navigate(WALLPAPERS_SCREEN, navOptions)
 
+fun NavController.popUpToWallpapersScreen() {
+    popBackStack(WALLPAPERS_SCREEN, false)
+}
+

@@ -24,9 +24,47 @@ class StorageRepository @Inject constructor(
     private val thumbnailsFolder = File("$appFolder/thumbnails/")
     private val originalsFolder = File("$appFolder/originals/")
     private val tempFolder = File("$appFolder/temp/")
+    private val tempFile = File("$tempFolder/tempFile")
+    private val tempThumbnail = File("$tempFolder/tempThumbnail")
 
     init {
         createFolders()
+    }
+
+    fun saveTempFile(): String? {
+        val newOriginalFile = File("$originalsFolder/${Math.random() * Int.MAX_VALUE}")
+        return if (copyFile(tempFile, newOriginalFile)) {
+            newOriginalFile.absolutePath
+        } else {
+            null
+        }
+    }
+
+    fun saveTempThumbnail(): String? {
+        val newOriginalThumbnail = File("$thumbnailsFolder/${Math.random() * Int.MAX_VALUE}")
+        return if (copyFile(tempThumbnail, newOriginalThumbnail)) {
+            newOriginalThumbnail.absolutePath
+        } else {
+            null
+        }
+    }
+
+    private fun copyFile(from: File, to: File): Boolean {
+        return try {
+            from.inputStream().use { iStream ->
+                to.outputStream().use { oStream ->
+                    val buffer = ByteArray(4000)
+                    while (iStream.available() > 0) {
+                        iStream.read(buffer)
+                        oStream.write(buffer)
+                    }
+                }
+            }
+            true
+        } catch (error: Throwable) {
+            Timber.e(error)
+            false
+        }
     }
 
     fun makeThumbnailTemp(uri: String): String {
@@ -34,7 +72,7 @@ class StorageRepository @Inject constructor(
             MediaMetadataRetriever().use { retriever ->
                 retriever.setDataSource(getFileDescriptor(uri)?.fileDescriptor)
                 val bitmap = retriever.getFrameAtTime(0)
-                File("$tempFolder/tempThumbnail").apply {
+                tempThumbnail.apply {
                     outputStream().use { outputStream ->
                         bitmap?.compress(Bitmap.CompressFormat.JPEG, 100, outputStream)
                     }
@@ -53,7 +91,7 @@ class StorageRepository @Inject constructor(
             Timber.e(error)
             null
         }?.use { inputStream ->
-            File("$tempFolder/tempFile").apply {
+            tempFile.apply {
                 outputStream().use { outputStream ->
                     val buffer = ByteArray(4000)
                     while (inputStream.available() > 0) {

@@ -4,6 +4,7 @@ plugins {
     alias(libs.plugins.ksp)
     alias(libs.plugins.hilt)
     alias(libs.plugins.parcelize)
+    alias(libs.plugins.serialization)
 }
 
 android {
@@ -45,7 +46,7 @@ android {
         buildConfig = true
     }
     composeOptions {
-        kotlinCompilerExtensionVersion = "1.5.1"
+        kotlinCompilerExtensionVersion = "1.5.6"
     }
     packaging {
         resources {
@@ -73,6 +74,7 @@ dependencies {
     implementation(libs.coil)
     implementation(libs.timber)
     implementation(libs.data.store)
+    implementation(libs.serialization)
     ksp(libs.room.compiler)
     ksp(libs.hilt.compiler)
     testImplementation(libs.junit)

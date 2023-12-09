@@ -17,6 +17,7 @@ hilt-navigation = "1.1.0"
 coil = "2.5.0"
 timber = "5.0.1"
 dataStore = "1.0.0"
+serializationJson = "1.6.2"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -44,6 +45,7 @@ hilt-compiler = { group = "com.google.dagger", name = "hilt-compiler", version.r
 hilt-navigation = { group = "androidx.hilt", name = "hilt-navigation-compose", version.ref = "hilt-navigation" }
 coil = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
 timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "timber" }
+serialization = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "serializationJson"}
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }
@@ -51,4 +53,5 @@ jetbrainsKotlinAndroid = { id = "org.jetbrains.kotlin.android", version.ref = "k
 ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 parcelize = { id = "org.jetbrains.kotlin.plugin.parcelize", version.ref = "kotlin" }
+serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 

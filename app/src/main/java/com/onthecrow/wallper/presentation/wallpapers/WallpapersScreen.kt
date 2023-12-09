@@ -25,6 +25,7 @@ fun WallpapersScreen() {
         uiState = uiState,
         onWallpaperClick = { viewModel.sendEvent(WallpapersEvent.OnWallpaperClick(it)) },
         onSettingsClick = {
+            // TODO move it somewhere else
             val intent = Intent(
                 WallpaperManager.ACTION_CHANGE_LIVE_WALLPAPER
             )

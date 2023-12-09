@@ -1,7 +1,6 @@
 package com.onthecrow.wallper.presentation.wallpapers
 
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.aspectRatio
@@ -14,11 +13,10 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.painter.BitmapPainter
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import coil.compose.AsyncImage
 import com.onthecrow.wallper.presentation.wallpapers.models.Wallpaper
 
 @Composable
@@ -37,13 +35,13 @@ fun WallpaperCard(
                 .fillMaxSize()
                 .clickable(true, onClick = onCardClick)
         ) {
-            Image(
+            AsyncImage(
                 modifier = Modifier
                     .fillMaxSize()
                     .align(Alignment.Center),
+                model = wallpaper.picturePath,
                 contentScale = ContentScale.Crop,
-                painter = BitmapPainter(wallpaper.bitmap),
-                contentDescription = ""
+                contentDescription = null,
             )
             if (wallpaper.isActive) {
                 Canvas(
@@ -67,6 +65,6 @@ fun WallpaperCard(
 @Composable
 fun WallpaperCardPreview() {
     WallpaperCard(
-        wallpaper = Wallpaper(0, ImageBitmap(100, 100), true),
+        wallpaper = Wallpaper(0, "", true),
     ) {}
 }

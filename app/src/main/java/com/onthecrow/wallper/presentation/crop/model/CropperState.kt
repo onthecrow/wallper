@@ -11,5 +11,8 @@ data class CropperState(
     val thumbnailPath: String = "",
     val screenWidth: Float = 1f,
     val screenHeight: Float = 1f,
-    val bitmap: ImageBitmap = imageBitmapFromPath("")
-) : BaseState<CropperAction>()
+    val bitmap: ImageBitmap = imageBitmapFromPath(""),
+    override val actions: List<CropperAction> = listOf(),
+) : BaseState<CropperAction>() {
+    override fun updateActions(newActions: List<CropperAction>) = copy(actions = newActions)
+}

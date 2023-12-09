@@ -2,7 +2,6 @@
 
 package com.onthecrow.wallper.presentation.crop
 
-import android.widget.Toast
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
@@ -20,7 +19,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
@@ -35,9 +33,10 @@ import com.onthecrow.wallper.presentation.crop.model.CropperState
 
 
 @Composable
-fun CropperUi(uiState: CropperState) {
-    val context = LocalContext.current
-
+fun CropperUi(
+    uiState: CropperState,
+    onCreateClick: (Rect) -> Unit,
+) {
     Scaffold(
         topBar = {
             TopAppBar(
@@ -109,13 +108,7 @@ fun CropperUi(uiState: CropperState) {
                 modifier = Modifier
                     .align(Alignment.CenterHorizontally)
                     .padding(start = 32.dp, bottom = 32.dp, end = 32.dp),
-                onClick = {
-                    Toast.makeText(
-                        context,
-                        "Left: ${rect.value.left}, top: ${rect.value.top}, right: ${rect.value.right}, bottom: ${rect.value.bottom}",
-                        Toast.LENGTH_SHORT
-                    ).show()
-                }
+                onClick = { onCreateClick(rect.value) }
             ) {
                 Text(text = stringResource(id = R.string.save))
             }

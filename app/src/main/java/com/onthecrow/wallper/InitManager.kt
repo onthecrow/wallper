@@ -2,6 +2,7 @@ package com.onthecrow.wallper
 
 import android.content.Context
 import android.graphics.Bitmap
+import android.graphics.Rect
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import androidx.annotation.RawRes
@@ -48,7 +49,9 @@ class InitManager @Inject constructor(
         return WallpaperEntity(
             Uri.parse("android.resource://com.onthecrow.wallper/".plus(rawRes)).toString(),
             frame,
-            isActive
+            isActive,
+            Rect(),
+            isVideo = true
         )
     }
 
