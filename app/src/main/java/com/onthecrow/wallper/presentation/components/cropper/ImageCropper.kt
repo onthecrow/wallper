@@ -60,6 +60,7 @@ fun ImageCropper(
     filterQuality: FilterQuality = DrawScope.DefaultFilterQuality,
     crop: Boolean = false,
     backgroundColor: Color = Color.Transparent,
+    cropRect: (Rect) -> Unit,
     onCropStart: () -> Unit,
     onCropSuccess: (ImageBitmap) -> Unit,
     onDrawGrid: (DrawScope.(rect: Rect, strokeWidth: Float, color: Color) -> Unit)? = null,
@@ -157,6 +158,8 @@ fun ImageCropper(
             onCropSuccess,
             cropProperties.requiredSize
         )
+
+        cropRect(cropState.cropRect)
 
         val imageModifier = Modifier
             .size(containerWidth, containerHeight)

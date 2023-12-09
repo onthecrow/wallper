@@ -8,6 +8,7 @@ import com.onthecrow.wallper.domain.PrepareFileUseCase
 import com.onthecrow.wallper.presentation.crop.model.CropperAction
 import com.onthecrow.wallper.presentation.crop.model.CropperEvent
 import com.onthecrow.wallper.presentation.crop.model.CropperState
+import com.onthecrow.wallper.util.imageBitmapFromPath
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -32,10 +33,16 @@ class CropperViewModel @Inject constructor(
                     isVideo = preparedFile.isVideo,
                     thumbnailPath = preparedFile.thumbnailPath,
                     screenWidth = screenResolution.width,
-                    screenHeight = screenResolution.height
+                    screenHeight = screenResolution.height,
+                    bitmap = imageBitmapFromPath(
+                        if (preparedFile.isVideo) {
+                            preparedFile.thumbnailPath
+                        } else {
+                            preparedFile.originalFilePath
+                        }
+                    ),
                 )
             }
-
         }
     }
 
