@@ -54,6 +54,35 @@ class WallperWallpaperService : WallpaperService() {
             }
         }
 
+//        private fun drawBitmap(path: String) {
+//            draw(BitmapFactory.decodeFile(path))
+//        }
+//
+//        private fun drawPlaceholder() {
+//            MainScope().launch {
+//                val resolution = getScreenResolutionUseCase()
+//                val drawable = baseContext.resources
+//                    .getDrawable(R.drawable.bg_engine_empty, null)
+//                    .toBitmap(width = resolution.width.toInt(), height = resolution.height.toInt())
+//                draw(drawable)
+//            }
+//        }
+//
+//        private fun draw(drawable: Bitmap) {
+//            val holder = surfaceHolder
+//            var canvas: Canvas? = null
+//            try {
+//                canvas = holder.lockCanvas()
+//                if (canvas != null) {
+//                    canvas.save()
+//                    canvas.drawBitmap(drawable, 0f, 0f, null)
+//                    canvas.restore()
+//                }
+//            } finally {
+//                if (canvas != null) holder.unlockCanvasAndPost(canvas)
+//            }
+//        }
+
         override fun onVisibilityChanged(visible: Boolean) {
             super.onVisibilityChanged(visible)
             if (visible) {
