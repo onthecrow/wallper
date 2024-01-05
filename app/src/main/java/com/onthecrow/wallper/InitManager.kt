@@ -29,12 +29,12 @@ class InitManager @Inject constructor(
         // TODO inject scope and dispatcher
         MainScope().launch(Dispatchers.IO) {
             if (wallpaperDao.getAll().first().isNotEmpty()) return@launch
-            val list = listOf(
-                createWallpaperEntity(context, R.raw.video1, false),
-                createWallpaperEntity(context, R.raw.video2, false),
-                createWallpaperEntity(context, R.raw.video3, true),
-                createWallpaperEntity(context, R.raw.video5, false),
-                createWallpaperEntity(context, R.raw.video9, false),
+            val list = listOf<WallpaperEntity>(
+//                createWallpaperEntity(context, R.raw.video1, false),
+//                createWallpaperEntity(context, R.raw.video2, false),
+//                createWallpaperEntity(context, R.raw.video3, true),
+//                createWallpaperEntity(context, R.raw.video5, false),
+//                createWallpaperEntity(context, R.raw.video9, false),
             )
             wallpaperDao.insertAll(*list.toTypedArray())
         }

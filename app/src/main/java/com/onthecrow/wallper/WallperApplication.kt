@@ -21,6 +21,6 @@ class WallperApplication : Application() {
         }
 
         // TODO temp solution for testing, remove when file selection will be done
-        initManager.populateDbIfNeeded()
+//        initManager.populateDbIfNeeded()
     }
 }
