@@ -13,7 +13,6 @@ import android.os.Build
 import android.service.wallpaper.WallpaperService
 import android.view.SurfaceHolder
 import androidx.core.graphics.drawable.toBitmap
-import androidx.core.net.toUri
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
@@ -74,7 +73,7 @@ class WallperWallpaperService : WallpaperService() {
                 BitmapFactory.decodeFile(activeWallpaper.thumbnailUri)
             }
             return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-                WallpaperColors.fromBitmap(bitmap)
+                bitmap?.let { WallpaperColors.fromBitmap(bitmap) }
             } else {
                 null
             }
@@ -156,7 +155,8 @@ class WallperWallpaperService : WallpaperService() {
 
         private fun getVideoMetadata(path: String): VideoMetadata {
             val mmr = MediaMetadataRetriever()
-            mmr.setDataSource(baseContext, path.toUri())
+//            mmr.setDataSource(path)
+            mmr.setDataSource(baseContext, Uri.parse(Uri.encode(path)))
             val rotation = mmr.extractMetadata(
                 MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION
             )
