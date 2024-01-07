@@ -9,27 +9,99 @@ class UVCoords(
     val bottomRight: UVPoint,
 ) {
     companion object {
-        fun fromRect(originalWidth: Int, originalHeight: Int, rect: Rect): UVCoords {
+        fun fromRect(originalWidth: Int, originalHeight: Int, rect: Rect, rotation: Int): UVCoords {
+            val (width, height) = if (rotation == 90 || rotation == 270) {
+                originalHeight to originalWidth
+            } else {
+                originalWidth to originalHeight
+            }
+            // TODO clean this up via smart algorithm or math
+            val pointsList =
+                when (rotation) {
+                    90 -> listOf(
+                        UVPoint(
+                            rect.top.toFloat() / height.toFloat(),
+                            rect.right.toFloat() / width.toFloat(),
+                        ),
+                        UVPoint(
+                            rect.top.toFloat() / height.toFloat(),
+                            rect.left.toFloat() / width.toFloat(),
+                        ),
+                        UVPoint(
+                            rect.bottom.toFloat() / height.toFloat(),
+                            rect.right.toFloat() / width.toFloat(),
+                        ),
+                        UVPoint(
+                            rect.bottom.toFloat() / height.toFloat(),
+                            rect.left.toFloat() / width.toFloat(),
+                        ),
+                    )
+
+                    180 -> listOf(
+                        UVPoint(
+                            rect.right.toFloat() / width.toFloat(),
+                            rect.bottom.toFloat() / height.toFloat(),
+                        ),
+                        UVPoint(
+                            rect.left.toFloat() / width.toFloat(),
+                            rect.bottom.toFloat() / height.toFloat(),
+                        ),
+                        UVPoint(
+                            rect.right.toFloat() / width.toFloat(),
+                            rect.top.toFloat() / height.toFloat(),
+                        ),
+                        UVPoint(
+                            rect.left.toFloat() / width.toFloat(),
+                            rect.top.toFloat() / height.toFloat(),
+                        ),
+                    )
+
+                    270 -> listOf(
+                        UVPoint(
+                            rect.bottom.toFloat() / height.toFloat(),
+                            rect.left.toFloat() / width.toFloat(),
+                        ),
+                        UVPoint(
+                            rect.bottom.toFloat() / height.toFloat(),
+                            rect.right.toFloat() / width.toFloat(),
+                        ),
+                        UVPoint(
+                            rect.top.toFloat() / height.toFloat(),
+                            rect.left.toFloat() / width.toFloat(),
+                        ),
+                        UVPoint(
+                            rect.top.toFloat() / height.toFloat(),
+                            rect.right.toFloat() / width.toFloat(),
+                        ),
+                    )
+
+                    else -> listOf(
+                        UVPoint(
+                            rect.left.toFloat() / width.toFloat(),
+                            rect.top.toFloat() / height.toFloat(),
+                        ),
+                        UVPoint(
+                            rect.right.toFloat() / width.toFloat(),
+                            rect.top.toFloat() / height.toFloat(),
+                        ),
+                        UVPoint(
+                            rect.left.toFloat() / width.toFloat(),
+                            rect.bottom.toFloat() / height.toFloat(),
+                        ),
+                        UVPoint(
+                            rect.right.toFloat() / width.toFloat(),
+                            rect.bottom.toFloat() / height.toFloat(),
+                        ),
+                    )
+                }
             return UVCoords(
-                topLeft = UVPoint(
-                    rect.left.toFloat() / originalWidth.toFloat(),
-                    rect.top.toFloat() / originalHeight.toFloat(),
-                ),
-                topRight = UVPoint(
-                    rect.right.toFloat() / originalWidth.toFloat(),
-                    rect.top.toFloat() / originalHeight.toFloat(),
-                ),
-                bottomLeft = UVPoint(
-                    rect.left.toFloat() / originalWidth.toFloat(),
-                    rect.bottom.toFloat() / originalHeight.toFloat(),
-                ),
-                bottomRight = UVPoint(
-                    rect.right.toFloat() / originalWidth.toFloat(),
-                    rect.bottom.toFloat() / originalHeight.toFloat(),
-                ),
+                topLeft = pointsList[0],
+                topRight = pointsList[1],
+                bottomLeft = pointsList[2],
+                bottomRight = pointsList[3],
             )
         }
     }
 }
 
-class UVPoint(val u: Float, val v: Float)
+data class UVPoint(val u: Float, val v: Float)

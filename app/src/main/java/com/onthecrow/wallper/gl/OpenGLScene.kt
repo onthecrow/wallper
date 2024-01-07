@@ -46,7 +46,7 @@ class OpenGLScene(
     val fullscreenTexture = OpenGLExternalTexture(
         textureWidth = sceneWidth,
         textureHeight = sceneHeight,
-        verticesData = getVerticesData(videoMetadata, rect),
+        verticesData = getVerticesData(videoMetadata, rect, videoMetadata.rotation),
         externalTextureId = fullscreenTextureId,
         rotate = videoMetadata.rotation,
     )
@@ -108,13 +108,13 @@ class OpenGLScene(
         )
     }
 
-    fun updateTextureParams(videoMetadata: VideoMetadata, rect: Rect) {
-        fullscreenTexture.setVerticesData(getVerticesData(videoMetadata, rect))
+    fun updateTextureParams(videoMetadata: VideoMetadata, rect: Rect, rotation: Int) {
+        fullscreenTexture.setVerticesData(getVerticesData(videoMetadata, rect, rotation))
         fullscreenTexture.rotate = videoMetadata.rotation
     }
 
-    private fun getVerticesData(videoMetadata: VideoMetadata, rect: Rect): FloatArray {
-        val uvCoords = UVCoords.fromRect(videoMetadata.width, videoMetadata.height, rect)
+    private fun getVerticesData(videoMetadata: VideoMetadata, rect: Rect, rotation: Int): FloatArray {
+        val uvCoords = UVCoords.fromRect(videoMetadata.width, videoMetadata.height, rect, rotation)
         return floatArrayOf(
             // X,   Y,      Z,     U,  V
             -1.0f, -1.0f, 1.0f, uvCoords.bottomLeft.u, uvCoords.bottomLeft.v,

@@ -19,11 +19,12 @@ import androidx.media3.exoplayer.ExoPlayer
 import com.onthecrow.wallper.R
 import com.onthecrow.wallper.data.WallpaperEntity
 import com.onthecrow.wallper.domain.GetActiveWallpaperUseCase
-import com.onthecrow.wallper.domain.GetScreenResolutionUseCase
 import com.onthecrow.wallper.service.renderer.GLES20WallpaperRenderer
 import com.onthecrow.wallper.service.renderer.GLWallpaperRenderer
 import com.onthecrow.wallper.service.renderer.RendererParams
+import com.onthecrow.wallper.util.croppedBitmap
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.launchIn
@@ -39,23 +40,21 @@ class WallperWallpaperService : WallpaperService() {
     @Inject
     lateinit var getActiveWallpaperUseCase: GetActiveWallpaperUseCase
 
-    @Inject
-    lateinit var getScreenResolutionUseCase: GetScreenResolutionUseCase
-    private var surfaceCreated = false
-
     override fun onCreateEngine(): Engine {
-        return GLEngine()
+        return GLEngine(getActiveWallpaperUseCase)
     }
 
     @UnstableApi
-    inner class GLEngine : Engine() {
+    inner class GLEngine(getActiveWallpaperUseCase: GetActiveWallpaperUseCase) : Engine() {
 
         private var glSurfaceView: GLEngine.GLWallpaperSurfaceView? = null
         private var renderer: GLWallpaperRenderer? = null
         private var mediaPlayer: ExoPlayer? = null
+        private var updateJob: Job?
+        private var surfaceCreated = false
 
         init {
-            getActiveWallpaperUseCase()
+            updateJob = getActiveWallpaperUseCase()
                 .onEach {
                     Timber.d("New selected wallpaper")
                     recreatePlayer(it)
@@ -90,11 +89,21 @@ class WallperWallpaperService : WallpaperService() {
             }
         }
 
+        override fun onDestroy() {
+            super.onDestroy()
+            updateJob?.cancel()
+            updateJob = null
+        }
+
         override fun onSurfaceDestroyed(holder: SurfaceHolder?) {
             super.onSurfaceDestroyed(holder)
             Timber.d("onSurfaceDestroyed()")
+            mediaPlayer?.stop()
             mediaPlayer?.release()
+            mediaPlayer = null
+            holder?.surface?.release()
             glSurfaceView?.apply {
+                onPause()
                 onDestroy()
                 glSurfaceView = null
             }
@@ -120,37 +129,54 @@ class WallperWallpaperService : WallpaperService() {
             Timber.d("recreatePlayer()")
             glSurfaceView?.onPause()
             mediaPlayer?.run { release() }
-            if (wallpaperEntity != null) {
-                mediaPlayer = ExoPlayer.Builder(baseContext).build().apply {
-                    setMediaItem(
-                        MediaItem.fromUri(
-                            Uri.parse(wallpaperEntity.originalUri)
+            // TODO refactor to factory or smth
+            when {
+                wallpaperEntity?.isVideo == true -> {
+                    mediaPlayer = ExoPlayer.Builder(baseContext).build().apply {
+                        setMediaItem(
+                            MediaItem.fromUri(
+                                Uri.parse(wallpaperEntity.originalUri)
+                            )
                         )
-                    )
-                    // This must be set after getting video info.
-                    Timber.d("Surface identity: ${System.identityHashCode(surfaceHolder.surface)}")
-                    renderer?.rendererParams = RendererParams.VideoParams(
+                        // This must be set after getting video info.
+                        Timber.d("Surface identity: ${System.identityHashCode(surfaceHolder.surface)}")
+                        renderer?.rendererParams = RendererParams.VideoParams(
+                            surfaceHolder.surfaceFrame.width(),
+                            surfaceHolder.surfaceFrame.height(),
+                            this,
+                            wallpaperEntity.shownRect,
+                            getVideoMetadata(wallpaperEntity.originalUri),
+                        )
+                        repeatMode = ExoPlayer.REPEAT_MODE_ONE
+                        volume = 0f
+                        prepare()
+                        play()
+                    }
+                }
+                wallpaperEntity == null -> {
+                    renderer?.rendererParams = RendererParams.PlaceholderParams(
                         surfaceHolder.surfaceFrame.width(),
                         surfaceHolder.surfaceFrame.height(),
-                        this,
-                        wallpaperEntity.shownRect,
-                        getVideoMetadata(wallpaperEntity.originalUri),
                     )
-                    repeatMode = ExoPlayer.REPEAT_MODE_ONE
-                    volume = 0f
-                    prepare()
-                    play()
                 }
-            } else {
-                renderer?.rendererParams = RendererParams.PlaceholderParams(
-                    surfaceHolder.surfaceFrame.width(),
-                    surfaceHolder.surfaceFrame.height(),
-                )
+                else -> {
+                    renderer?.rendererParams = RendererParams.PictureParams(
+                        surfaceHolder.surfaceFrame.width(),
+                        surfaceHolder.surfaceFrame.height(),
+                        croppedBitmap(
+                            surfaceHolder.surfaceFrame.width(),
+                            surfaceHolder.surfaceFrame.height(),
+                            wallpaperEntity.originalUri,
+                            wallpaperEntity.shownRect
+                        )
+                    )
+                }
             }
             glSurfaceView?.onResume()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
                 notifyColorsChanged()
             }
+            Timber.d("Player recreated with params: ${renderer?.rendererParams}")
         }
 
         private fun getVideoMetadata(path: String): VideoMetadata {
@@ -201,6 +227,7 @@ class WallperWallpaperService : WallpaperService() {
                 preserveEGLContextOnPause = true
                 setRenderer(renderer)
                 // On demand render will lead to black screen.
+                // TODO change to RENDERMODE_WHEN_DIRTY and add manual fps
                 renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
             }
         }
