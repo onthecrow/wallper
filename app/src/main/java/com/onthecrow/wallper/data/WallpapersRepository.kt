@@ -2,7 +2,6 @@ package com.onthecrow.wallper.data
 
 import android.graphics.Rect
 import androidx.room.withTransaction
-import com.onthecrow.wallper.domain.model.WallpaperBounds
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
 import javax.inject.Inject
@@ -13,17 +12,17 @@ class WallpapersRepository @Inject constructor(
 
     suspend fun saveWallpaper(
         originalFileUri: String,
-        thumbnailUri: String,
-        isActive: Boolean,
-        wallpaperBounds: WallpaperBounds,
-        isVideo: Boolean,
+        rect: Rect,
+        isVideo: Boolean = false,
+        thumbnailUri: String = "",
+        isActive: Boolean = false,
     ) {
         appDatabase.wallpaperDao().insertAll(
             WallpaperEntity(
                 thumbnailUri = thumbnailUri,
                 originalUri = originalFileUri,
                 isActive = isActive,
-                shownRect = Rect(wallpaperBounds.left, wallpaperBounds.top, wallpaperBounds.right, wallpaperBounds.bottom),
+                shownRect = rect,
                 isVideo = isVideo,
             )
         )
