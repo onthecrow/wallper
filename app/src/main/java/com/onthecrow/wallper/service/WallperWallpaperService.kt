@@ -24,11 +24,16 @@ import com.onthecrow.wallper.service.renderer.GLWallpaperRenderer
 import com.onthecrow.wallper.service.renderer.RendererParams
 import com.onthecrow.wallper.util.croppedBitmap
 import dagger.hilt.android.AndroidEntryPoint
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import timber.log.Timber
 import javax.inject.Inject
@@ -47,35 +52,26 @@ class WallperWallpaperService : WallpaperService() {
     @UnstableApi
     inner class GLEngine(getActiveWallpaperUseCase: GetActiveWallpaperUseCase) : Engine() {
 
+        private val engineContext = CoroutineScope(Dispatchers.Main + SupervisorJob())
+
         private var glSurfaceView: GLEngine.GLWallpaperSurfaceView? = null
         private var renderer: GLWallpaperRenderer? = null
         private var mediaPlayer: ExoPlayer? = null
-        private var updateJob: Job?
-        private var surfaceCreated = false
+        private var computeColorsJob: Job? = null
+        private var computedColors: WallpaperColors? = null
 
         init {
-            updateJob = getActiveWallpaperUseCase()
+            getActiveWallpaperUseCase()
+                .drop(1)
                 .onEach {
                     Timber.d("New selected wallpaper")
                     recreatePlayer(it)
                 }
-                .launchIn(MainScope())
+                .launchIn(engineContext)
         }
 
         override fun onComputeColors(): WallpaperColors? {
-            val activeWallpaper = runBlocking { getActiveWallpaperUseCase().firstOrNull() }
-            val bitmap = if (activeWallpaper == null) {
-                applicationContext.resources
-                    .getDrawable(R.drawable.bg_engine_empty, null)
-                    .toBitmap(surfaceHolder.surfaceFrame.width(), surfaceHolder.surfaceFrame.height())
-            } else {
-                BitmapFactory.decodeFile(activeWallpaper.thumbnailUri)
-            }
-            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-                bitmap?.let { WallpaperColors.fromBitmap(bitmap) }
-            } else {
-                null
-            }
+            return computedColors
         }
 
         override fun onVisibilityChanged(visible: Boolean) {
@@ -91,8 +87,7 @@ class WallperWallpaperService : WallpaperService() {
 
         override fun onDestroy() {
             super.onDestroy()
-            updateJob?.cancel()
-            updateJob = null
+            engineContext.cancel()
         }
 
         override fun onSurfaceDestroyed(holder: SurfaceHolder?) {
@@ -122,7 +117,6 @@ class WallperWallpaperService : WallpaperService() {
                 holder.surfaceFrame.height(),
             )
             recreatePlayer(wallpaper)
-            surfaceCreated = true
         }
 
         private fun recreatePlayer(wallpaperEntity: WallpaperEntity?) {
@@ -153,12 +147,14 @@ class WallperWallpaperService : WallpaperService() {
                         play()
                     }
                 }
+
                 wallpaperEntity == null -> {
                     renderer?.rendererParams = RendererParams.PlaceholderParams(
                         surfaceHolder.surfaceFrame.width(),
                         surfaceHolder.surfaceFrame.height(),
                     )
                 }
+
                 else -> {
                     renderer?.rendererParams = RendererParams.PictureParams(
                         surfaceHolder.surfaceFrame.width(),
@@ -174,11 +170,35 @@ class WallperWallpaperService : WallpaperService() {
             }
             glSurfaceView?.onResume()
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
-                notifyColorsChanged()
+                computeColors()
             }
             Timber.d("Player recreated with params: ${renderer?.rendererParams}")
         }
 
+        private fun computeColors() {
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1) return
+
+            computeColorsJob?.cancel()
+            computeColorsJob = engineContext.launch(Dispatchers.IO) {
+                val activeWallpaper = getActiveWallpaperUseCase().firstOrNull()
+
+                val bitmap = if (activeWallpaper == null) {
+                    applicationContext.resources
+                        .getDrawable(R.drawable.bg_engine_empty, null)
+                        .toBitmap(
+                            surfaceHolder.surfaceFrame.width(),
+                            surfaceHolder.surfaceFrame.height()
+                        )
+                } else {
+                    BitmapFactory.decodeFile(activeWallpaper.thumbnailUri)
+                }
+
+                computedColors = bitmap?.let { WallpaperColors.fromBitmap(bitmap) }
+                notifyColorsChanged()
+            }
+        }
+
+        // TODO Bake video metadata in db on wallpaper creation (performance impact ~50ms)
         private fun getVideoMetadata(path: String): VideoMetadata {
             val mmr = MediaMetadataRetriever()
 //            mmr.setDataSource(path)
