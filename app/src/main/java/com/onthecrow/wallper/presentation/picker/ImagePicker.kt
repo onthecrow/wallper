@@ -3,17 +3,15 @@ package com.onthecrow.wallper.presentation.picker
 import android.net.Uri
 import androidx.activity.ComponentActivity
 import androidx.activity.result.ActivityResultLauncher
-import androidx.activity.result.PickVisualMediaRequest
-import androidx.activity.result.contract.ActivityResultContracts
 
 object ImagePicker {
 
-    private var pickMediaLauncher: ActivityResultLauncher<PickVisualMediaRequest>? = null
+    private var pickMediaLauncher: ActivityResultLauncher<List<String>>? = null
     private var listener: ((uri: Uri?) -> Unit)? = null
 
     fun init(activity: ComponentActivity) {
         pickMediaLauncher =
-            activity.registerForActivityResult(ActivityResultContracts.PickVisualMedia()) { uri ->
+            activity.registerForActivityResult(PickMediaContract()) { uri ->
                 listener?.invoke(uri)
             }
     }
@@ -28,7 +26,8 @@ object ImagePicker {
 
     fun launch() {
         pickMediaLauncher?.launch(
-            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
+            listOf("")
+//            PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)
         )
     }
 }

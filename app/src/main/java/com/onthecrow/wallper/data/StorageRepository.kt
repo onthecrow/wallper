@@ -49,6 +49,10 @@ class StorageRepository @Inject constructor(
         }
     }
 
+    private fun copyFile(fromPath: String, toPath: String) {
+        copyFile(File(fromPath), File(toPath))
+    }
+
     private fun copyFile(from: File, to: File): Boolean {
         return try {
             from.inputStream().use { iStream ->
@@ -67,7 +71,7 @@ class StorageRepository @Inject constructor(
         }
     }
 
-    fun makeThumbnailTemp(uri: String): String {
+    fun makeThumbnailTemp(uri: String): Pair<String?, Throwable?> {
         return try {
             MediaMetadataRetriever().use { retriever ->
                 retriever.setDataSource(getFileDescriptor(uri)?.fileDescriptor)
@@ -76,11 +80,11 @@ class StorageRepository @Inject constructor(
                     outputStream().use { outputStream ->
                         bitmap?.compress(Bitmap.CompressFormat.JPEG, 100, outputStream)
                     }
-                }.absolutePath
+                }.absolutePath to null
             }
         } catch (error: Throwable) {
             Timber.e(error)
-            ""
+            null to error
         }
     }
 

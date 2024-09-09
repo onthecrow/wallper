@@ -15,11 +15,15 @@ class PrepareFileUseCase @Inject constructor(
         }
     }
 
-    private fun prepareVideo(uri: String) = TempFile(
-        originalFilePath = storageRepository.copyFileTemp(uri),
-        thumbnailPath = storageRepository.makeThumbnailTemp(uri),
-        isVideo = true
-    )
+    private fun prepareVideo(uri: String): TempFile {
+        val thumbnail = storageRepository.makeThumbnailTemp(uri)
+        return TempFile(
+            originalFilePath = storageRepository.copyFileTemp(uri),
+            thumbnailPath = thumbnail.first ?: "",
+            isVideo = true,
+            error = thumbnail.second
+        )
+    }
 
     private fun preparePhoto(uri: String) = TempFile(
         originalFilePath = storageRepository.copyFileTemp(uri)

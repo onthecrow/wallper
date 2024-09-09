@@ -114,13 +114,19 @@ class OpenGLScene(
     }
 
     private fun getVerticesData(videoMetadata: VideoMetadata, rect: Rect, rotation: Int): FloatArray {
-        val uvCoords = UVCoords.fromRect(videoMetadata.width, videoMetadata.height, rect, rotation)
+        val uvCoords = UVCoords.fromRect(videoMetadata.width, videoMetadata.height, Rect(0, 0, videoMetadata.width, videoMetadata.height), rotation)
         return floatArrayOf(
             // X,   Y,      Z,     U,  V
             -1.0f, -1.0f, 1.0f, uvCoords.bottomLeft.u, uvCoords.bottomLeft.v,
             1.0f, -1.0f, 1.0f, uvCoords.bottomRight.u, uvCoords.bottomRight.v,
             -1.0f, 1.0f, 1.0f, uvCoords.topLeft.u, uvCoords.topLeft.v,
             1.0f, 1.0f, 1.0f, uvCoords.topRight.u, uvCoords.topRight.v,
+        )
+        return floatArrayOf(
+            -1.0f, -1.0f, 1.0f, 1f, 1f,
+            1.0f, -1.0f, 1.0f, 1f, 0f,
+            -1.0f, 1.0f, 1.0f, 0f, 1f,
+            1.0f, 1.0f, 1.0f, 0f, 0f
         )
     }
 

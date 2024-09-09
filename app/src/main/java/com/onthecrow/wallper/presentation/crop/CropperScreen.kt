@@ -19,7 +19,8 @@ fun CropperScreen() {
 
     CropperUi(
         uiState = uiState,
-        onCreateClick = { viewModel.sendEvent(CropperEvent.CreateWallpaper(it)) }
+        conversionStateChannel = viewModel.conversionChannel,
+        onEventSend = { event -> viewModel.sendEvent(event) },
     )
 
     HandleUiActions(viewModel) { action ->

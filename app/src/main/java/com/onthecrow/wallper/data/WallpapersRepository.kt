@@ -13,17 +13,25 @@ class WallpapersRepository @Inject constructor(
     suspend fun saveWallpaper(
         originalFileUri: String,
         rect: Rect,
-        isVideo: Boolean = false,
         thumbnailUri: String = "",
+        croppedFilePath: String,
+        startTime: Long = 0,
+        endTime: Long = 0,
         isActive: Boolean = false,
+        isVideo: Boolean = false,
+        isProcessed: Boolean,
     ) {
         appDatabase.wallpaperDao().insertAll(
             WallpaperEntity(
                 thumbnailUri = thumbnailUri,
                 originalUri = originalFileUri,
-                isActive = isActive,
+                processedUri = croppedFilePath,
                 shownRect = rect,
+                startTime = startTime,
+                endTime = endTime,
+                isActive = isActive,
                 isVideo = isVideo,
+                isProcessed = isProcessed,
             )
         )
     }
