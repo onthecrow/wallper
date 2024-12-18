@@ -17,7 +17,7 @@ coil = "2.5.0"
 timber = "5.0.1"
 dataStore = "1.0.0"
 serializationJson = "1.6.2"
-media3 = "1.2.0"
+media3 = "1.2.1"
 ffmpeg = "6.0-2"
 
 [libraries]
