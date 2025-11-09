@@ -16,6 +16,7 @@ import com.onthecrow.wallper.util.imageBitmapFromPath
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import timber.log.Timber
@@ -70,6 +71,7 @@ class CropperViewModel @Inject constructor(
                         performAction(CropperAction.NavigateToWallpapersScreen)
                     }
                 }
+                .catch { Timber.e(it) }
                 .collect { Timber.d(it.toString()) }
         }
     }

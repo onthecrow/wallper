@@ -6,14 +6,15 @@ import android.app.ActivityManager
 import android.app.WallpaperColors
 import android.content.Context
 import android.graphics.BitmapFactory
-import android.media.MediaMetadataRetriever
-import android.net.Uri
 import android.opengl.GLSurfaceView
 import android.os.Build
 import android.service.wallpaper.WallpaperService
 import android.view.SurfaceHolder
 import androidx.core.graphics.drawable.toBitmap
+import androidx.core.net.toUri
 import androidx.media3.common.MediaItem
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import com.onthecrow.wallper.R
@@ -22,6 +23,7 @@ import com.onthecrow.wallper.domain.GetActiveWallpaperUseCase
 import com.onthecrow.wallper.service.renderer.GLES20WallpaperRenderer
 import com.onthecrow.wallper.service.renderer.GLWallpaperRenderer
 import com.onthecrow.wallper.service.renderer.RendererParams
+import com.onthecrow.wallper.util.MetadataUtils.getVideoMetadata
 import com.onthecrow.wallper.util.croppedBitmap
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -29,12 +31,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.firstOrNull
-import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import timber.log.Timber
 import javax.inject.Inject
 
@@ -46,39 +47,58 @@ class WallperWallpaperService : WallpaperService() {
     lateinit var getActiveWallpaperUseCase: GetActiveWallpaperUseCase
 
     override fun onCreateEngine(): Engine {
-        return GLEngine(getActiveWallpaperUseCase)
+        Timber.d("onCreateEngine")
+        return GLEngine()
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        Timber.d("onDestroy")
+    }
+
+    override fun onLowMemory() {
+        super.onLowMemory()
+        Timber.d("onLowMemory")
     }
 
     @UnstableApi
-    inner class GLEngine(getActiveWallpaperUseCase: GetActiveWallpaperUseCase) : Engine() {
+    inner class GLEngine : Engine() {
 
         private val engineContext = CoroutineScope(Dispatchers.Main + SupervisorJob())
 
-        private var glSurfaceView: GLEngine.GLWallpaperSurfaceView? = null
+        private var glSurfaceView: GLWallpaperSurfaceView? = null
         private var renderer: GLWallpaperRenderer? = null
         private var mediaPlayer: ExoPlayer? = null
         private var computeColorsJob: Job? = null
         private var computedColors: WallpaperColors? = null
 
-        init {
-            getActiveWallpaperUseCase()
-                .drop(1)
-                .onEach {
-                    Timber.d("New selected wallpaper")
-                    recreatePlayer(it)
-                }
-                .launchIn(engineContext)
-        }
+        private val _state = getActiveWallpaperUseCase()
+            .onEach { wallpaperEntity ->
+                Timber.d("New selected wallpaper: $wallpaperEntity")
+                recreatePlayer(wallpaperEntity)
+            }
+            .stateIn(engineContext, SharingStarted.Eagerly, null)
 
         override fun onComputeColors(): WallpaperColors? {
             return computedColors
         }
 
+        override fun onSurfaceChanged(
+            holder: SurfaceHolder?,
+            format: Int,
+            width: Int,
+            height: Int
+        ) {
+            super.onSurfaceChanged(holder, format, width, height)
+            Timber.d("onSurfaceChanged()")
+        }
+
         override fun onVisibilityChanged(visible: Boolean) {
             super.onVisibilityChanged(visible)
+            Timber.d("onVisibilityChanged()")
             if (visible) {
-                mediaPlayer?.play()
                 glSurfaceView?.onResume()
+                mediaPlayer?.play()
             } else {
                 mediaPlayer?.pause()
                 glSurfaceView?.onPause()
@@ -87,6 +107,7 @@ class WallperWallpaperService : WallpaperService() {
 
         override fun onDestroy() {
             super.onDestroy()
+            Timber.d("onDestroy()")
             engineContext.cancel()
         }
 
@@ -109,37 +130,48 @@ class WallperWallpaperService : WallpaperService() {
         override fun onSurfaceCreated(holder: SurfaceHolder?) {
             super.onSurfaceCreated(holder)
             Timber.d("onSurfaceCreated()")
-            val wallpaper = runBlocking {
-                getActiveWallpaperUseCase().firstOrNull()
-            }
+//            val wallpaper = runBlocking {
+//                getActiveWallpaperUseCase().firstOrNull()
+//            }
             createGLSurfaceView(
                 holder!!.surfaceFrame.width(),
                 holder.surfaceFrame.height(),
             )
-            recreatePlayer(wallpaper)
+            recreatePlayer()
         }
 
-        private fun recreatePlayer(wallpaperEntity: WallpaperEntity?) {
+        private fun recreatePlayer(entity: WallpaperEntity? = _state.value) {
             Timber.d("recreatePlayer()")
-            glSurfaceView?.onPause()
-            mediaPlayer?.run { release() }
+            mediaPlayer?.run {
+                stop()
+                release()
+                mediaPlayer = null
+            }
             // TODO refactor to factory or smth
             when {
-                wallpaperEntity?.isVideo == true -> {
+                entity?.isVideo == true -> {
+                    Timber.d("isVideo")
                     mediaPlayer = ExoPlayer.Builder(baseContext).build().apply {
                         setMediaItem(
                             MediaItem.fromUri(
-                                Uri.parse(wallpaperEntity.originalUri)
+                                entity.originalUri.toUri()
                             )
                         )
+                        addListener(object : Player.Listener {
+                            override fun onPlayerError(error: PlaybackException) {
+                                super.onPlayerError(error)
+                                Timber.e(error, "Player error")
+                            }
+                        })
                         // This must be set after getting video info.
                         Timber.d("Surface identity: ${System.identityHashCode(surfaceHolder.surface)}")
                         renderer?.rendererParams = RendererParams.VideoParams(
                             surfaceHolder.surfaceFrame.width(),
                             surfaceHolder.surfaceFrame.height(),
                             this,
-                            wallpaperEntity.shownRect,
-                            getVideoMetadata(wallpaperEntity.originalUri),
+                            entity.shownRect,
+                            // TODO Bake video metadata in db on wallpaper creation (performance impact ~50ms)
+                            getVideoMetadata(baseContext, entity.originalUri),
                         )
                         repeatMode = ExoPlayer.REPEAT_MODE_ONE
                         volume = 0f
@@ -148,7 +180,7 @@ class WallperWallpaperService : WallpaperService() {
                     }
                 }
 
-                wallpaperEntity == null -> {
+                entity == null -> {
                     renderer?.rendererParams = RendererParams.PlaceholderParams(
                         surfaceHolder.surfaceFrame.width(),
                         surfaceHolder.surfaceFrame.height(),
@@ -162,8 +194,8 @@ class WallperWallpaperService : WallpaperService() {
                         croppedBitmap(
                             surfaceHolder.surfaceFrame.width(),
                             surfaceHolder.surfaceFrame.height(),
-                            wallpaperEntity.originalUri,
-                            wallpaperEntity.shownRect
+                            entity.originalUri,
+                            entity.shownRect
                         )
                     )
                 }
@@ -198,29 +230,8 @@ class WallperWallpaperService : WallpaperService() {
             }
         }
 
-        // TODO Bake video metadata in db on wallpaper creation (performance impact ~50ms)
-        private fun getVideoMetadata(path: String): VideoMetadata {
-            val mmr = MediaMetadataRetriever()
-//            mmr.setDataSource(path)
-            mmr.setDataSource(baseContext, Uri.parse(Uri.encode(path)))
-            val rotation = mmr.extractMetadata(
-                MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION
-            )
-            val width = mmr.extractMetadata(
-                MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH
-            )
-            val height = mmr.extractMetadata(
-                MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT
-            )
-            mmr.release()
-            return VideoMetadata(
-                rotation?.toInt() ?: 0,
-                width?.toInt() ?: 0,
-                height?.toInt() ?: 0,
-            )
-        }
-
         private fun createGLSurfaceView(width: Int, height: Int) {
+            Timber.d("createGLSurfaceView()")
             glSurfaceView?.apply {
                 onDestroy()
                 glSurfaceView = null
@@ -242,7 +253,7 @@ class WallperWallpaperService : WallpaperService() {
                     renderer = GLES20WallpaperRenderer(context, width, height)
                 } else {
 //                    Toast.makeText(context, R.string.gles_version, Toast.LENGTH_LONG).show()
-//                    throw RuntimeException("Needs GLESv2 or higher")
+                    throw RuntimeException("Needs GLESv2 or higher")
                 }
                 preserveEGLContextOnPause = true
                 setRenderer(renderer)
@@ -259,6 +270,7 @@ class WallperWallpaperService : WallpaperService() {
 
             fun onDestroy() {
                 super.onDetachedFromWindow()
+                Timber.d("onDestroy()")
             }
         }
     }

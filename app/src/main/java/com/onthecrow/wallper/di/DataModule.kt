@@ -20,7 +20,7 @@ class DataModule {
     @Singleton
     fun provideDB(@ApplicationContext context: Context): AppDatabase {
         return Room.databaseBuilder(
-            context,
+            context.createDeviceProtectedStorageContext(),
             AppDatabase::class.java, APP_DATABASE_NAME
         ).build()
     }

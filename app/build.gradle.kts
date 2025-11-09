@@ -78,7 +78,6 @@ dependencies {
     implementation(libs.timber)
     implementation(libs.data.store)
     implementation(libs.serialization)
-    implementation(libs.ffmpeg)
     ksp(libs.room.compiler)
     ksp(libs.hilt.compiler)
     testImplementation(libs.junit)

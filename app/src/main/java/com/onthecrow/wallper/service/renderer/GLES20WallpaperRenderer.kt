@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import androidx.core.graphics.drawable.toBitmap
+import androidx.core.graphics.withSave
 import com.onthecrow.wallper.R
 import com.onthecrow.wallper.gl.OpenGLScene
 import kotlinx.coroutines.Dispatchers
@@ -35,6 +36,7 @@ class GLES20WallpaperRenderer(
     }
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
+        Timber.d("onSurfaceCreated")
         openGLScene = OpenGLScene(
             sceneHeight = rendererParams.height,
             sceneWidth = rendererParams.width,
@@ -44,7 +46,9 @@ class GLES20WallpaperRenderer(
         setPlayerOrPlaceholder()
     }
 
-    override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {}
+    override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
+        Timber.d("Surface changed: $width x $height")
+    }
 
     override fun onDrawFrame(gl: GL10?) {
         openGLScene?.updateFrame()
@@ -80,10 +84,8 @@ class GLES20WallpaperRenderer(
             var canvas: Canvas? = null
             try {
                 canvas = surface.lockHardwareCanvas()
-                if (canvas != null) {
-                    canvas.save()
-                    canvas.drawBitmap(bitmap, 0f, 0f, null)
-                    canvas.restore()
+                canvas?.withSave {
+                    drawBitmap(bitmap, 0f, 0f, null)
                 }
             } finally {
                 if (canvas != null) surface.unlockCanvasAndPost(canvas)

@@ -8,6 +8,7 @@ import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.os.ParcelFileDescriptor
+import com.onthecrow.wallper.util.DBSUtils
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
@@ -20,7 +21,7 @@ class StorageRepository @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
 
-    private val appFolder = context.getExternalFilesDir(null)
+    private val appFolder = context.createDeviceProtectedStorageContext().getExternalFilesDir(null)
     private val thumbnailsFolder = File("$appFolder/thumbnails/")
     private val originalsFolder = File("$appFolder/originals/")
     private val tempFolder = File("$appFolder/temp/")
@@ -32,12 +33,16 @@ class StorageRepository @Inject constructor(
     }
 
     fun saveTempFile(): String? {
+        val fileName = (Math.random() * Int.MAX_VALUE).toString()
         val newOriginalFile = File("$originalsFolder/${Math.random() * Int.MAX_VALUE}")
-        return if (copyFile(tempFile, newOriginalFile)) {
-            newOriginalFile.absolutePath
-        } else {
-            null
+        return DBSUtils.write(context, fileName, tempFile.readBytes()).absolutePath.also {
+            Timber.d("Tmp file saved: $it")
         }
+//        return if (copyFile(tempFile, newOriginalFile)) {
+//            newOriginalFile.absolutePath
+//        } else {
+//            null
+//        }
     }
 
     fun saveTempThumbnail(): String? {
