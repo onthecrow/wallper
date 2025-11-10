@@ -4,7 +4,10 @@ import android.annotation.SuppressLint
 import android.graphics.SurfaceTexture
 import android.opengl.GLES11Ext
 import android.opengl.GLES20
+import android.opengl.GLSurfaceView
 import android.opengl.Matrix
+import android.os.Handler
+import android.os.Looper
 import android.view.Surface
 import com.onthecrow.wallper.util.GLErrorUtils
 import java.nio.ByteBuffer
@@ -79,6 +82,14 @@ class OpenGLExternalTexture(
         surface.release()
     }
 
+    fun attachFrameListener(glView: GLSurfaceView) {
+        surfaceTexture.setOnFrameAvailableListener({
+//            lastFrameAvailMs = SystemClock.elapsedRealtime()
+            glView.requestRender()
+        }, Handler(Looper.getMainLooper()))
+    }
+
+
     fun updateFrame(
         aPositionHandle: Int,
         aTextureCoordHandler: Int,
@@ -86,6 +97,8 @@ class OpenGLExternalTexture(
         uMvpHandler: Int,
     ) {
         GLES20.glViewport(0, 0, textureWidth, textureHeight)
+
+        surfaceTexture.updateTexImage()
 
         surfaceTexture.getTransformMatrix(mTexMatrix)
 
@@ -146,8 +159,6 @@ class OpenGLExternalTexture(
 
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
         GLErrorUtils.checkGlError("glDrawArrays")
-
-        surfaceTexture.updateTexImage()
     }
 
     fun createTexture() {

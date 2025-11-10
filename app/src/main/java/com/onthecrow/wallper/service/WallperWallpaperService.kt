@@ -17,6 +17,7 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.analytics.AnalyticsListener
 import com.onthecrow.wallper.R
 import com.onthecrow.wallper.data.WallpaperEntity
 import com.onthecrow.wallper.domain.GetActiveWallpaperUseCase
@@ -37,6 +38,7 @@ import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import timber.log.Timber
+import java.lang.Exception
 import javax.inject.Inject
 
 
@@ -90,12 +92,12 @@ class WallperWallpaperService : WallpaperService() {
             height: Int
         ) {
             super.onSurfaceChanged(holder, format, width, height)
-            Timber.d("onSurfaceChanged()")
+            Timber.d("${System.identityHashCode(this)} onSurfaceChanged()")
         }
 
         override fun onVisibilityChanged(visible: Boolean) {
             super.onVisibilityChanged(visible)
-            Timber.d("onVisibilityChanged()")
+            Timber.d("${System.identityHashCode(this)} onVisibilityChanged($visible) ${mediaPlayer?.isPlaying} ${glSurfaceView}")
             if (visible) {
                 glSurfaceView?.onResume()
                 mediaPlayer?.play()
@@ -161,6 +163,56 @@ class WallperWallpaperService : WallpaperService() {
                             override fun onPlayerError(error: PlaybackException) {
                                 super.onPlayerError(error)
                                 Timber.e(error, "Player error")
+                            }
+
+                            override fun onEvents(player: Player, events: Player.Events) {
+                                super.onEvents(player, events)
+                                for (i in 0 until events.size()) {
+                                    Player.EVENT_METADATA
+                                    Timber.d("onPlayerEvent ${events.get(i)}")
+                                }
+                            }
+                        })
+                        addAnalyticsListener(object : AnalyticsListener {
+                            override fun onIsPlayingChanged(
+                                eventTime: AnalyticsListener.EventTime,
+                                isPlaying: Boolean
+                            ) {
+                                super.onIsPlayingChanged(eventTime, isPlaying)
+                                Timber.d("onIsPlayingChanged $isPlaying")
+                            }
+
+                            override fun onPlayWhenReadyChanged(
+                                eventTime: AnalyticsListener.EventTime,
+                                playWhenReady: Boolean,
+                                reason: Int
+                            ) {
+                                super.onPlayWhenReadyChanged(eventTime, playWhenReady, reason)
+                                Timber.d("onPlayWhenReadyChanged $playWhenReady")
+                            }
+
+                            override fun onPlaybackStateChanged(
+                                eventTime: AnalyticsListener.EventTime,
+                                state: Int
+                            ) {
+                                super.onPlaybackStateChanged(eventTime, state)
+                                Timber.d("onPlaybackStateChanged $state")
+                            }
+
+                            override fun onVideoCodecError(
+                                eventTime: AnalyticsListener.EventTime,
+                                videoCodecError: Exception
+                            ) {
+                                super.onVideoCodecError(eventTime, videoCodecError)
+                                Timber.e(videoCodecError, "onVideoCodecError: ${videoCodecError.message}")
+                            }
+
+                            override fun onPlayerError(
+                                eventTime: AnalyticsListener.EventTime,
+                                error: PlaybackException
+                            ) {
+                                super.onPlayerError(eventTime, error)
+                                Timber.e(error, "onPlayerError: ${error.message}")
                             }
                         })
                         // This must be set after getting video info.
@@ -250,7 +302,7 @@ class WallperWallpaperService : WallpaperService() {
                 if (configInfo.reqGlEsVersion >= 0x20000) {
                     Timber.d("GLESv2 is supported")
                     setEGLContextClientVersion(2)
-                    renderer = GLES20WallpaperRenderer(context, width, height)
+                    renderer = GLES20WallpaperRenderer(context, {glSurfaceView!!}, width, height)
                 } else {
 //                    Toast.makeText(context, R.string.gles_version, Toast.LENGTH_LONG).show()
                     throw RuntimeException("Needs GLESv2 or higher")
@@ -259,7 +311,7 @@ class WallperWallpaperService : WallpaperService() {
                 setRenderer(renderer)
                 // On demand render will lead to black screen.
                 // TODO change to RENDERMODE_WHEN_DIRTY and add manual fps
-                renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+                renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY
             }
         }
 
