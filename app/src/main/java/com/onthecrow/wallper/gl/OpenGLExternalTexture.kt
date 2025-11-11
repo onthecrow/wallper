@@ -8,8 +8,10 @@ import android.opengl.GLSurfaceView
 import android.opengl.Matrix
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.view.Surface
 import com.onthecrow.wallper.util.GLErrorUtils
+import timber.log.Timber
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
@@ -27,7 +29,16 @@ class OpenGLExternalTexture(
     private val mTexMatrix = FloatArray(16)
     private var verticesBuffer: FloatBuffer
 
+    // ---- для логики «нет новых кадров» ----
+    private var lastFrameTsNs: Long = -1L              // последний timestamp кадра из SurfaceTexture (наносекунды)
+    private var lastFrameAvailMs: Long = 0L            // когда пришёл onFrameAvailable (elapsedRealtime)
+    private var lastUpdateTexMs: Long = 0L             // когда последний раз вызывали updateTexImage()
+    private var stallStartMs: Long = 0L                // когда впервые заметили, что кадры не меняются
+    private var lastNoFrameLogMs: Long = 0L            // когда последний раз логировали стазис
+
     private var textureId: Int = -1
+
+    @Volatile private var onFrameAvailableListener: (() -> Unit)? = null
 
     private var surfaceTexture: SurfaceTexture
     var surface: Surface
@@ -82,13 +93,18 @@ class OpenGLExternalTexture(
         surface.release()
     }
 
+    private var lastFrameTs = 0L
+
     fun attachFrameListener(glView: GLSurfaceView) {
         surfaceTexture.setOnFrameAvailableListener({
-//            lastFrameAvailMs = SystemClock.elapsedRealtime()
+            lastFrameAvailMs = SystemClock.elapsedRealtime()
             glView.requestRender()
         }, Handler(Looper.getMainLooper()))
     }
 
+    fun doOnNextUpdateFrame(action: () -> Unit) {
+        onFrameAvailableListener = action
+    }
 
     fun updateFrame(
         aPositionHandle: Int,
@@ -96,9 +112,24 @@ class OpenGLExternalTexture(
         uTexHandler: Int,
         uMvpHandler: Int,
     ) {
+        onFrameAvailableListener?.invoke()
+        onFrameAvailableListener = null
+
         GLES20.glViewport(0, 0, textureWidth, textureHeight)
 
         surfaceTexture.updateTexImage()
+
+        val ts = surfaceTexture.timestamp
+        if (ts != lastFrameTs) {
+            if (SystemClock.elapsedRealtime() - lastFrameAvailMs > 200) {
+                Timber.w("Frame updated late: ${(SystemClock.elapsedRealtime()-lastFrameAvailMs)}ms since onFrameAvailable")
+            }
+            lastFrameTs = ts
+            stallStartMs = 0L
+        } else {
+            // Раз в ~2с можно писать, если подряд нет обновлений:
+            maybeLogNoNewFrames()
+        }
 
         surfaceTexture.getTransformMatrix(mTexMatrix)
 
@@ -165,10 +196,35 @@ class OpenGLExternalTexture(
         surfaceTexture.release()
         surface.release()
         surfaceTexture = SurfaceTexture(textureId)
-        surfaceTexture.setDefaultBufferSize(textureWidth, textureHeight)
+//        surfaceTexture.setDefaultBufferSize(textureWidth, textureHeight)
         surface = Surface(surfaceTexture)
     }
 
+    /** Логирует, если долго нет новых кадров (throttle: сначала каждые 2с, потом каждые 10с) */
+    private fun maybeLogNoNewFrames(nowMs: Long = SystemClock.elapsedRealtime()) {
+        if (stallStartMs == 0L) {
+            // начали отсчёт «застоя»
+            stallStartMs = nowMs
+            lastNoFrameLogMs = 0L
+            return
+        }
+
+        val sinceStall = nowMs - stallStartMs
+        val sinceAvail = if (lastFrameAvailMs == 0L) -1L else nowMs - lastFrameAvailMs
+        val sinceUpdate = if (lastUpdateTexMs == 0L) -1L else nowMs - lastUpdateTexMs
+
+        // первые 10 секунд — лог раз в 2с; дальше — раз в 10с
+        val interval = if (sinceStall < 10_000L) 2_000L else 10_000L
+        if (nowMs - lastNoFrameLogMs < interval) return
+        lastNoFrameLogMs = nowMs
+
+        Timber.w(
+            "No new frames for ${sinceStall}ms " +
+                    "(since onFrameAvailable=${sinceAvail}ms, " +
+                    "since updateTexImage=${sinceUpdate}ms, " +
+                    "lastTsNs=$lastFrameTsNs)"
+        )
+    }
 
     companion object {
         private const val TRIANGLE_VERTICES_DATA_STRIDE = 5

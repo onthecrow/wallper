@@ -2,22 +2,33 @@
 
 package com.onthecrow.wallper.service
 
+import NoExynosSelector
 import android.app.ActivityManager
 import android.app.WallpaperColors
 import android.content.Context
 import android.graphics.BitmapFactory
+import android.graphics.PixelFormat
 import android.opengl.GLSurfaceView
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.service.wallpaper.WallpaperService
 import android.view.SurfaceHolder
 import androidx.core.graphics.drawable.toBitmap
 import androidx.core.net.toUri
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
+import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.exoplayer.DefaultLoadControl
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.analytics.AnalyticsListener
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import androidx.media3.exoplayer.upstream.DefaultAllocator
 import com.onthecrow.wallper.R
 import com.onthecrow.wallper.data.WallpaperEntity
 import com.onthecrow.wallper.domain.GetActiveWallpaperUseCase
@@ -32,11 +43,15 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.lang.Exception
 import javax.inject.Inject
@@ -75,6 +90,7 @@ class WallperWallpaperService : WallpaperService() {
         private var computedColors: WallpaperColors? = null
 
         private val _state = getActiveWallpaperUseCase()
+            .distinctUntilChanged()
             .onEach { wallpaperEntity ->
                 Timber.d("New selected wallpaper: $wallpaperEntity")
                 recreatePlayer(wallpaperEntity)
@@ -100,8 +116,23 @@ class WallperWallpaperService : WallpaperService() {
             Timber.d("${System.identityHashCode(this)} onVisibilityChanged($visible) ${mediaPlayer?.isPlaying} ${glSurfaceView}")
             if (visible) {
                 glSurfaceView?.onResume()
-                mediaPlayer?.play()
+                mediaPlayer?.clearVideoSurface()
+                Timber.d("before on next frame")
+
+                (renderer as? GLES20WallpaperRenderer)?.run {
+                    this.doOnNextUpdateFrame {
+                        Timber.d("doOnNextUpdateFrame")
+                        Handler(Looper.getMainLooper()).post {
+                            mediaPlayer?.setVideoSurface(it)
+                            mediaPlayer?.play()
+                        }
+                    }
+                }
             } else {
+                (renderer as? GLES20WallpaperRenderer)?.openGLScene?.fullscreenTexture?.run {
+                    this.doOnNextUpdateFrame { }
+                }
+                mediaPlayer?.clearVideoSurface()
                 mediaPlayer?.pause()
                 glSurfaceView?.onPause()
             }
@@ -115,7 +146,7 @@ class WallperWallpaperService : WallpaperService() {
 
         override fun onSurfaceDestroyed(holder: SurfaceHolder?) {
             super.onSurfaceDestroyed(holder)
-            Timber.d("onSurfaceDestroyed()")
+            Timber.d("WS onSurfaceDestroyed, surface=${System.identityHashCode(holder?.surface)}")
             mediaPlayer?.stop()
             mediaPlayer?.release()
             mediaPlayer = null
@@ -131,7 +162,7 @@ class WallperWallpaperService : WallpaperService() {
 
         override fun onSurfaceCreated(holder: SurfaceHolder?) {
             super.onSurfaceCreated(holder)
-            Timber.d("onSurfaceCreated()")
+            Timber.d("WS onSurfaceCreated, surface=${System.identityHashCode(holder?.surface)} size=${holder?.surfaceFrame?.width()}x${holder?.surfaceFrame?.height()}")
 //            val wallpaper = runBlocking {
 //                getActiveWallpaperUseCase().firstOrNull()
 //            }
@@ -153,12 +184,38 @@ class WallperWallpaperService : WallpaperService() {
             when {
                 entity?.isVideo == true -> {
                     Timber.d("isVideo")
-                    mediaPlayer = ExoPlayer.Builder(baseContext).build().apply {
-                        setMediaItem(
-                            MediaItem.fromUri(
-                                entity.originalUri.toUri()
-                            )
+                    // 64КБ сегменты, тримим при reset’e
+                    val allocator = DefaultAllocator(/* trimOnReset = */ true,
+                        C.DEFAULT_BUFFER_SEGMENT_SIZE
+                    )
+
+                    val loadControl = DefaultLoadControl.Builder()
+                        // 1.5–5 c буфера обычно более чем достаточно для обоев
+                        .setBufferDurationsMs(
+                            /* minBufferMs = */ 1500,
+                            /* maxBufferMs = */ 5000,
+                            /* bufferForPlaybackMs = */ 250,
+                            /* bufferForPlaybackAfterRebufferMs = */ 500
                         )
+                        // Приоритет «времени» над размером: не раздувать буфер сверх нужного времени
+                        .setPrioritizeTimeOverSizeThresholds(true)
+                        .setAllocator(allocator)
+                        // Если у вашей версии есть этот метод — можно дополнительно «потолок» в байтах:
+                        // .setTargetBufferBytes(16 * 1024 * 1024)
+                        .build()
+                    val renderersFactory = DefaultRenderersFactory(baseContext)
+                        .setEnableDecoderFallback(true)
+                        .setMediaCodecSelector(NoExynosSelector())
+                    mediaPlayer = ExoPlayer.Builder(baseContext, renderersFactory)
+                        .setLoadControl(loadControl)
+                        .build()
+                        .apply {
+                        val dataSourceFactory = DefaultDataSource.Factory(baseContext)
+
+                        val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory)
+                            .createMediaSource(MediaItem.fromUri(entity.originalUri.toUri()))
+                        setMediaSource(mediaSource)
+
                         addListener(object : Player.Listener {
                             override fun onPlayerError(error: PlaybackException) {
                                 super.onPlayerError(error)
@@ -172,8 +229,27 @@ class WallperWallpaperService : WallpaperService() {
                                     Timber.d("onPlayerEvent ${events.get(i)}")
                                 }
                             }
+
+                            override fun onPlaybackStateChanged(state: Int) {
+                                Timber.d("Player state=$state (BUFFERING=2, READY=3, ENDED=4)")
+                            }
+                            override fun onIsPlayingChanged(isPlaying: Boolean) {
+                                Timber.d("Player isPlaying=$isPlaying")
+                            }
+                            override fun onRenderedFirstFrame() {
+                                Timber.d("Player rendered first frame")
+                            }
                         })
                         addAnalyticsListener(object : AnalyticsListener {
+                            override fun onVideoDecoderInitialized(eventTime: AnalyticsListener.EventTime, decoderName: String, initTimeMs: Long) {
+                                Timber.d("Video decoder=$decoderName init=${initTimeMs}ms")
+                            }
+                            override fun onDroppedVideoFrames(eventTime: AnalyticsListener.EventTime, droppedFrames: Int, elapsedMs: Long) {
+                                Timber.w("DroppedFrames count=$droppedFrames in ${elapsedMs}ms")
+                            }
+                            override fun onVideoSizeChanged(eventTime: AnalyticsListener.EventTime, videoSize: VideoSize) {
+                                Timber.d("VideoSize ${videoSize.width}x${videoSize.height} rot=${videoSize.unappliedRotationDegrees}")
+                            }
                             override fun onIsPlayingChanged(
                                 eventTime: AnalyticsListener.EventTime,
                                 isPlaying: Boolean
@@ -228,7 +304,6 @@ class WallperWallpaperService : WallpaperService() {
                         repeatMode = ExoPlayer.REPEAT_MODE_ONE
                         volume = 0f
                         prepare()
-                        play()
                     }
                 }
 
@@ -253,6 +328,14 @@ class WallperWallpaperService : WallpaperService() {
                 }
             }
             glSurfaceView?.onResume()
+            (renderer as? GLES20WallpaperRenderer)?.openGLScene?.fullscreenTexture?.run {
+                this.doOnNextUpdateFrame {
+                    Handler(Looper.getMainLooper()).post {
+                        mediaPlayer?.setVideoSurface(surface)
+                        mediaPlayer?.play()
+                    }
+                }
+            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
                 computeColors()
             }
@@ -307,7 +390,12 @@ class WallperWallpaperService : WallpaperService() {
 //                    Toast.makeText(context, R.string.gles_version, Toast.LENGTH_LONG).show()
                     throw RuntimeException("Needs GLESv2 or higher")
                 }
-                preserveEGLContextOnPause = true
+//                preserveEGLContextOnPause = true
+                setEGLConfigChooser(
+                    /* red= */ 5, /* green= */ 6, /* blue= */ 5,
+                    /* alpha= */ 0, /* depth= */ 0, /* stencil= */ 0
+                )
+                holder.setFormat(PixelFormat.RGB_565)
                 setRenderer(renderer)
                 // On demand render will lead to black screen.
                 // TODO change to RENDERMODE_WHEN_DIRTY and add manual fps
