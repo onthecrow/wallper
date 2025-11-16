@@ -8,7 +8,7 @@ import javax.inject.Inject
 class GetActiveWallpaperUseCase @Inject constructor(
     private val wallpapersRepository: WallpapersRepository
 ) {
-    operator fun invoke(): Flow<WallpaperEntity> {
+    operator fun invoke(): Flow<WallpaperEntity?> {
         return wallpapersRepository.getActiveWallpaper()
     }
 }

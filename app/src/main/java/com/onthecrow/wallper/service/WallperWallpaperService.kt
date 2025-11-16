@@ -6,18 +6,21 @@ import android.app.ActivityManager
 import android.app.WallpaperColors
 import android.content.Context
 import android.graphics.BitmapFactory
+import android.graphics.PixelFormat
 import android.opengl.GLSurfaceView
 import android.os.Build
 import android.service.wallpaper.WallpaperService
 import android.view.SurfaceHolder
 import androidx.core.graphics.drawable.toBitmap
 import androidx.core.net.toUri
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
-import androidx.media3.common.PlaybackException
-import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DefaultDataSource
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.exoplayer.analytics.AnalyticsListener
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import androidx.media3.exoplayer.upstream.DefaultAllocator
 import com.onthecrow.wallper.R
 import com.onthecrow.wallper.data.WallpaperEntity
 import com.onthecrow.wallper.domain.GetActiveWallpaperUseCase
@@ -37,9 +40,11 @@ import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import timber.log.Timber
-import java.lang.Exception
 import javax.inject.Inject
+import javax.microedition.khronos.egl.EGL10
+import javax.microedition.khronos.egl.EGLConfig
 
 
 @AndroidEntryPoint
@@ -47,6 +52,9 @@ class WallperWallpaperService : WallpaperService() {
 
     @Inject
     lateinit var getActiveWallpaperUseCase: GetActiveWallpaperUseCase
+
+    @Inject
+    lateinit var watchhog: Watchhog
 
     override fun onCreateEngine(): Engine {
         Timber.d("onCreateEngine")
@@ -116,6 +124,7 @@ class WallperWallpaperService : WallpaperService() {
         override fun onSurfaceDestroyed(holder: SurfaceHolder?) {
             super.onSurfaceDestroyed(holder)
             Timber.d("onSurfaceDestroyed()")
+
             mediaPlayer?.stop()
             mediaPlayer?.release()
             mediaPlayer = null
@@ -153,83 +162,68 @@ class WallperWallpaperService : WallpaperService() {
             when {
                 entity?.isVideo == true -> {
                     Timber.d("isVideo")
-                    mediaPlayer = ExoPlayer.Builder(baseContext).build().apply {
-                        setMediaItem(
-                            MediaItem.fromUri(
-                                entity.originalUri.toUri()
-                            )
-                        )
-                        addListener(object : Player.Listener {
-                            override fun onPlayerError(error: PlaybackException) {
-                                super.onPlayerError(error)
-                                Timber.e(error, "Player error")
-                            }
 
-                            override fun onEvents(player: Player, events: Player.Events) {
-                                super.onEvents(player, events)
-                                for (i in 0 until events.size()) {
-                                    Player.EVENT_METADATA
-                                    Timber.d("onPlayerEvent ${events.get(i)}")
+                    // 64КБ сегменты, тримим при reset’e
+                    val allocator = DefaultAllocator(/* trimOnReset = */ true,
+                        C.DEFAULT_BUFFER_SEGMENT_SIZE
+                    )
+
+                    val loadControl = DefaultLoadControl.Builder()
+                        // 1.5–5 c буфера обычно более чем достаточно для обоев
+                        .setBufferDurationsMs(
+                            /* minBufferMs = */ 1500,
+                            /* maxBufferMs = */ 5000,
+                            /* bufferForPlaybackMs = */ 250,
+                            /* bufferForPlaybackAfterRebufferMs = */ 500
+                        )
+                        // Приоритет «времени» над размером: не раздувать буфер сверх нужного времени
+                        .setPrioritizeTimeOverSizeThresholds(true)
+                        .setAllocator(allocator)
+                        // Если у вашей версии есть этот метод — можно дополнительно «потолок» в байтах:
+                        // .setTargetBufferBytes(16 * 1024 * 1024)
+                        .build()
+
+                    mediaPlayer = ExoPlayer.Builder(baseContext)
+                        .setLoadControl(loadControl)
+                        .build()
+                        .apply {
+                            val dataSourceFactory = DefaultDataSource.Factory(baseContext)
+
+                            val mediaSource = ProgressiveMediaSource.Factory(dataSourceFactory)
+                                .createMediaSource(MediaItem.fromUri(entity.originalUri.toUri()))
+
+                            watchhog.attachPlayer(this)
+
+                            setMediaSource(mediaSource)
+
+                            // This must be set after getting video info.
+                            engineContext.launch(Dispatchers.IO) {
+                                val videoMetadata =
+                                    getVideoMetadata(baseContext, entity.originalUri)
+                                withContext(Dispatchers.Main) {
+                                    Timber.d(
+                                        "Surface identity: ${
+                                            System.identityHashCode(
+                                                surfaceHolder.surface
+                                            )
+                                        }"
+                                    )
+                                    if (mediaPlayer == null) return@withContext
+                                    renderer?.rendererParams = RendererParams.VideoParams(
+                                        surfaceHolder.surfaceFrame.width(),
+                                        surfaceHolder.surfaceFrame.height(),
+                                        mediaPlayer!!,
+                                        entity.shownRect,
+                                        // TODO Bake video metadata in db on wallpaper creation (performance impact ~50ms)
+                                        videoMetadata,
+                                    )
                                 }
                             }
-                        })
-                        addAnalyticsListener(object : AnalyticsListener {
-                            override fun onIsPlayingChanged(
-                                eventTime: AnalyticsListener.EventTime,
-                                isPlaying: Boolean
-                            ) {
-                                super.onIsPlayingChanged(eventTime, isPlaying)
-                                Timber.d("onIsPlayingChanged $isPlaying")
-                            }
-
-                            override fun onPlayWhenReadyChanged(
-                                eventTime: AnalyticsListener.EventTime,
-                                playWhenReady: Boolean,
-                                reason: Int
-                            ) {
-                                super.onPlayWhenReadyChanged(eventTime, playWhenReady, reason)
-                                Timber.d("onPlayWhenReadyChanged $playWhenReady")
-                            }
-
-                            override fun onPlaybackStateChanged(
-                                eventTime: AnalyticsListener.EventTime,
-                                state: Int
-                            ) {
-                                super.onPlaybackStateChanged(eventTime, state)
-                                Timber.d("onPlaybackStateChanged $state")
-                            }
-
-                            override fun onVideoCodecError(
-                                eventTime: AnalyticsListener.EventTime,
-                                videoCodecError: Exception
-                            ) {
-                                super.onVideoCodecError(eventTime, videoCodecError)
-                                Timber.e(videoCodecError, "onVideoCodecError: ${videoCodecError.message}")
-                            }
-
-                            override fun onPlayerError(
-                                eventTime: AnalyticsListener.EventTime,
-                                error: PlaybackException
-                            ) {
-                                super.onPlayerError(eventTime, error)
-                                Timber.e(error, "onPlayerError: ${error.message}")
-                            }
-                        })
-                        // This must be set after getting video info.
-                        Timber.d("Surface identity: ${System.identityHashCode(surfaceHolder.surface)}")
-                        renderer?.rendererParams = RendererParams.VideoParams(
-                            surfaceHolder.surfaceFrame.width(),
-                            surfaceHolder.surfaceFrame.height(),
-                            this,
-                            entity.shownRect,
-                            // TODO Bake video metadata in db on wallpaper creation (performance impact ~50ms)
-                            getVideoMetadata(baseContext, entity.originalUri),
-                        )
-                        repeatMode = ExoPlayer.REPEAT_MODE_ONE
-                        volume = 0f
-                        prepare()
-                        play()
-                    }
+                            repeatMode = ExoPlayer.REPEAT_MODE_ONE
+                            volume = 0f
+                            prepare()
+                            play()
+                        }
                 }
 
                 entity == null -> {
@@ -302,12 +296,14 @@ class WallperWallpaperService : WallpaperService() {
                 if (configInfo.reqGlEsVersion >= 0x20000) {
                     Timber.d("GLESv2 is supported")
                     setEGLContextClientVersion(2)
-                    renderer = GLES20WallpaperRenderer(context, {glSurfaceView!!}, width, height)
+                    renderer = GLES20WallpaperRenderer(context, { this }, width, height)
                 } else {
 //                    Toast.makeText(context, R.string.gles_version, Toast.LENGTH_LONG).show()
                     throw RuntimeException("Needs GLESv2 or higher")
                 }
                 preserveEGLContextOnPause = true
+                setEGLConfigChooser(5, 6, 5, 0, 0, 0)
+                holder.setFormat(PixelFormat.RGB_565)
                 setRenderer(renderer)
                 // On demand render will lead to black screen.
                 // TODO change to RENDERMODE_WHEN_DIRTY and add manual fps

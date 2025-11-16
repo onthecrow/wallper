@@ -1,23 +1,23 @@
 [versions]
-agp = "8.4.0"
-kotlin = "1.9.21"
-coreKtx = "1.12.0"
+agp = "8.13.1"
+kotlin = "2.2.21"
+coreKtx = "1.17.0"
 junit = "4.13.2"
-junitVersion = "1.1.5"
-espressoCore = "3.5.1"
-lifecycleRuntimeKtx = "2.6.2"
-activityCompose = "1.8.1"
-composeBom = "2023.10.01"
-ksp = "1.9.21-1.0.15"
-room = "2.6.0"
-navigation = "2.7.5"
-hilt = "2.49"
-hilt-navigation = "1.1.0"
-coil = "2.5.0"
+junitVersion = "1.3.0"
+espressoCore = "3.7.0"
+lifecycleRuntimeKtx = "2.9.4"
+activityCompose = "1.11.0"
+composeBom = "2025.11.00"
+ksp = "2.2.20-2.0.3"
+room = "2.8.3"
+navigation = "2.9.6"
+hilt = "2.57.2"
+hilt-navigation = "1.3.0"
+coil = "2.7.0"
 timber = "5.0.1"
-dataStore = "1.0.0"
-serializationJson = "1.6.2"
-media3 = "1.2.0"
+dataStore = "1.1.7"
+serializationJson = "1.9.0"
+media3 = "1.8.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -57,4 +57,4 @@ ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }
 hilt = { id = "com.google.dagger.hilt.android", version.ref = "hilt" }
 parcelize = { id = "org.jetbrains.kotlin.plugin.parcelize", version.ref = "kotlin" }
 serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
-
+compose-compiler = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }

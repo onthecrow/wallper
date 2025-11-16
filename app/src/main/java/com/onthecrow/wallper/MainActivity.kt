@@ -21,7 +21,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var filesDir: File
 
     @Inject
-    protected lateinit var screenResolutionManager: ScreenResolutionManager
+    lateinit var screenResolutionManager: ScreenResolutionManager
 
     init {
         ImagePicker.init(this)

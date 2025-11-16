@@ -14,7 +14,7 @@ interface WallpaperDao {
     fun getAll(): Flow<List<WallpaperEntity>>
 
     @Query("SELECT * FROM wallpaperentity WHERE is_active = 1 LIMIT 1")
-    fun getActive(): Flow<WallpaperEntity>
+    fun getActive(): Flow<WallpaperEntity?>
 
     @Query("SELECT * FROM wallpaperentity WHERE uid =:uid")
     suspend fun getWallpaper(uid: Int): WallpaperEntity

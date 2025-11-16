@@ -3,6 +3,7 @@ package com.onthecrow.wallper.service.renderer
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.opengl.GLES20
 import android.opengl.GLSurfaceView
 import android.view.Surface
 import androidx.core.graphics.drawable.toBitmap
@@ -45,6 +46,10 @@ class GLES20WallpaperRenderer(
 
     override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
         Timber.d("onSurfaceCreated")
+        GLES20.glDisable(GLES20.GL_DEPTH_TEST)
+        GLES20.glDisable(GLES20.GL_STENCIL_TEST)
+        GLES20.glDisable(GLES20.GL_BLEND)    // если не рисуете полупрозрачность
+        GLES20.glDisable(GLES20.GL_DITHER)
         openGLScene = OpenGLScene(
             sceneHeight = rendererParams.height,
             sceneWidth = rendererParams.width,

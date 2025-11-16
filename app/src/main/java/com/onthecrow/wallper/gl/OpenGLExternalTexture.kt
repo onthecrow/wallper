@@ -61,7 +61,7 @@ class OpenGLExternalTexture(
         )
 
         surfaceTexture = SurfaceTexture(textureId)
-        surfaceTexture.setDefaultBufferSize(textureWidth, textureHeight)
+//        surfaceTexture.setDefaultBufferSize(textureWidth, textureHeight)
 
         surface = Surface(surfaceTexture)
     }
@@ -84,7 +84,6 @@ class OpenGLExternalTexture(
 
     fun attachFrameListener(glView: GLSurfaceView) {
         surfaceTexture.setOnFrameAvailableListener({
-//            lastFrameAvailMs = SystemClock.elapsedRealtime()
             glView.requestRender()
         }, Handler(Looper.getMainLooper()))
     }
@@ -165,7 +164,7 @@ class OpenGLExternalTexture(
         surfaceTexture.release()
         surface.release()
         surfaceTexture = SurfaceTexture(textureId)
-        surfaceTexture.setDefaultBufferSize(textureWidth, textureHeight)
+//        surfaceTexture.setDefaultBufferSize(textureWidth, textureHeight)
         surface = Surface(surfaceTexture)
     }
 

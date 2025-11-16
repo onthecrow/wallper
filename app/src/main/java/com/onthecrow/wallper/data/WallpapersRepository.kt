@@ -40,7 +40,7 @@ class WallpapersRepository @Inject constructor(
         return appDatabase.wallpaperDao().getAll()
     }
 
-    fun getActiveWallpaper(): Flow<WallpaperEntity> {
+    fun getActiveWallpaper(): Flow<WallpaperEntity?> {
         return appDatabase.wallpaperDao().getActive()
     }
 
