@@ -1,4 +1,7 @@
 <resources>
     <string name="app_name">Wallper</string>
     <string name="save">Save</string>
+    <string name="open_context_menu">Long press to edit or remove</string>
+    <string name="delete">Delete</string>
+    <string name="edit">Edit</string>
 </resources>

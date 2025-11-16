@@ -163,6 +163,16 @@ class StorageRepository @Inject constructor(
         }
     }
 
+    fun deleteFile(uri: String) {
+        runCatching {
+            File(uri).run {
+                if (exists()) {
+                    delete()
+                }
+            }
+        }.onFailure { Timber.e(it) }
+    }
+
     companion object {
         private const val MIME_VIDEO = "video"
     }

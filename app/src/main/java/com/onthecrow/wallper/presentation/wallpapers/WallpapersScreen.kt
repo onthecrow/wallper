@@ -6,7 +6,7 @@ import android.content.Intent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.platform.LocalContext
-import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import com.onthecrow.wallper.core.actions.HandleUiActions
 import com.onthecrow.wallper.navigation.LocalNavController
 import com.onthecrow.wallper.presentation.crop.navigateToCropperScreen
@@ -36,6 +36,7 @@ fun WallpapersScreen() {
             context.startActivity(intent)
         },
         onAddClick = { viewModel.addWallpaper() },
+        onDeleteClick = { viewModel.deleteWallpaper(it) }
     )
 
     HandleUiActions(viewModel) { action ->

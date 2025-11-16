@@ -5,6 +5,7 @@ import android.widget.Toast
 import androidx.lifecycle.viewModelScope
 import com.onthecrow.wallper.core.viewmodel.BaseViewModel
 import com.onthecrow.wallper.domain.ActivateWallpaperUseCase
+import com.onthecrow.wallper.domain.DeleteWallpaperUseCase
 import com.onthecrow.wallper.domain.FileValidationUseCase
 import com.onthecrow.wallper.domain.GetWallpapersUseCase
 import com.onthecrow.wallper.presentation.picker.ImagePicker
@@ -31,6 +32,7 @@ class WallpapersViewModel @Inject constructor(
     getWallpapersUseCase: GetWallpapersUseCase,
     private val activateWallpaperUseCase: ActivateWallpaperUseCase,
     private val fileValidationUseCase: FileValidationUseCase,
+    private val deleteWallpaperUseCase: DeleteWallpaperUseCase,
 ) : BaseViewModel<WallpapersState, WallpapersAction, WallpapersEvent>(WallpapersState()) {
 
     init {
@@ -70,5 +72,9 @@ class WallpapersViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             activateWallpaperUseCase(id)
         }
+    }
+
+    fun deleteWallpaper(id: Int) {
+        viewModelScope.launch { deleteWallpaperUseCase(id) }
     }
 }

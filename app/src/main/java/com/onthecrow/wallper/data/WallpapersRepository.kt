@@ -57,4 +57,12 @@ class WallpapersRepository @Inject constructor(
             }
         }
     }
+
+    suspend fun getWallpaper(id: Int): WallpaperEntity {
+        return appDatabase.wallpaperDao().getWallpaper(id)
+    }
+
+    suspend fun deleteWallpaper(wallpaperEntity: WallpaperEntity) {
+        appDatabase.wallpaperDao().delete(wallpaperEntity)
+    }
 }

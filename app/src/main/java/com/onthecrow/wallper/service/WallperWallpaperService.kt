@@ -302,7 +302,8 @@ class WallperWallpaperService : WallpaperService() {
                     throw RuntimeException("Needs GLESv2 or higher")
                 }
                 preserveEGLContextOnPause = true
-                setEGLConfigChooser(5, 6, 5, 0, 0, 0)
+                // todo this line produces awful visuals on some devices
+//                setEGLConfigChooser(5, 6, 5, 0, 0, 0)
                 holder.setFormat(PixelFormat.RGB_565)
                 setRenderer(renderer)
                 // On demand render will lead to black screen.
