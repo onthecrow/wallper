@@ -10,6 +10,7 @@ import androidx.compose.ui.unit.dp
 import com.onthecrow.wallper.presentation.components.cropper.model.AspectRatio
 import com.onthecrow.wallper.presentation.components.cropper.model.CropOutline
 import com.onthecrow.wallper.presentation.components.cropper.model.OutlineType
+import com.onthecrow.wallper.presentation.components.cropper.model.RectCropShape
 import com.onthecrow.wallper.presentation.components.cropper.model.aspectRatios
 import com.onthecrow.wallper.ui.theme.DefaultBackgroundColor
 import com.onthecrow.wallper.ui.theme.DefaultHandleColor
@@ -124,7 +125,7 @@ data class CropStyle internal constructor(
 @Immutable
 data class CropOutlineProperty(
     val outlineType: OutlineType,
-    val cropOutline: CropOutline
+    val cropOutline: RectCropShape
 )
 
 /**

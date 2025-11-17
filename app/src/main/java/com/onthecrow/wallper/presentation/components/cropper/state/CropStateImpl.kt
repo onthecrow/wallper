@@ -216,7 +216,6 @@ abstract class CropState internal constructor(
     // Double Tap
     internal abstract suspend fun onDoubleTap(
         offset: Offset,
-        zoom: Float = 1f,
         onAnimationEnd: () -> Unit
     )
 

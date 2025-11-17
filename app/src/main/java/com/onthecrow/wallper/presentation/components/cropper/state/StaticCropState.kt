@@ -108,10 +108,8 @@ class StaticCropState internal constructor(
         }
     }
 
-    // Double Tap
     override suspend fun onDoubleTap(
         offset: Offset,
-        zoom: Float,
         onAnimationEnd: () -> Unit
     ) {
         doubleTapped = true

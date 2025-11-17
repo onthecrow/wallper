@@ -19,6 +19,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.onthecrow.wallper.R
+import com.onthecrow.wallper.presentation.components.cropper.VideoSurface
 import com.onthecrow.wallper.presentation.wallpapers.models.Wallpaper
 
 @Composable
@@ -47,6 +48,11 @@ fun WallpaperCard(
                     onLongClickLabel = stringResource(R.string.open_context_menu)
                 )
         ) {
+            // todo have to scale the video first, for wallpapers list separately
+//            VideoSurface(
+//                modifier = Modifier.fillMaxSize(),
+//                videoUri = wallpaper.videoUri,
+//            )
             AsyncImage(
                 modifier = Modifier
                     .fillMaxSize()
@@ -77,6 +83,6 @@ fun WallpaperCard(
 @Composable
 fun WallpaperCardPreview() {
     WallpaperCard(
-        wallpaper = Wallpaper(0, "", true),
+        wallpaper = Wallpaper(0, "", true, ""),
     ) {}
 }

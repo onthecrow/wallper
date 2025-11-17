@@ -4,6 +4,7 @@ import android.graphics.Rect
 import androidx.room.withTransaction
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.firstOrNull
+import timber.log.Timber
 import javax.inject.Inject
 
 class WallpapersRepository @Inject constructor(
@@ -52,6 +53,7 @@ class WallpapersRepository @Inject constructor(
                         update(copy(isActive = false))
                     }
                     val activeNew = getWallpaper(id).copy(isActive = true)
+                    Timber.d("#### ${activeNew.originalUri}")
                     update(activeNew)
                 }
             }

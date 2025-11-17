@@ -2,17 +2,12 @@ package com.onthecrow.wallper.presentation.components.cropper
 
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.debugInspectorInfo
 import com.onthecrow.wallper.presentation.components.cropper.gesture.detectMotionEventsAsList
@@ -20,9 +15,6 @@ import com.onthecrow.wallper.presentation.components.cropper.gesture.detectTrans
 import com.onthecrow.wallper.presentation.components.cropper.model.CropData
 import com.onthecrow.wallper.presentation.components.cropper.state.CropState
 import com.onthecrow.wallper.presentation.components.cropper.state.cropData
-import com.onthecrow.wallper.presentation.components.cropper.utils.ZoomLevel
-import com.onthecrow.wallper.presentation.components.cropper.utils.getNextZoomLevel
-import com.onthecrow.wallper.presentation.components.cropper.utils.update
 import kotlinx.coroutines.launch
 
 /**
@@ -36,8 +28,6 @@ import kotlinx.coroutines.launch
  * @param cropState State of the zoom that contains option to set initial, min, max zoom,
  * enabling rotation, pan or zoom and contains current [CropData]
  * event propagations. Also contains [Rect] of visible area based on pan, zoom and rotation
- * @param zoomOnDoubleTap lambda that returns current [ZoomLevel] and based on current level
- * enables developer to define zoom on double tap gesture
  * @param onGestureStart callback to to notify gesture has started and return current
  * [CropData]  of this modifier
  * @param onGesture callback to notify about ongoing gesture and return current
@@ -48,7 +38,6 @@ import kotlinx.coroutines.launch
 fun Modifier.crop(
     vararg keys: Any?,
     cropState: CropState,
-    zoomOnDoubleTap: (ZoomLevel) -> Float = cropState.DefaultOnDoubleTap,
     onDown: ((CropData) -> Unit)? = null,
     onMove: ((CropData) -> Unit)? = null,
     onUp: ((CropData) -> Unit)? = null,
@@ -64,9 +53,6 @@ fun Modifier.crop(
         }
 
         val coroutineScope = rememberCoroutineScope()
-
-        // Current Zoom level
-        var zoomLevel by remember { mutableStateOf(ZoomLevel.Min) }
 
         val transformModifier = Modifier.pointerInput(*keys) {
             detectTransformGestures(
@@ -103,11 +89,8 @@ fun Modifier.crop(
             detectTapGestures(
                 onDoubleTap = { offset: Offset ->
                     coroutineScope.launch {
-                        zoomLevel = getNextZoomLevel(zoomLevel)
-                        val newZoom = zoomOnDoubleTap(zoomLevel)
                         cropState.onDoubleTap(
                             offset = offset,
-                            zoom = newZoom
                         ) {
                             onGestureEnd?.invoke(cropState.cropData)
                         }
@@ -139,16 +122,11 @@ fun Modifier.crop(
             )
         }
 
-        val graphicsModifier = Modifier.graphicsLayer {
-            this.update(cropState)
-        }
-
         this.then(
             clipToBounds()
                 .then(tapModifier)
                 .then(transformModifier)
                 .then(touchModifier)
-                .then(graphicsModifier)
         )
     },
     inspectorInfo = debugInspectorInfo {
@@ -160,12 +138,3 @@ fun Modifier.crop(
         properties["onUp"] = onGestureEnd
     }
 )
-
-internal val CropState.DefaultOnDoubleTap: (ZoomLevel) -> Float
-    get() = { zoomLevel: ZoomLevel ->
-        when (zoomLevel) {
-            ZoomLevel.Min -> 1f
-            ZoomLevel.Mid -> 3f.coerceIn(zoomMin, zoomMax)
-            ZoomLevel.Max -> 5f.coerceAtLeast(zoomMax)
-        }
-    }

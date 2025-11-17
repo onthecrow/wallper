@@ -113,24 +113,16 @@ fun CropperUi(
                         }
                         val cropStyle by remember { mutableStateOf(CropDefaults.style()) }
 
-                        val crop by remember { mutableStateOf(false) }
-
                         ImageCropper(
                             modifier = Modifier
                                 .fillMaxSize(),
+                            videoUri = uiState.originalFilePath,
                             imageBitmap = uiState.bitmap,
                             contentDescription = "Image Cropper",
                             cropStyle = cropStyle,
                             cropProperties = cropProperties,
-                            crop = crop,
-                            cropRect = {
-                                rect.value = it
-                            },
-                            onCropStart = {
-
-                            },
-                            onCropSuccess = {
-
+                            cropRect = { cropRect ->
+                                rect.value = cropRect
                             },
                         )
                     }

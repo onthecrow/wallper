@@ -247,7 +247,6 @@ class DynamicCropState internal constructor(
 
     override suspend fun onDoubleTap(
         offset: Offset,
-        zoom: Float,
         onAnimationEnd: () -> Unit
     ) {
         doubleTapped = true
@@ -279,7 +278,6 @@ class DynamicCropState internal constructor(
         }
         onAnimationEnd()
     }
-
 
     // TODO Change pan when zoom is bigger than 1f and touchRegion is inside overlay rect
 //    private suspend fun moveOverlayToBounds(change: PointerInputChange, newRect: Rect) {
