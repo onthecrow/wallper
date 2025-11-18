@@ -11,7 +11,6 @@ import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.debugInspectorInfo
 import com.onthecrow.wallper.presentation.components.cropper.gesture.detectMotionEventsAsList
-import com.onthecrow.wallper.presentation.components.cropper.gesture.detectTransformGestures
 import com.onthecrow.wallper.presentation.components.cropper.model.CropData
 import com.onthecrow.wallper.presentation.components.cropper.state.CropState
 import com.onthecrow.wallper.presentation.components.cropper.state.cropData
@@ -54,37 +53,6 @@ fun Modifier.crop(
 
         val coroutineScope = rememberCoroutineScope()
 
-        val transformModifier = Modifier.pointerInput(*keys) {
-            detectTransformGestures(
-                consume = false,
-                onGestureStart = {
-                    onGestureStart?.invoke(cropState.cropData)
-                },
-                onGestureEnd = {
-                    coroutineScope.launch {
-                        cropState.onGestureEnd {
-                            onGestureEnd?.invoke(cropState.cropData)
-                        }
-                    }
-                },
-                onGesture = { centroid, pan, zoom, rotate, mainPointer, pointerList ->
-
-                    coroutineScope.launch {
-                        cropState.onGesture(
-                            centroid = centroid,
-                            panChange = pan,
-                            zoomChange = zoom,
-                            rotationChange = rotate,
-                            mainPointer = mainPointer,
-                            changes = pointerList
-                        )
-                    }
-                    onGesture?.invoke(cropState.cropData)
-                    mainPointer.consume()
-                }
-            )
-        }
-
         val tapModifier = Modifier.pointerInput(*keys) {
             detectTapGestures(
                 onDoubleTap = { offset: Offset ->
@@ -125,7 +93,6 @@ fun Modifier.crop(
         this.then(
             clipToBounds()
                 .then(tapModifier)
-                .then(transformModifier)
                 .then(touchModifier)
         )
     },

@@ -7,7 +7,6 @@ import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.input.pointer.positionChangeIgnoreConsumed
 import androidx.compose.ui.unit.IntSize
 import com.onthecrow.wallper.presentation.components.cropper.TouchRegion
-import com.onthecrow.wallper.presentation.components.cropper.model.AspectRatio
 import com.onthecrow.wallper.presentation.components.cropper.settings.CropProperties
 import kotlinx.coroutines.coroutineScope
 import kotlin.math.roundToInt
@@ -20,14 +19,9 @@ import kotlin.math.roundToInt
  * @param handleSize size of the handle to control, move or scale dynamic overlay
  * @param imageSize size of the **Bitmap**
  * @param containerSize size of the Composable that draws **Bitmap**
- * @param maxZoom maximum zoom value
  * @param fling when set to true dragging pointer builds up velocity. When last
  * pointer leaves Composable a movement invoked against friction till velocity drops below
  * to threshold
- * @param zoomable when set to true zoom is enabled
- * @param pannable when set to true pan is enabled
- * @param rotatable when set to true rotation is enabled
- * @param limitPan limits pan to bounds of parent Composable. Using this flag prevents creating
  * @param fixedAspectRatio when set to true aspect ratio of overlay is fixed
  * @param minDimension minimum size of the overlay, if null defaults to handleSize * 2
  * empty space on sides or edges of parent
@@ -37,14 +31,9 @@ class DynamicCropState internal constructor(
     imageSize: IntSize,
     containerSize: IntSize,
     drawAreaSize: IntSize,
-    aspectRatio: AspectRatio,
+    aspectRatio: Float,
     overlayRatio: Float,
-    maxZoom: Float,
     fling: Boolean,
-    zoomable: Boolean,
-    pannable: Boolean,
-    rotatable: Boolean,
-    limitPan: Boolean,
     private val fixedAspectRatio: Boolean,
     private val minDimension: IntSize?
 ) : CropState(
@@ -52,13 +41,8 @@ class DynamicCropState internal constructor(
     containerSize = containerSize,
     drawAreaSize = drawAreaSize,
     aspectRatio = aspectRatio,
-    overlayRatio = overlayRatio,
-    maxZoom = maxZoom,
     fling = fling,
-    zoomable = zoomable,
-    pannable = pannable,
-    rotatable = rotatable,
-    limitPan = limitPan
+    overlayRatio = overlayRatio,
 ) {
 
     /**
@@ -153,11 +137,7 @@ class DynamicCropState internal constructor(
     }
 
     private fun getAspectRatio(): Float {
-        return if (aspectRatio == AspectRatio.Original) {
-            imageSize.width / imageSize.height.toFloat()
-        } else {
-            aspectRatio.value
-        }
+        return aspectRatio
     }
 
     override suspend fun onUp(change: PointerInputChange) = coroutineScope {
@@ -175,10 +155,10 @@ class DynamicCropState internal constructor(
             }
 
             // Update and animate pan, zoom and image draw area after overlay position is updated
-            animateTransformationToOverlayBounds(overlayRect, true)
+//            animateTransformationToOverlayBounds(overlayRect, true)
 
             // Update image draw area after animating pan, zoom or rotation is completed
-            drawAreaRect = updateImageDrawRectFromTransformation()
+//            drawAreaRect = updateImageDrawRectFromTransformation()
 
             touchRegion = TouchRegion.None
         }
@@ -194,28 +174,8 @@ class DynamicCropState internal constructor(
         mainPointer: PointerInputChange,
         changes: List<PointerInputChange>
     ) {
-
         if (touchRegion == TouchRegion.None || gestureInvoked) {
             doubleTapped = false
-
-            val newPan = if (gestureInvoked) Offset.Zero else panChange
-
-            updateTransformState(
-                centroid = centroid,
-                zoomChange = zoomChange,
-                panChange = newPan,
-                rotationChange = rotationChange
-            )
-
-            // Update image draw rectangle based on pan, zoom or rotation change
-            drawAreaRect = updateImageDrawRectFromTransformation()
-
-            // Fling Gesture
-            if (pannable && fling) {
-                if (changes.size == 1) {
-                    addPosition(mainPointer.uptimeMillis, mainPointer.position)
-                }
-            }
         }
     }
 
@@ -228,19 +188,7 @@ class DynamicCropState internal constructor(
             // Gesture end might be called after second tap and we don't want to fling
             // or animate back to valid bounds when doubled tapped
             if (!doubleTapped) {
-
-                if (pannable && fling && !gestureInvoked && zoom > 1) {
-                    fling {
-                        // We get target value on start instead of updating bounds after
-                        // gesture has finished
-                        drawAreaRect = updateImageDrawRectFromTransformation()
-                        onBoundsCalculated()
-                    }
-                } else {
-                    onBoundsCalculated()
-                }
-
-                animateTransformationToOverlayBounds(overlayRect, animate = true)
+                onBoundsCalculated()
             }
         }
     }
@@ -251,16 +199,6 @@ class DynamicCropState internal constructor(
     ) {
         doubleTapped = true
 
-        if (fling) {
-            resetTracking()
-        }
-        resetWithAnimation(pan = pan, zoom = zoom, rotation = rotation)
-
-        // We get target value on start instead of updating bounds after
-        // gesture has finished
-        drawAreaRect = updateImageDrawRectFromTransformation()
-
-
         if (!isOverlayInImageDrawBounds()) {
             // Moves rectangle to bounds inside drawArea Rect while keeping aspect ratio
             // of current overlay rect
@@ -268,52 +206,13 @@ class DynamicCropState internal constructor(
                 getOverlayFromAspectRatio(
                     containerSize.width.toFloat(),
                     containerSize.height.toFloat(),
-                    drawAreaSize.width.toFloat(),
                     aspectRatio,
                     overlayRatio
                 )
             )
-
-            animateTransformationToOverlayBounds(overlayRect, false)
         }
         onAnimationEnd()
     }
-
-    // TODO Change pan when zoom is bigger than 1f and touchRegion is inside overlay rect
-//    private suspend fun moveOverlayToBounds(change: PointerInputChange, newRect: Rect) {
-//        val bounds = drawAreaRect
-//
-//        val positionChange = change.positionChangeIgnoreConsumed()
-//
-//        // When zoom is bigger than 100% and dynamic overlay is not at any edge of
-//        // image we can pan in the same direction motion goes towards when touch region
-//        // of rectangle is not one of the handles but region inside
-//        val isPanRequired = touchRegion == TouchRegion.Inside && zoom > 1f
-//
-//        // Overlay moving right
-//        if (isPanRequired && newRect.right < bounds.right) {
-//            println("Moving right newRect $newRect, bounds: $bounds")
-//            snapOverlayRectTo(newRect.translate(-positionChange.x, 0f))
-//            snapPanXto(pan.x - positionChange.x * zoom)
-//            // Overlay moving left
-//        } else if (isPanRequired && pan.x < bounds.left && newRect.left <= 0f) {
-////            snapOverlayRectTo(newRect.translate(-positionChange.x, 0f))
-////            snapPanXto(pan.x - positionChange.x * zoom)
-//        } else if (isPanRequired && pan.y < bounds.top && newRect.top <= 0f) {
-//            // Overlay moving top
-////            snapOverlayRectTo(newRect.translate(0f, -positionChange.y))
-////            snapPanYto(pan.y - positionChange.y * zoom)
-//        } else if (isPanRequired && -pan.y < bounds.bottom && newRect.bottom >= containerSize.height) {
-//            // Overlay moving bottom
-////            snapOverlayRectTo(newRect.translate(0f, -positionChange.y))
-////            snapPanYto(pan.y - positionChange.y * zoom)
-//        } else {
-//            snapOverlayRectTo(newRect)
-//        }
-////        if (touchRegion != TouchRegion.None) {
-////            change.consume()
-////        }
-//    }
 
     /**
      * When pointer is up calculate valid position and size overlay can be updated to inside
@@ -358,11 +257,11 @@ class DynamicCropState internal constructor(
 
     private fun correctRectAspectRatio(rectTemp: Rect, touchRegion: TouchRegion): Rect {
         var resultRect = rectTemp.copy()
-        if (resultRect.width / resultRect.height != aspectRatio.value) {
-            val widthHeight = if (resultRect.width / resultRect.height > aspectRatio.value) {
-                aspectRatio.value * resultRect.height to resultRect.height
+        if (resultRect.width / resultRect.height != aspectRatio) {
+            val widthHeight = if (resultRect.width / resultRect.height > aspectRatio) {
+                aspectRatio * resultRect.height to resultRect.height
             } else {
-                resultRect.width to resultRect.width / aspectRatio.value
+                resultRect.width to resultRect.width / aspectRatio
             }
             when (touchRegion) {
                 TouchRegion.TopLeft -> {
@@ -371,24 +270,28 @@ class DynamicCropState internal constructor(
                         bottom = resultRect.top + widthHeight.second,
                     )
                 }
+
                 TouchRegion.TopRight -> {
                     resultRect = resultRect.copy(
                         left = resultRect.right - widthHeight.first,
                         bottom = resultRect.top + widthHeight.second,
                     )
                 }
+
                 TouchRegion.BottomLeft -> {
                     resultRect = resultRect.copy(
                         right = resultRect.left + widthHeight.first,
                         top = resultRect.bottom - widthHeight.second,
                     )
                 }
+
                 TouchRegion.BottomRight -> {
                     resultRect = resultRect.copy(
                         left = resultRect.right - widthHeight.first,
                         top = resultRect.bottom - widthHeight.second,
                     )
                 }
+
                 TouchRegion.Inside, TouchRegion.None -> {
                     val widthDiff = resultRect.width - widthHeight.first
                     val heightDiff = resultRect.height - widthHeight.second
@@ -573,15 +476,19 @@ class DynamicCropState internal constructor(
         TouchRegion.TopLeft -> {
             rect.topLeft - touchPosition
         }
+
         TouchRegion.TopRight -> {
             rect.topRight - touchPosition
         }
+
         TouchRegion.BottomLeft -> {
             rect.bottomLeft - touchPosition
         }
+
         TouchRegion.BottomRight -> {
             rect.bottomRight - touchPosition
         }
+
         else -> {
             Offset.Zero
         }

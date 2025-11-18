@@ -23,19 +23,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.FilterQuality
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import com.onthecrow.wallper.presentation.components.cropper.draw.DrawingOverlay
-import com.onthecrow.wallper.presentation.components.cropper.model.RectCropShape
 import com.onthecrow.wallper.presentation.components.cropper.settings.CropDefaults
 import com.onthecrow.wallper.presentation.components.cropper.settings.CropProperties
 import com.onthecrow.wallper.presentation.components.cropper.settings.CropStyle
-import com.onthecrow.wallper.presentation.components.cropper.settings.CropType
 import com.onthecrow.wallper.presentation.components.cropper.state.DynamicCropState
 import com.onthecrow.wallper.presentation.components.cropper.state.rememberCropState
 import kotlinx.coroutines.delay
@@ -44,11 +40,9 @@ import kotlinx.coroutines.delay
 fun ImageCropper(
     modifier: Modifier = Modifier,
     videoUri: String,
-    imageBitmap: ImageBitmap,
-    contentDescription: String?,
+    videoSize: IntSize,
     cropStyle: CropStyle = CropDefaults.style(),
     cropProperties: CropProperties,
-    filterQuality: FilterQuality = DrawScope.DefaultFilterQuality,
     backgroundColor: Color = Color.Transparent,
     cropRect: (Rect) -> Unit,
     onDrawGrid: (DrawScope.(rect: Rect, strokeWidth: Float, color: Color) -> Unit)? = null,
@@ -56,11 +50,6 @@ fun ImageCropper(
 
     BoxWithConstraints(
         modifier = modifier.clipToBounds(),
-//        contentScale = cropProperties.contentScale,
-//        contentDescription = contentDescription,
-//        filterQuality = filterQuality,
-//        imageBitmap = imageBitmap,
-//        drawImage = false
     ) {
 
         // No crop operation is applied by ScalableImage so rect points to bounds of original
@@ -82,8 +71,8 @@ fun ImageCropper(
 
         // Bitmap Dimensions
         // todo change for the actual size of the video
-        val bitmapWidth = 3840
-        val bitmapHeight = 2160
+        val bitmapWidth = videoSize.width
+        val bitmapHeight = videoSize.height
 
         // Dimensions of Composable that displays Bitmap
         val imageWidthPx: Int
@@ -96,10 +85,8 @@ fun ImageCropper(
             containerHeight = containerHeightPx.toDp()
         }
 
-        val cropType = cropProperties.cropType
         val contentScale = cropProperties.contentScale
         val fixedAspectRatio = cropProperties.fixedAspectRatio
-        val cropOutline = cropProperties.cropOutlineProperty.cropOutline
 
         // these keys are for resetting cropper when image width/height, contentScale or
         // overlay aspect ratio changes
@@ -108,7 +95,6 @@ fun ImageCropper(
                 imageWidthPx,
                 imageHeightPx,
                 contentScale,
-                cropType,
                 fixedAspectRatio
             )
 
@@ -149,7 +135,6 @@ fun ImageCropper(
             cropState.updateProperties(cropProperties)
         }
 
-        /// Create a MutableTransitionState<Boolean> for the AnimatedVisibility.
         var visible by remember { mutableStateOf(false) }
 
         LaunchedEffect(Unit) {
@@ -163,8 +148,6 @@ fun ImageCropper(
             visible = visible,
             handleSize = cropProperties.handleSize,
             overlayRect = cropState.overlayRect,
-            cropType = cropType,
-            cropOutline = cropOutline,
             cropStyle = cropStyle,
             transparentColor = transparentColor,
             backgroundColor = backgroundColor,
@@ -180,8 +163,6 @@ private fun ImageCropper(
     videoUri: String,
     visible: Boolean,
     handleSize: Float,
-    cropType: CropType,
-    cropOutline: RectCropShape,
     cropStyle: CropStyle,
     overlayRect: Rect,
     transparentColor: Color,
@@ -208,14 +189,13 @@ private fun ImageCropper(
                 val drawGrid = cropStyle.drawGrid
                 val overlayColor = cropStyle.overlayColor
                 val handleColor = cropStyle.handleColor
-                val drawHandles = cropType == CropType.Dynamic
+                val drawHandles = true
                 val strokeWidth = cropStyle.strokeWidth
 
                 DrawingOverlay(
                     modifier = modifier,
                     drawOverlay = drawOverlay,
                     rect = overlayRect,
-                    cropOutline = cropOutline,
                     drawGrid = drawGrid,
                     overlayColor = overlayColor,
                     handleColor = handleColor,
@@ -235,20 +215,17 @@ private fun getResetKeys(
     imageWidthPx: Int,
     imageHeightPx: Int,
     contentScale: ContentScale,
-    cropType: CropType,
     fixedAspectRatio: Boolean,
 ) = remember(
     imageWidthPx,
     imageHeightPx,
     contentScale,
-    cropType,
     fixedAspectRatio,
 ) {
     arrayOf(
         imageWidthPx,
         imageHeightPx,
         contentScale,
-        cropType,
         fixedAspectRatio,
     )
 }

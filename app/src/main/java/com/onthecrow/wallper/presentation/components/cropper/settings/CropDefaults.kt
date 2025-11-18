@@ -7,11 +7,6 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import com.onthecrow.wallper.presentation.components.cropper.model.AspectRatio
-import com.onthecrow.wallper.presentation.components.cropper.model.CropOutline
-import com.onthecrow.wallper.presentation.components.cropper.model.OutlineType
-import com.onthecrow.wallper.presentation.components.cropper.model.RectCropShape
-import com.onthecrow.wallper.presentation.components.cropper.model.aspectRatios
 import com.onthecrow.wallper.ui.theme.DefaultBackgroundColor
 import com.onthecrow.wallper.ui.theme.DefaultHandleColor
 import com.onthecrow.wallper.ui.theme.DefaultOverlayColor
@@ -25,12 +20,9 @@ object CropDefaults {
      * Properties effect crop behavior that should be passed to [CropState]
      */
     fun properties(
-        cropType: CropType = CropType.Dynamic,
         handleSize: Float,
         maxZoom: Float = 10f,
         contentScale: ContentScale = ContentScale.Fit,
-        cropOutlineProperty: CropOutlineProperty,
-        aspectRatio: AspectRatio = aspectRatios[2].aspectRatio,
         overlayRatio: Float = .9f,
         pannable: Boolean = true,
         fling: Boolean = false,
@@ -39,14 +31,13 @@ object CropDefaults {
         fixedAspectRatio: Boolean = false,
         requiredSize: IntSize? = null,
         minDimension: IntSize? = null,
+        aspectRatio: Float,
     ): CropProperties {
         return CropProperties(
-            cropType = cropType,
             handleSize = handleSize,
             contentScale = contentScale,
-            cropOutlineProperty = cropOutlineProperty,
-            maxZoom = maxZoom,
             aspectRatio = aspectRatio,
+            maxZoom = maxZoom,
             overlayRatio = overlayRatio,
             pannable = pannable,
             fling = fling,
@@ -88,11 +79,8 @@ object CropDefaults {
  */
 @Immutable
 data class CropProperties internal constructor(
-    val cropType: CropType,
     val handleSize: Float,
     val contentScale: ContentScale,
-    val cropOutlineProperty: CropOutlineProperty,
-    val aspectRatio: AspectRatio,
     val overlayRatio: Float,
     val pannable: Boolean,
     val fling: Boolean,
@@ -102,6 +90,7 @@ data class CropProperties internal constructor(
     val fixedAspectRatio: Boolean = false,
     val requiredSize: IntSize? = null,
     val minDimension: IntSize? = null,
+    val aspectRatio: Float,
 )
 
 /**
@@ -117,15 +106,6 @@ data class CropStyle internal constructor(
     val handleColor: Color,
     val backgroundColor: Color,
     val cropTheme: CropTheme = CropTheme.Dark
-)
-
-/**
- * Property for passing [CropOutline] between settings UI to [ImageCropper]
- */
-@Immutable
-data class CropOutlineProperty(
-    val outlineType: OutlineType,
-    val cropOutline: RectCropShape
 )
 
 /**

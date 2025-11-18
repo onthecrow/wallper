@@ -6,8 +6,6 @@
 package com.onthecrow.wallper.presentation.crop
 
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.interaction.MutableInteractionSource
-import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,7 +15,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -26,10 +23,8 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.RangeSlider
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -37,7 +32,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
@@ -51,15 +45,12 @@ import androidx.compose.ui.window.DialogProperties
 import com.onthecrow.wallper.R
 import com.onthecrow.wallper.crop.VideoCroppingStatus
 import com.onthecrow.wallper.presentation.components.cropper.ImageCropper
-import com.onthecrow.wallper.presentation.components.cropper.model.AspectRatio
-import com.onthecrow.wallper.presentation.components.cropper.model.OutlineType
-import com.onthecrow.wallper.presentation.components.cropper.model.RectCropShape
 import com.onthecrow.wallper.presentation.components.cropper.settings.CropDefaults
-import com.onthecrow.wallper.presentation.components.cropper.settings.CropOutlineProperty
 import com.onthecrow.wallper.presentation.crop.model.CropperEvent
 import com.onthecrow.wallper.presentation.crop.model.CropperState
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.receiveAsFlow
+import timber.log.Timber
 
 
 @Composable
@@ -88,7 +79,7 @@ fun CropperUi(
                         modifier = Modifier
                             .padding(32.dp)
                             .weight(1f)
-                            .aspectRatio(uiState.bitmap.width.toFloat() / uiState.bitmap.height.toFloat())
+                            .aspectRatio(uiState.videoSize.width.toFloat() / uiState.videoSize.height.toFloat())
                             .align(Alignment.CenterHorizontally)
                     ) {
 
@@ -97,15 +88,8 @@ fun CropperUi(
                         val cropProperties by remember {
                             mutableStateOf(
                                 CropDefaults.properties(
-                                    cropOutlineProperty = CropOutlineProperty(
-                                        OutlineType.Rect,
-                                        RectCropShape(0, "Rect")
-                                    ),
-                                    pannable = false,
-                                    zoomable = false,
                                     overlayRatio = 1f,
-                                    fling = false,
-                                    aspectRatio = AspectRatio(uiState.screenWidth / uiState.screenHeight),
+                                    aspectRatio = uiState.screenWidth / uiState.screenHeight,
                                     fixedAspectRatio = true,
                                     handleSize = handleSize
                                 )
@@ -117,11 +101,11 @@ fun CropperUi(
                             modifier = Modifier
                                 .fillMaxSize(),
                             videoUri = uiState.originalFilePath,
-                            imageBitmap = uiState.bitmap,
-                            contentDescription = "Image Cropper",
+                            videoSize = uiState.videoSize,
                             cropStyle = cropStyle,
                             cropProperties = cropProperties,
                             cropRect = { cropRect ->
+                                Timber.d("cropRect: $cropRect")
                                 rect.value = cropRect
                             },
                         )

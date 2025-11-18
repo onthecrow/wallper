@@ -1,6 +1,8 @@
 package com.onthecrow.wallper.presentation.crop
 
+import android.content.Context
 import android.graphics.Rect
+import androidx.compose.ui.unit.IntSize
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
 import com.onthecrow.wallper.core.viewmodel.BaseViewModel
@@ -12,8 +14,9 @@ import com.onthecrow.wallper.domain.model.TempFile
 import com.onthecrow.wallper.presentation.crop.model.CropperAction
 import com.onthecrow.wallper.presentation.crop.model.CropperEvent
 import com.onthecrow.wallper.presentation.crop.model.CropperState
-import com.onthecrow.wallper.util.imageBitmapFromPath
+import com.onthecrow.wallper.util.MetadataUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.catch
@@ -25,11 +28,12 @@ import javax.inject.Inject
 @HiltViewModel
 class CropperViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
+    @ApplicationContext private val context: Context,
     private val prepareFileUseCase: PrepareFileUseCase,
     private val getScreenResolutionUseCase: GetScreenResolutionUseCase,
     private val createWallpaperUseCase: CreateWallpaperUseCase,
 ) : BaseViewModel<CropperState, CropperAction, CropperEvent>(
-    CropperState(checkNotNull(savedStateHandle[CROPPER_SCREEN_NAV_ARGUMENT_URI]))
+    CropperState(checkNotNull(savedStateHandle[CROPPER_SCREEN_NAV_ARGUMENT_URI]),)
 ) {
 
     val conversionChannel = Channel<VideoCroppingStatus>()
@@ -80,6 +84,7 @@ class CropperViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             val preparedFile = prepareFileUseCase(uiState.value.uri)
             val screenResolution = getScreenResolutionUseCase()
+            val metadata = MetadataUtils.getVideoMetadata(context, preparedFile.originalFilePath)
             updateUiState {
                 copy(
                     originalFilePath = preparedFile.originalFilePath,
@@ -87,13 +92,7 @@ class CropperViewModel @Inject constructor(
                     thumbnailPath = preparedFile.thumbnailPath,
                     screenWidth = screenResolution.width,
                     screenHeight = screenResolution.height,
-                    bitmap = imageBitmapFromPath(
-                        if (preparedFile.isVideo) {
-                            preparedFile.thumbnailPath
-                        } else {
-                            preparedFile.originalFilePath
-                        }
-                    ),
+                    videoSize = IntSize(metadata.width, metadata.height),
                     error = preparedFile.error,
                 )
             }

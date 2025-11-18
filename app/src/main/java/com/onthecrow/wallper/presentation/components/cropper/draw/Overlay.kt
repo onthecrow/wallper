@@ -7,9 +7,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawOutline
@@ -19,16 +19,9 @@ import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Dp
-import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
-import com.onthecrow.wallper.presentation.components.cropper.model.CropImageMask
-import com.onthecrow.wallper.presentation.components.cropper.model.CropOutline
-import com.onthecrow.wallper.presentation.components.cropper.model.CropPath
-import com.onthecrow.wallper.presentation.components.cropper.model.CropShape
-import com.onthecrow.wallper.presentation.components.cropper.model.RectCropShape
 import com.onthecrow.wallper.presentation.components.cropper.utils.drawGrid
 import com.onthecrow.wallper.presentation.components.cropper.utils.drawWithLayer
-import com.onthecrow.wallper.presentation.components.cropper.utils.scaleAndTranslatePath
 
 /**
  * Draw overlay composed of 9 rectangles. When [drawHandles]
@@ -39,7 +32,6 @@ internal fun DrawingOverlay(
     modifier: Modifier,
     drawOverlay: Boolean,
     rect: Rect,
-    cropOutline: RectCropShape,
     drawGrid: Boolean,
     transparentColor: Color,
     overlayColor: Color,
@@ -58,8 +50,8 @@ internal fun DrawingOverlay(
         Path()
     }
 
-    val outline = remember(rect, cropOutline) {
-        cropOutline.shape.createOutline(rect.size, layoutDirection, density)
+    val outline = remember(rect) {
+        RectangleShape.createOutline(rect.size, layoutDirection, density)
     }
 
     Canvas(modifier = modifier) {

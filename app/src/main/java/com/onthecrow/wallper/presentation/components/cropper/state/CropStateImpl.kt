@@ -13,15 +13,11 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.input.pointer.PointerInputChange
 import androidx.compose.ui.unit.IntSize
 import com.onthecrow.wallper.presentation.components.cropper.TouchRegion
-import com.onthecrow.wallper.presentation.components.cropper.model.AspectRatio
 import com.onthecrow.wallper.presentation.components.cropper.model.CropData
 import com.onthecrow.wallper.presentation.components.cropper.settings.CropProperties
 
 val CropState.cropData: CropData
     get() = CropData(
-        zoom = animatableZoom.targetValue,
-        pan = Offset(animatablePanX.targetValue, animatablePanY.targetValue),
-        rotation = animatableRotation.targetValue,
         overlayRect = overlayRect,
         cropRect = cropRect
     )
@@ -34,46 +30,28 @@ val CropState.cropData: CropData
  * of the Composable. [drawAreaSize] can be smaller than [containerSize] initially based
  * on content scale of Image composable
  * @param drawAreaSize size of the area that **Bitmap** is drawn
- * @param maxZoom maximum zoom value
  * @param fling when set to true dragging pointer builds up velocity. When last
  * pointer leaves Composable a movement invoked against friction till velocity drops below
  * to threshold
- * @param zoomable when set to true zoom is enabled
- * @param pannable when set to true pan is enabled
- * @param rotatable when set to true rotation is enabled
- * @param limitPan limits pan to bounds of parent Composable. Using this flag prevents creating
  * empty space on sides or edges of parent
  */
 abstract class CropState internal constructor(
     imageSize: IntSize,
     containerSize: IntSize,
     drawAreaSize: IntSize,
-    maxZoom: Float,
     internal var fling: Boolean = true,
-    internal var aspectRatio: AspectRatio,
+    internal var aspectRatio: Float,
     internal var overlayRatio: Float,
-    zoomable: Boolean = true,
-    pannable: Boolean = true,
-    rotatable: Boolean = false,
-    limitPan: Boolean = false
 ) : TransformState(
     imageSize = imageSize,
     containerSize = containerSize,
     drawAreaSize = drawAreaSize,
-    initialZoom = 1f,
-    initialRotation = 0f,
-    maxZoom = maxZoom,
-    zoomable = zoomable,
-    pannable = pannable,
-    rotatable = rotatable,
-    limitPan = limitPan
 ) {
 
     private val animatableRectOverlay = Animatable(
         getOverlayFromAspectRatio(
             containerSize.width.toFloat(),
             containerSize.height.toFloat(),
-            drawAreaSize.width.toFloat(),
             aspectRatio,
             overlayRatio
         ),
@@ -100,10 +78,9 @@ abstract class CropState internal constructor(
      */
     var touchRegion by mutableStateOf(TouchRegion.None)
 
-    internal suspend fun init() {
+    internal fun init() {
         // When initial aspect ratio doesn't match drawable area
         // overlay gets updated so updates draw area as well
-        animateTransformationToOverlayBounds(overlayRect, animate = true)
         initialized = true
     }
 
@@ -118,11 +95,6 @@ abstract class CropState internal constructor(
         if (!initialized) return
 
         fling = cropProperties.fling
-        pannable = cropProperties.pannable
-        zoomable = cropProperties.zoomable
-        rotatable = cropProperties.rotatable
-
-        val maxZoom = cropProperties.maxZoom
 
         // Update overlay rectangle
         val aspectRatio = cropProperties.aspectRatio
@@ -131,41 +103,23 @@ abstract class CropState internal constructor(
         val overlayRatio = cropProperties.overlayRatio
 
         if (
-            this.aspectRatio.value != aspectRatio.value ||
-            maxZoom != zoomMax ||
+            this.aspectRatio != aspectRatio ||
             this.overlayRatio != overlayRatio ||
             forceUpdate
         ) {
             this.aspectRatio = aspectRatio
             this.overlayRatio = overlayRatio
 
-            zoomMax = maxZoom
-            animatableZoom.updateBounds(zoomMin, zoomMax)
-
-            val currentZoom = if (zoom > zoomMax) zoomMax else zoom
-
-            // Set new zoom
-            snapZoomTo(currentZoom)
-
-            // Calculate new region of image is drawn. It can be drawn left of 0 and right
-            // of container width depending on transformation
-            drawAreaRect = updateImageDrawRectFromTransformation()
-
             // Update overlay rectangle based on current draw area and new aspect ratio
             animateOverlayRectTo(
                 getOverlayFromAspectRatio(
                     containerSize.width.toFloat(),
                     containerSize.height.toFloat(),
-                    drawAreaSize.width.toFloat(),
                     aspectRatio,
                     overlayRatio
                 )
             )
         }
-
-        // Animate zoom, pan, rotation to move draw area to cover overlay rect
-        // inside draw area rect
-        animateTransformationToOverlayBounds(overlayRect, animate = true)
     }
 
     /**
@@ -239,112 +193,7 @@ abstract class CropState internal constructor(
                 rect.bottom <= containerSize.height
     }
 
-    /**
-     * Update rectangle for area that image is drawn. This rect changes when zoom and
-     * pan changes and position of image changes on screen as result of transformation.
-     *
-     * This function is called
-     *
-     * * when [onGesture] is called to update rect when zoom or pan changes
-     *  and if [fling] is true just after **fling** gesture starts with target
-     *  value in  [StaticCropState].
-     *
-     *  * when [updateProperties] is called in [CropState]
-     *
-     *  * when [onUp] is called in [DynamicCropState] to match [overlayRect] that could be
-     *  changed and animated if it's out of [containerSize] bounds or its grow
-     *  bigger than previous size
-     */
-    internal fun updateImageDrawRectFromTransformation(): Rect {
-        val containerWidth = containerSize.width
-        val containerHeight = containerSize.height
 
-        val originalDrawWidth = drawAreaSize.width
-        val originalDrawHeight = drawAreaSize.height
-
-        val panX = animatablePanX.targetValue
-        val panY = animatablePanY.targetValue
-
-        val left = (containerWidth - originalDrawWidth) / 2
-        val top = (containerHeight - originalDrawHeight) / 2
-
-        val zoom = animatableZoom.targetValue
-
-        val newWidth = originalDrawWidth * zoom
-        val newHeight = originalDrawHeight * zoom
-
-        return Rect(
-            offset = Offset(
-                left - (newWidth - originalDrawWidth) / 2 + panX,
-                top - (newHeight - originalDrawHeight) / 2 + panY,
-            ),
-            size = Size(newWidth, newHeight)
-        )
-    }
-
-    // TODO Add resetting back to bounds for rotated state as well
-    /**
-     * Resets to bounds with animation and resets tracking for fling animation.
-     * Changes pan, zoom and rotation to valid bounds based on [drawAreaRect] and [overlayRect]
-     */
-    internal suspend fun animateTransformationToOverlayBounds(
-        overlayRect: Rect,
-        animate: Boolean,
-        animationSpec: AnimationSpec<Float> = tween(400)
-    ) {
-
-        val zoom = zoom.coerceAtLeast(1f)
-
-        // Calculate new pan based on overlay
-        val newDrawAreaRect = calculateValidImageDrawRect(overlayRect, drawAreaRect)
-
-        val newZoom =
-            calculateNewZoom(oldRect = drawAreaRect, newRect = newDrawAreaRect, zoom = zoom)
-
-        val leftChange = newDrawAreaRect.left - drawAreaRect.left
-        val topChange = newDrawAreaRect.top - drawAreaRect.top
-
-        val widthChange = newDrawAreaRect.width - drawAreaRect.width
-        val heightChange = newDrawAreaRect.height - drawAreaRect.height
-
-        val panXChange = leftChange + widthChange / 2
-        val panYChange = topChange + heightChange / 2
-
-        val newPanX = pan.x + panXChange
-        val newPanY = pan.y + panYChange
-
-        if (animate) {
-            resetWithAnimation(
-                pan = Offset(newPanX, newPanY),
-                zoom = newZoom,
-                animationSpec = animationSpec
-            )
-        } else {
-            snapPanXto(newPanX)
-            snapPanYto(newPanY)
-            snapZoomTo(newZoom)
-        }
-
-        resetTracking()
-
-        drawAreaRect = updateImageDrawRectFromTransformation()
-    }
-
-    /**
-     * If new overlay is bigger, when crop type is dynamic, we need to increase zoom at least
-     * size of bigger dimension for image draw area([drawAreaRect]) to cover overlay([overlayRect])
-     */
-    private fun calculateNewZoom(oldRect: Rect, newRect: Rect, zoom: Float): Float {
-
-        if (oldRect.size == Size.Zero || newRect.size == Size.Zero) return zoom
-
-        val widthChange = (newRect.width / oldRect.width)
-            .coerceAtLeast(1f)
-        val heightChange = (newRect.height / oldRect.height)
-            .coerceAtLeast(1f)
-
-        return widthChange.coerceAtLeast(heightChange) * zoom
-    }
 
     /**
      * Calculate valid position for image draw rectangle when pointer is up. Overlay rectangle
@@ -393,32 +242,14 @@ abstract class CropState internal constructor(
     internal fun getOverlayFromAspectRatio(
         containerWidth: Float,
         containerHeight: Float,
-        drawAreaWidth: Float,
-        aspectRatio: AspectRatio,
+        aspectRatio: Float,
         coefficient: Float
     ): Rect {
-
-        if (aspectRatio == AspectRatio.Original) {
-            val imageAspectRatio = imageSize.width.toFloat() / imageSize.height.toFloat()
-
-            // Maximum width and height overlay rectangle can be measured with
-            val overlayWidthMax = drawAreaWidth.coerceAtMost(containerWidth * coefficient)
-            val overlayHeightMax =
-                (overlayWidthMax / imageAspectRatio).coerceAtMost(containerHeight * coefficient)
-
-            val offsetX = (containerWidth - overlayWidthMax) / 2f
-            val offsetY = (containerHeight - overlayHeightMax) / 2f
-
-            return Rect(
-                offset = Offset(offsetX, offsetY),
-                size = Size(overlayWidthMax, overlayHeightMax)
-            )
-        }
 
         val overlayWidthMax = containerWidth * coefficient
         val overlayHeightMax = containerHeight * coefficient
 
-        val aspectRatioValue = aspectRatio.value
+        val aspectRatioValue = aspectRatio
 
         var width = overlayWidthMax
         var height = overlayWidthMax / aspectRatioValue

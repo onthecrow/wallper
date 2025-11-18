@@ -93,6 +93,24 @@ class WallperWallpaperService : WallpaperService() {
             return computedColors
         }
 
+        override fun onOffsetsChanged(
+            xOffset: Float,
+            yOffset: Float,
+            xOffsetStep: Float,
+            yOffsetStep: Float,
+            xPixelOffset: Int,
+            yPixelOffset: Int
+        ) {
+            super.onOffsetsChanged(
+                xOffset,
+                yOffset,
+                xOffsetStep,
+                yOffsetStep,
+                xPixelOffset,
+                yPixelOffset
+            )
+        }
+
         override fun onSurfaceChanged(
             holder: SurfaceHolder?,
             format: Int,
