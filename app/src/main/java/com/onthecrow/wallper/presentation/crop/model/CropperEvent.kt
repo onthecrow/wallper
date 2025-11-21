@@ -7,4 +7,5 @@ sealed interface CropperEvent {
     data class TimeLineRangeChanged(val newRange: ClosedFloatingPointRange<Float>) : CropperEvent
     data object ShowAdditionalProcessingInfo : CropperEvent
     data object ToggleAdditionalProcessing : CropperEvent
+    data object TimeLineRangingFinished : CropperEvent
 }

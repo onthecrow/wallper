@@ -21,18 +21,22 @@ class WallpapersRepository @Inject constructor(
         isActive: Boolean = false,
         isVideo: Boolean = false,
         isProcessed: Boolean,
+        startPosition: Long,
+        endPosition: Long,
     ) {
         appDatabase.wallpaperDao().insertAll(
             WallpaperEntity(
-                thumbnailUri = thumbnailUri,
                 originalUri = originalFileUri,
+                thumbnailUri = thumbnailUri,
                 processedUri = croppedFilePath,
                 shownRect = rect,
                 startTime = startTime,
                 endTime = endTime,
                 isActive = isActive,
-                isVideo = isVideo,
                 isProcessed = isProcessed,
+                isVideo = isVideo,
+                startPosition = startPosition,
+                endPosition = endPosition,
             )
         )
     }

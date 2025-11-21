@@ -17,4 +17,6 @@ data class WallpaperEntity(
     @ColumnInfo(name = "is_processed") val isProcessed: Boolean,
     @ColumnInfo(name = "is_video") val isVideo: Boolean,
     @PrimaryKey(autoGenerate = true) val uid: Int = 0,
+    val startPosition: Long,
+    val endPosition: Long,
 )

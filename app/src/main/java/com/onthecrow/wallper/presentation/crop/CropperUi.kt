@@ -58,6 +58,7 @@ fun CropperUi(
     uiState: CropperState,
     conversionStateChannel: Channel<VideoCroppingStatus>,
     onEventSend: (CropperEvent) -> Unit,
+    playerState: CropperState,
 ) {
     val channel =
         conversionStateChannel.receiveAsFlow().collectAsState(VideoCroppingStatus.Undefinite)
@@ -102,6 +103,9 @@ fun CropperUi(
                                 .fillMaxSize(),
                             videoUri = uiState.originalFilePath,
                             videoSize = uiState.videoSize,
+                            videoRange = uiState.timeLineRange,
+                            uiSeek = uiState.seekPosition,
+                            videoSeek = playerState.seekPosition,
                             cropStyle = cropStyle,
                             cropProperties = cropProperties,
                             cropRect = { cropRect ->
@@ -113,8 +117,9 @@ fun CropperUi(
                 }
 
                 RangeSlider(
-                    modifier = Modifier.padding(horizontal = 8.dp),
+                    modifier = Modifier.padding(horizontal = 32.dp),
                     value = uiState.timeLineRange,
+                    onValueChangeFinished = { onEventSend.invoke(CropperEvent.TimeLineRangingFinished) },
                     onValueChange = { onEventSend.invoke(CropperEvent.TimeLineRangeChanged(it)) },
                 )
 
@@ -192,7 +197,10 @@ fun CropperUi(
 @Preview
 @Composable
 fun CropperUiPreview() {
-    CropperUi(uiState = CropperState(), conversionStateChannel = Channel()) {
-
-    }
+//    CropperUi(
+//        uiState = CropperState(), conversionStateChannel = Channel(),
+//        {
+//
+//        },
+//    )
 }

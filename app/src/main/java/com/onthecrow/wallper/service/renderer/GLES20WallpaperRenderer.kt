@@ -4,7 +4,6 @@ import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.opengl.GLES20
-import android.opengl.GLSurfaceView
 import android.view.Surface
 import androidx.core.graphics.drawable.toBitmap
 import androidx.core.graphics.withSave
@@ -20,26 +19,28 @@ import javax.microedition.khronos.opengles.GL10
 
 class GLES20WallpaperRenderer(
     private val context: Context,
-    private val surfaceProvider: () -> GLSurfaceView,
-    width: Int,
-    height: Int,
-) : GLWallpaperRenderer(width, height) {
+    private var onFrameAvailable: () -> Unit,
+    private val renderParams: RendererParams.VideoParams,
+) : GLWallpaperRenderer() {
 
     private var openGLScene: OpenGLScene? = null
 
     override fun onRendererParamsChanged(params: RendererParams) {
+        Timber.d("Renderer params changed: $params")
         if (openGLScene == null) return
         openGLScene?.updateTextureParams(
             params.videoMetadata,
             params.rect,
             params.videoMetadata.rotation
         )
+        Timber.d("Renderer params updated")
         setPlayerOrPlaceholder()
     }
 
     override fun setOffset(xOffset: Float, yOffset: Float) {}
 
     override fun dispose() {
+        Timber.d("dispose()")
         openGLScene?.release()
         openGLScene = null
     }
@@ -51,10 +52,10 @@ class GLES20WallpaperRenderer(
         GLES20.glDisable(GLES20.GL_BLEND)    // если не рисуете полупрозрачность
         GLES20.glDisable(GLES20.GL_DITHER)
         openGLScene = OpenGLScene(
-            sceneHeight = rendererParams.height,
-            sceneWidth = rendererParams.width,
-            videoMetadata = rendererParams.videoMetadata,
-            rect = rendererParams.rect
+            sceneHeight = renderParams.height,
+            sceneWidth = renderParams.width,
+            videoMetadata = renderParams.videoMetadata,
+            rect = renderParams.rect
         )
         setPlayerOrPlaceholder()
     }
@@ -68,17 +69,19 @@ class GLES20WallpaperRenderer(
     }
 
     private fun setPlayerOrPlaceholder() {
-        Timber.d("Set player or placeholder with params: $rendererParams")
         openGLScene?.fullscreenTexture?.let { texture ->
             texture.createTexture()
-            with(rendererParams) {
+            with(renderParams) {
                 when (this) {
-                    is RendererParams.PictureParams -> draw(bitmap)
-                    is RendererParams.PlaceholderParams -> drawPlaceholder()
-                    is RendererParams.VideoParams -> runBlocking { attachPlayerSurfaceSafely(player, texture.surface) }
+                    is RendererParams.VideoParams -> runBlocking {
+                        attachPlayerSurfaceSafely(player, texture.surface)
+                    }
                 }
             }
-            texture.attachFrameListener(surfaceProvider())
+            // при непрерывном рендере слушатель кадров не нужен
+            texture.attachFrameListener {
+                onFrameAvailable()  // лямбда, переданная из движка
+            }
         }
     }
 
@@ -87,35 +90,40 @@ class GLES20WallpaperRenderer(
     private suspend fun attachPlayerSurfaceSafely(player: ExoPlayer, newSurface: Surface) {
         withContext(Dispatchers.Main.immediate) {
             val old = currentVideoSurface
+            Timber.d("Attaching player surface ${System.identityHashCode(newSurface)}...")
             player.setVideoSurface(newSurface)  // заменить атомарно
+            Timber.d("Player surface attached ${System.identityHashCode(newSurface)}...")
             // Теперь безопасно отпустить старый (если был)
             if (old != null && old != newSurface) {
-                try { old.release() } catch (_: Throwable) {}
+                try {
+                    old.release()
+                } catch (_: Throwable) {
+                }
             }
             currentVideoSurface = newSurface
         }
     }
 
-    private fun drawPlaceholder() {
-        Timber.d("Draw placeholder")
-        val drawable = context.resources
-            .getDrawable(R.drawable.bg_engine_empty, null)
-            .toBitmap(width = rendererParams.width, height = rendererParams.height)
-        draw(drawable)
-    }
+//    private fun drawPlaceholder() {
+//        Timber.d("Draw placeholder")
+//        val drawable = context.resources
+//            .getDrawable(R.drawable.bg_engine_empty, null)
+//            .toBitmap(width = rendererParams.width, height = rendererParams.height)
+//        draw(drawable)
+//    }
 
-    private fun draw(bitmap: Bitmap) {
-        Timber.d("Draw bitmap: $bitmap")
-        openGLScene?.fullscreenTexture?.surface?.let { surface ->
-            var canvas: Canvas? = null
-            try {
-                canvas = surface.lockHardwareCanvas()
-                canvas?.withSave {
-                    drawBitmap(bitmap, 0f, 0f, null)
-                }
-            } finally {
-                if (canvas != null) surface.unlockCanvasAndPost(canvas)
-            }
-        }
-    }
+//    private fun draw(bitmap: Bitmap) {
+//        Timber.d("Draw bitmap: $bitmap")
+//        openGLScene?.fullscreenTexture?.surface?.let { surface ->
+//            var canvas: Canvas? = null
+//            try {
+//                canvas = surface.lockHardwareCanvas()
+//                canvas?.withSave {
+//                    drawBitmap(bitmap, 0f, 0f, null)
+//                }
+//            } finally {
+//                if (canvas != null) surface.unlockCanvasAndPost(canvas)
+//            }
+//        }
+//    }
 }

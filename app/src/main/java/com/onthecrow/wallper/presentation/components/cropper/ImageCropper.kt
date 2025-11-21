@@ -41,6 +41,9 @@ fun ImageCropper(
     modifier: Modifier = Modifier,
     videoUri: String,
     videoSize: IntSize,
+    videoRange: ClosedFloatingPointRange<Float>,
+    uiSeek: Float?,
+    videoSeek: Float?,
     cropStyle: CropStyle = CropDefaults.style(),
     cropProperties: CropProperties,
     backgroundColor: Color = Color.Transparent,
@@ -112,7 +115,7 @@ fun ImageCropper(
             }
         }
 
-        val pressedStateColor = remember(cropStyle.backgroundColor){
+        val pressedStateColor = remember(cropStyle.backgroundColor) {
             cropStyle.backgroundColor
                 .copy(cropStyle.backgroundColor.alpha * .7f)
         }
@@ -145,6 +148,9 @@ fun ImageCropper(
         ImageCropper(
             modifier = imageModifier,
             videoUri = videoUri,
+            videoRange = videoRange,
+            uiSeek = uiSeek,
+            videoSeek = videoSeek,
             visible = visible,
             handleSize = cropProperties.handleSize,
             overlayRect = cropState.overlayRect,
@@ -161,6 +167,9 @@ fun ImageCropper(
 private fun ImageCropper(
     modifier: Modifier,
     videoUri: String,
+    videoRange: ClosedFloatingPointRange<Float>,
+    uiSeek: Float?,
+    videoSeek: Float?,
     visible: Boolean,
     handleSize: Float,
     cropStyle: CropStyle,
@@ -182,7 +191,18 @@ private fun ImageCropper(
 
             Box(contentAlignment = Alignment.Center) {
                 // todo draw video
-                VideoSurface(videoUri)
+                VideoSurface(
+                    videoUri,
+                    videoRange = videoRange,
+                    seek = uiSeek,
+                )
+
+                if (videoSeek != null) {
+                    Seeker(
+                        videoUri,
+                        videoSeek,
+                    )
+                }
 
                 val drawOverlay = cropStyle.drawOverlay
 

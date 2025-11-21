@@ -15,8 +15,8 @@ import javax.inject.Inject
 
 
 class CreateWallpaperUseCase @Inject constructor(
-    @MainVideoCropper private val mainVideoCropper: VideoCropper,
-    @FallbackVideoCropper private val fallbackVideoCropper: VideoCropper,
+    @param:MainVideoCropper private val mainVideoCropper: VideoCropper,
+//    @param:FallbackVideoCropper private val fallbackVideoCropper: VideoCropper,
     private val storageRepository: StorageRepository,
     private val wallpapersRepository: WallpapersRepository,
 ) {
@@ -24,15 +24,15 @@ class CreateWallpaperUseCase @Inject constructor(
         rect: Rect,
         tempFile: TempFile,
         additionalProcessing: Boolean,
+        videoRange: LongRange,
     ): Flow<VideoCroppingStatus> {
         val filePath = storageRepository.saveTempFile()
         val thumbnailPath = storageRepository.saveTempThumbnail()
         val croppedFilePath = filePath + SUFFIX_CROPPED_FILE
-
         return when {
             tempFile.isVideo && additionalProcessing ->
-                mainVideoCropper.setFallbackCropper(fallbackVideoCropper)
-                    .crop(rect, filePath ?: "", croppedFilePath)
+                mainVideoCropper/*.setFallbackCropper(fallbackVideoCropper)*/
+                    .crop(rect, filePath ?: "", croppedFilePath, videoRange?.start, videoRange?.endInclusive)
 
             else -> flowOf(VideoCroppingStatus.Success)
         }.onEach { status ->
@@ -44,6 +44,8 @@ class CreateWallpaperUseCase @Inject constructor(
                     rect = rect,
                     isVideo = tempFile.isVideo,
                     isProcessed = additionalProcessing,
+                    startPosition = videoRange.first,
+                    endPosition = videoRange.last,
                 )
             }
         }

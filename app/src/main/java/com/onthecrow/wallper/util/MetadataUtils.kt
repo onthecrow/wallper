@@ -11,20 +11,16 @@ object MetadataUtils {
         val mmr = MediaMetadataRetriever()
 //        mmr.setDataSource(path)
         mmr.setDataSource(context, Uri.encode(path).toUri())
-        val rotation = mmr.extractMetadata(
-            MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION
-        )
-        val width = mmr.extractMetadata(
-            MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH
-        )
-        val height = mmr.extractMetadata(
-            MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT
-        )
+        val rotation = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)
+        val width = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)
+        val height = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)
+        val duration = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
         mmr.release()
         return VideoMetadata(
             rotation?.toInt() ?: 0,
             width?.toInt() ?: 0,
             height?.toInt() ?: 0,
+            duration?.toLong() ?: 0L,
         )
     }
 }

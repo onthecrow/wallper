@@ -1,7 +1,7 @@
 package com.onthecrow.wallper.presentation.crop
 
 import android.content.Context
-import android.graphics.Rect
+import androidx.compose.ui.graphics.toAndroidRect
 import androidx.compose.ui.unit.IntSize
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
@@ -28,7 +28,7 @@ import javax.inject.Inject
 @HiltViewModel
 class CropperViewModel @Inject constructor(
     savedStateHandle: SavedStateHandle,
-    @ApplicationContext private val context: Context,
+    @param:ApplicationContext private val context: Context,
     private val prepareFileUseCase: PrepareFileUseCase,
     private val getScreenResolutionUseCase: GetScreenResolutionUseCase,
     private val createWallpaperUseCase: CreateWallpaperUseCase,
@@ -44,30 +44,36 @@ class CropperViewModel @Inject constructor(
 
     override fun sendEvent(uiEvent: CropperEvent) {
         when (uiEvent) {
-            is CropperEvent.CreateWallpaper -> createWallpaper(
-                Rect(
-                    uiEvent.rect.left.toInt(),
-                    uiEvent.rect.top.toInt(),
-                    uiEvent.rect.right.toInt(),
-                    uiEvent.rect.bottom.toInt(),
-                ),
-            )
+            is CropperEvent.CreateWallpaper -> createWallpaper(uiEvent.rect)
             CropperEvent.ShowAdditionalProcessingInfo -> {}
-            is CropperEvent.TimeLineRangeChanged -> updateUiState { copy(timeLineRange = uiEvent.newRange) }
+            is CropperEvent.TimeLineRangeChanged -> updateUiState {
+                Timber.d("TimeLineRangeChanged: $uiEvent")
+                if (uiEvent.newRange.start != uiState.value.timeLineRange.start) {
+                    copy(seekPosition = uiEvent.newRange.start, timeLineRange = uiEvent.newRange)
+                } else {
+                    copy(seekPosition = uiEvent.newRange.endInclusive, timeLineRange = uiEvent.newRange)
+                }
+            }
             CropperEvent.ToggleAdditionalProcessing -> updateUiState { copy(isAdditionalProcessing = !isAdditionalProcessing) }
+            CropperEvent.TimeLineRangingFinished -> updateUiState {
+                Timber.d("TimeLineRangingFinished")
+                copy(seekPosition = null)
+            }
         }
     }
 
-    private fun createWallpaper(rect: Rect) {
+    private fun createWallpaper(rect: androidx.compose.ui.geometry.Rect) {
         viewModelScope.launch(Dispatchers.Main) {
+            val duration = MetadataUtils.getVideoMetadata(context, uiState.value.originalFilePath).duration
             createWallpaperUseCase.invoke(
-                rect,
+                rect.toAndroidRect(),
                 TempFile(
                     uiState.value.originalFilePath,
                     uiState.value.isVideo,
                     uiState.value.thumbnailPath
                 ),
                 uiState.value.isAdditionalProcessing,
+                (uiState.value.timeLineRange.start * duration).toLong() .. (uiState.value.timeLineRange.endInclusive * duration).toLong(),
             )
                 .onEach {
                     conversionChannel.send(it)

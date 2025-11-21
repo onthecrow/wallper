@@ -28,9 +28,6 @@ import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
-import kotlinx.coroutines.flow.flattenConcat
-import kotlinx.coroutines.flow.flowOf
-import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 
 class TransformerVideoCropperImpl(
@@ -41,7 +38,9 @@ class TransformerVideoCropperImpl(
     override fun cropInternal(
         rectToCropFor: Rect,
         inputFilePath: String,
-        outputFilePath: String
+        outputFilePath: String,
+        startPosition: Long?,
+        endPosition: Long?,
     ): Flow<VideoCroppingStatus> {
         return callbackFlow {
             var progressJob: Job? = null
@@ -56,7 +55,7 @@ class TransformerVideoCropperImpl(
                 }
             )
             transformer.start(
-                getEditedMediaItemForVideo(inputFilePath, rectToCropFor),
+                getEditedMediaItemForVideo(inputFilePath, rectToCropFor, startPosition, endPosition),
                 outputFilePath
             )
             progressJob = getProgressRenewalJob(
@@ -68,13 +67,13 @@ class TransformerVideoCropperImpl(
                 progressJob.cancel()
                 transformer.cancel()
             }
-        }.map { status ->
+        }/*.map { status ->
             if (status is VideoCroppingStatus.Error) {
                 fallbackCropper?.crop(rectToCropFor, inputFilePath, outputFilePath)
             } else {
                 null
             } ?: flowOf(status)
-        }.flattenConcat()
+        }.flattenConcat()*/
     }
 
     @OptIn(UnstableApi::class)
@@ -139,18 +138,35 @@ class TransformerVideoCropperImpl(
     private fun getEditedMediaItemForVideo(
         inputFilePath: String,
         rectToCropFor: Rect,
+        startPosition: Long?,
+        endPosition: Long?,
     ): EditedMediaItem {
         val videoMetadata = getVideoMetadata(inputFilePath)
-        return EditedMediaItem.Builder(MediaItem.fromUri(inputFilePath))
+        return EditedMediaItem.Builder(
+            MediaItem.Builder()
+                .setUri(inputFilePath)
+                .setClippingConfiguration(
+                    MediaItem.ClippingConfiguration.Builder().apply {
+                        startPosition?.let { setStartPositionMs(it) }
+                        endPosition?.let { setEndPositionMs(it) }
+                    }
+                        .build()
+                )
+                .build()
+        )
             .setRemoveAudio(true)
             // TODO implement other frame rates later
-            .setFrameRate(24)
+//            .setFrameRate(24)
             .setEffects(
                 Effects(
                     listOf(),
                     getVideoEffectsForVideo(
                         videoMetadata,
-                        NDCCoords.fromRect(rectToCropFor, videoMetadata.width, videoMetadata.height),
+                        NDCCoords.fromRect(
+                            rectToCropFor,
+                            videoMetadata.width,
+                            videoMetadata.height
+                        ),
                     )
                 )
             )

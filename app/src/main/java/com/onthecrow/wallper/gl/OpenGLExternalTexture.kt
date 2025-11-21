@@ -10,6 +10,7 @@ import android.os.Handler
 import android.os.Looper
 import android.view.Surface
 import com.onthecrow.wallper.util.GLErrorUtils
+import timber.log.Timber
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
@@ -20,7 +21,7 @@ class OpenGLExternalTexture(
     val textureWidth: Int,
     val textureHeight: Int,
     verticesData: FloatArray,
-    externalTextureId: Int? = null,
+    val externalTextureId: Int? = null,
     var rotate: Int = Surface.ROTATION_0
 ) {
     private val mMVPMatrix = FloatArray(16)
@@ -80,11 +81,15 @@ class OpenGLExternalTexture(
         verticesBuffer.clear()
         surfaceTexture.release()
         surface.release()
+        if (textureId != -1) {
+            GLES20.glDeleteTextures(1, intArrayOf(textureId), 0)
+            textureId = -1
+        }
     }
 
-    fun attachFrameListener(glView: GLSurfaceView) {
+    fun attachFrameListener(listener: () -> Unit) {
         surfaceTexture.setOnFrameAvailableListener({
-            glView.requestRender()
+            listener()
         }, Handler(Looper.getMainLooper()))
     }
 
@@ -161,11 +166,20 @@ class OpenGLExternalTexture(
     }
 
     fun createTexture() {
+        if (textureId != -1) return
         surfaceTexture.release()
         surface.release()
+
+        textureId = externalTextureId
+            ?: IntArray(1).also {
+                GLES20.glGenTextures(1, it, 0)
+            }.let { it[0] }
         surfaceTexture = SurfaceTexture(textureId)
-//        surfaceTexture.setDefaultBufferSize(textureWidth, textureHeight)
         surface = Surface(surfaceTexture)
+//        _surface = Surface(surfaceTexture)
+//        surfaceTexture = SurfaceTexture(textureId)
+////        surfaceTexture.setDefaultBufferSize(textureWidth, textureHeight)
+//        surface = Surface(surfaceTexture)
     }
 
 

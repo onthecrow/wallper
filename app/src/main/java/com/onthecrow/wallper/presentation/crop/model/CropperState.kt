@@ -11,6 +11,7 @@ data class CropperState(
     val screenWidth: Float = 1f,
     val screenHeight: Float = 1f,
     val error: Throwable? = null,
+    val seekPosition: Float? = null,
     val isAdditionalProcessing: Boolean = false,
     val timeLineRange: ClosedFloatingPointRange<Float> = 0f..1f,
     override val actions: List<CropperAction> = listOf(),

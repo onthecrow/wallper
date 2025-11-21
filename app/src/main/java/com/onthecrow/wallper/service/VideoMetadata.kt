@@ -4,4 +4,5 @@ data class VideoMetadata(
     val rotation: Int,
     val width: Int,
     val height: Int,
+    val duration: Long,
 )
