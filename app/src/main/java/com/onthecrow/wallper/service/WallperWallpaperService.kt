@@ -21,7 +21,6 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -112,9 +111,10 @@ class WallperWallpaperService : WallpaperService() {
             surfaceHolder: SurfaceHolder? = this.surfaceHolder
         ) {
             Timber.d("createEngine()")
-            if (surfaceHolder == null || entity == null) return
+            if (surfaceHolder == null) return
             wallpaperEngine?.release()
             wallpaperEngine = wallpaperEngineFactory.create(baseContext, { surfaceHolder }, entity)
+            computeColors()
         }
 
         @Suppress("unused")
@@ -123,7 +123,7 @@ class WallperWallpaperService : WallpaperService() {
 
             computeColorsJob?.cancel()
             computeColorsJob = engineContext.launch(Dispatchers.IO) {
-                val activeWallpaper = getActiveWallpaperUseCase().firstOrNull()
+                val activeWallpaper = _state.value
 
                 val bitmap = if (activeWallpaper == null) {
                     applicationContext.resources

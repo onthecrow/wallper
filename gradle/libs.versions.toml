@@ -19,6 +19,7 @@ dataStore = "1.2.0"
 serializationJson = "1.9.0"
 media3 = "1.8.0"
 splashScreen = "1.2.0"
+appcompatResources = "1.7.1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -51,6 +52,7 @@ hilt-navigation = { group = "androidx.hilt", name = "hilt-navigation-compose", v
 coil = { group = "io.coil-kt", name = "coil-compose", version.ref = "coil" }
 timber = { group = "com.jakewharton.timber", name = "timber", version.ref = "timber" }
 serialization = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-json", version.ref = "serializationJson"}
+androidx-appcompat-resources = { group = "androidx.appcompat", name = "appcompat-resources", version.ref = "appcompatResources" }
 
 [plugins]
 androidApplication = { id = "com.android.application", version.ref = "agp" }

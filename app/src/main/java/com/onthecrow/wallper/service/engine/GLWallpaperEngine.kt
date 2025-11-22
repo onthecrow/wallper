@@ -9,17 +9,13 @@ import com.onthecrow.wallper.service.renderer.GLES20WallpaperRenderer
 import com.onthecrow.wallper.service.renderer.GLWallpaperRenderer
 import com.onthecrow.wallper.service.renderer.RendererParams
 import com.onthecrow.wallper.util.MetadataUtils.getVideoMetadata
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.MainScope
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import timber.log.Timber
 
 class GLWallpaperEngine(
-    private val context: Context,
-    private val exoPlayerFactory: ExoPlayerFactory,
-    private val surfaceHolder: () -> SurfaceHolder,
-    private val wallpaperEntity: WallpaperEntity,
+    context: Context,
+    exoPlayerFactory: ExoPlayerFactory,
+    surfaceHolder: () -> SurfaceHolder,
+    wallpaperEntity: WallpaperEntity,
 ) : WallpaperEngine() {
 
     private var glThread: WallpaperGLThread? = null
@@ -43,7 +39,6 @@ class GLWallpaperEngine(
         val videoMetadata = getVideoMetadata(context, wallpaperEntity.originalUri)
         // 1) создаём renderer (GLES20WallpaperRenderer)
         renderer = GLES20WallpaperRenderer(
-            context = context,
             onFrameAvailable = {
                 glThread?.requestRender()
             },

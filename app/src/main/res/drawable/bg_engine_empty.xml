@@ -10,4 +10,8 @@
         android:width="200dp"
         android:height="200dp">
     </item>
+    <item android:gravity="center"
+        android:top="120dp"
+        android:drawable="@drawable/ic_wallper_moto">
+    </item>
 </layer-list>

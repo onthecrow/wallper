@@ -4,13 +4,11 @@ import android.annotation.SuppressLint
 import android.graphics.SurfaceTexture
 import android.opengl.GLES11Ext
 import android.opengl.GLES20
-import android.opengl.GLSurfaceView
 import android.opengl.Matrix
 import android.os.Handler
 import android.os.Looper
 import android.view.Surface
 import com.onthecrow.wallper.util.GLErrorUtils
-import timber.log.Timber
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
@@ -81,10 +79,6 @@ class OpenGLExternalTexture(
         verticesBuffer.clear()
         surfaceTexture.release()
         surface.release()
-        if (textureId != -1) {
-            GLES20.glDeleteTextures(1, intArrayOf(textureId), 0)
-            textureId = -1
-        }
     }
 
     fun attachFrameListener(listener: () -> Unit) {
@@ -165,22 +159,13 @@ class OpenGLExternalTexture(
         GLErrorUtils.checkGlError("glDrawArrays")
     }
 
-    fun createTexture() {
-        if (textureId != -1) return
-        surfaceTexture.release()
-        surface.release()
-
-        textureId = externalTextureId
-            ?: IntArray(1).also {
-                GLES20.glGenTextures(1, it, 0)
-            }.let { it[0] }
-        surfaceTexture = SurfaceTexture(textureId)
-        surface = Surface(surfaceTexture)
-//        _surface = Surface(surfaceTexture)
+//    fun createTexture() {
+//        surfaceTexture.release()
+//        surface.release()
 //        surfaceTexture = SurfaceTexture(textureId)
 ////        surfaceTexture.setDefaultBufferSize(textureWidth, textureHeight)
 //        surface = Surface(surfaceTexture)
-    }
+//    }
 
 
     companion object {
