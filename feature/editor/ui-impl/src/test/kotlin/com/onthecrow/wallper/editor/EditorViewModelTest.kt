@@ -1,0 +1,100 @@
+package com.onthecrow.wallper.editor
+
+import com.onthecrow.wallper.core.model.ClipRange
+import com.onthecrow.wallper.core.model.CropRect
+import com.onthecrow.wallper.core.model.MediaInfo
+import com.onthecrow.wallper.core.model.MediaType
+import com.onthecrow.wallper.core.navigation.Destination
+import com.onthecrow.wallper.core.navigation.Navigator
+import com.onthecrow.wallper.editor.domain.CreateWallpaperUseCase
+import com.onthecrow.wallper.editor.domain.PrepareMediaUseCase
+import com.onthecrow.wallper.editor.domain.model.ExportStatus
+import com.onthecrow.wallper.editor.domain.model.PreparedMedia
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.resetMain
+import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.test.setMain
+import kotlin.test.AfterTest
+import kotlin.test.BeforeTest
+import kotlin.test.Test
+import kotlin.test.assertEquals
+import kotlin.test.assertIs
+
+@OptIn(ExperimentalCoroutinesApi::class)
+class EditorViewModelTest {
+
+    private val dispatcher = UnconfinedTestDispatcher()
+    private val media = PreparedMedia("temp/media", MediaType.VIDEO, MediaInfo(1920, 1080, 0, 10_000))
+    private var prepareResult: Result<PreparedMedia> = Result.success(media)
+    private var exportStatuses: List<ExportStatus> = listOf(ExportStatus.InProgress(10), ExportStatus.Success)
+    private val createCalls = mutableListOf<Triple<CropRect, ClipRange, Boolean>>()
+    private var backNavigations = 0
+
+    @BeforeTest
+    fun setUp() = Dispatchers.setMain(dispatcher)
+
+    @AfterTest
+    fun tearDown() = Dispatchers.resetMain()
+
+    private fun createViewModel() = EditorViewModel(
+        destination = EditorDestination("content://video"),
+        reducer = EditorReducer(),
+        prepareMediaUseCase = object : PrepareMediaUseCase {
+            override suspend fun invoke(uri: String) = prepareResult
+        },
+        createWallpaperUseCase = object : CreateWallpaperUseCase {
+            override fun invoke(media: PreparedMedia, crop: CropRect, clip: ClipRange, preCrop: Boolean): Flow<ExportStatus> {
+                createCalls += Triple(crop, clip, preCrop)
+                return flowOf(*exportStatuses.toTypedArray())
+            }
+        },
+        navigator = object : Navigator {
+            override fun navigate(destination: Destination) = Unit
+            override fun navigateBack() { backNavigations++ }
+        },
+    )
+
+    @Test
+    fun `picked media is prepared on start`() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+
+        assertEquals(media, viewModel.state.value.media)
+    }
+
+    @Test
+    fun `failed preparation shows the error`() = runTest(dispatcher) {
+        prepareResult = Result.failure(IllegalStateException("broken file"))
+
+        val viewModel = createViewModel()
+
+        assertIs<ExportStatus.Error>(viewModel.state.value.exportStatus)
+    }
+
+    @Test
+    fun `save turns the slider range into a clip and goes back on success`() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+        viewModel.onEvent(EditorEvent.OnTimeLineRangeChange(0.1f..0.5f))
+        viewModel.onEvent(EditorEvent.OnAdditionalProcessingToggle)
+
+        viewModel.onEvent(EditorEvent.OnSaveClick(CropRect(0, 0, 100, 200)))
+
+        assertEquals(Triple(CropRect(0, 0, 100, 200), ClipRange(1_000, 5_000), true), createCalls.single())
+        assertEquals(ExportStatus.Success, viewModel.state.value.exportStatus)
+        assertEquals(1, backNavigations)
+    }
+
+    @Test
+    fun `failed export stays on the screen`() = runTest(dispatcher) {
+        exportStatuses = listOf(ExportStatus.Error(IllegalStateException("encoder")))
+        val viewModel = createViewModel()
+
+        viewModel.onEvent(EditorEvent.OnSaveClick(CropRect(0, 0, 100, 200)))
+
+        assertIs<ExportStatus.Error>(viewModel.state.value.exportStatus)
+        assertEquals(0, backNavigations)
+    }
+}

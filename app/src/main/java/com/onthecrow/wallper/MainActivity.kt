@@ -3,10 +3,11 @@ package com.onthecrow.wallper
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.ui.Modifier
+import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.lifecycle.lifecycleScope
-import com.onthecrow.wallper.navigation.SetupNavigation
-import com.onthecrow.wallper.presentation.picker.ImagePicker
-import com.onthecrow.wallper.ui.theme.WallperTheme
+import com.onthecrow.wallper.core.designsystem.theme.WallperTheme
+import com.onthecrow.wallper.core.navigation.NavigationProvider
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -21,16 +22,12 @@ class MainActivity : ComponentActivity() {
     private lateinit var filesDir: File
 
     @Inject
-    lateinit var screenResolutionManager: ScreenResolutionManager
-
-    init {
-        ImagePicker.init(this)
-    }
+    lateinit var navigationProvider: NavigationProvider
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        installSplashScreen()
         super.onCreate(savedInstanceState)
         filesDir = this.getExternalFilesDir(null)!!
-        screenResolutionManager.obtainScreenResolution(this)
         lifecycleScope.launch {
             withContext(Dispatchers.IO) {
                 copyLogFile()
@@ -38,7 +35,7 @@ class MainActivity : ComponentActivity() {
         }
         setContent {
             WallperTheme {
-                SetupNavigation()
+                navigationProvider.Navigation(Modifier)
             }
         }
     }
@@ -49,13 +46,9 @@ class MainActivity : ComponentActivity() {
             "wallper-log.txt",
         )
         if (logFile.exists()) {
-//            val bytes = logFile.readText()
             val extLogFile = File(filesDir.absolutePath, "wallper-log.txt")
             if (extLogFile.exists()) extLogFile.delete()
             extLogFile.writeBytes(logFile.readBytes())
-//            extLogFile.bufferedWriter().use {
-//                it.write(bytes)
-//            }
         }
     }
 }

@@ -1,30 +1,53 @@
+rootProject.name = "Wallper"
+enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
+
 pluginManagement {
+    includeBuild("build-logic")
     repositories {
         google {
-            content {
-                includeGroupByRegex("com\\.android.*")
-                includeGroupByRegex("com\\.google.*")
-                includeGroupByRegex("androidx.*")
+            mavenContent {
+                includeGroupAndSubgroups("androidx")
+                includeGroupAndSubgroups("com.android")
+                includeGroupAndSubgroups("com.google")
             }
-        }
-        maven {
-            url = uri("https://plugins.gradle.org/m2/")
         }
         mavenCentral()
         gradlePluginPortal()
     }
 }
+
 dependencyResolutionManagement {
     repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
-        google()
-        mavenCentral()
-        maven {
-            url = uri("https://plugins.gradle.org/m2/")
+        google {
+            mavenContent {
+                includeGroupAndSubgroups("androidx")
+                includeGroupAndSubgroups("com.android")
+                includeGroupAndSubgroups("com.google")
+            }
         }
+        mavenCentral()
     }
 }
 
-rootProject.name = "Wallper"
 include(":app")
- 
+include(":core:model")
+include(":core:coroutines")
+include(":core:mvi")
+include(":core:navigation:api")
+include(":core:navigation:impl")
+include(":core:designsystem")
+include(":core:resources")
+include(":core:storage")
+include(":core:engine:api")
+include(":feature:wallpapers:logic-api")
+include(":feature:wallpapers:logic-impl")
+include(":core:player")
+include(":core:gl")
+include(":core:engine:impl")
+include(":feature:wallpapers:ui-api")
+include(":feature:wallpapers:ui-impl")
+include(":feature:editor:logic-api")
+include(":feature:editor:logic-impl")
+include(":feature:editor:ui-api")
+include(":feature:editor:ui-impl")

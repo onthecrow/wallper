@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-
-    <style name="Theme.Wallper" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.App.Starting" parent="Theme.SplashScreen">
+        <item name="android:windowBackground">@color/ic_launcher_background</item>
+        <item name="android:windowSplashScreenBackground">@color/ic_launcher_background</item>
+    </style>
+    <style name="Theme.Wallper" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowSplashScreenBackground">@color/ic_launcher_background</item>
+<!--        <item name="android:windowSplashScreenAnimatedIcon">@drawable/...</item>-->
+<!--        <item name="android:windowSplashScreenAnimationDuration">1000</item>-->
+<!--        <item name="android:windowSplashScreenIconBackgroundColor">@color/...</item>-->
+    </style>
 </resources>
