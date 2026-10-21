@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <uses-feature android:name="android.software.live_wallpaper" />
+
+    <application>
+        <!-- After the store release this class name must never change: the system stores it
+             as the selected live wallpaper component. -->
+        <service
+            android:name=".WallperWallpaperService"
+            android:label="@string/engine_label"
+            android:permission="android.permission.BIND_WALLPAPER"
+            android:directBootAware="true"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.service.wallpaper.WallpaperService" />
+            </intent-filter>
+            <meta-data
+                android:name="android.service.wallpaper"
+                android:resource="@xml/wallpaper" />
+        </service>
+    </application>
+
+</manifest>
