@@ -7,8 +7,6 @@ import timber.log.Timber
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
-import javax.microedition.khronos.egl.EGLConfig
-import javax.microedition.khronos.opengles.GL10
 
 /**
  * Простой GL-рендерер: fullscreen quad с текстурой из битмапа.
@@ -27,7 +25,7 @@ class BitmapWallpaperRenderer(
     private lateinit var vertexBuffer: FloatBuffer
     private lateinit var texCoordBuffer: FloatBuffer
 
-    override fun onSurfaceCreated(gl: GL10?, config: EGLConfig?) {
+    override fun onSurfaceCreated() {
         Timber.d("BitmapRenderer.onSurfaceCreated")
         GLES20.glDisable(GLES20.GL_DEPTH_TEST)
         GLES20.glDisable(GLES20.GL_STENCIL_TEST)
@@ -39,12 +37,12 @@ class BitmapWallpaperRenderer(
         loadTexture()
     }
 
-    override fun onSurfaceChanged(gl: GL10?, width: Int, height: Int) {
+    override fun onSurfaceChanged(width: Int, height: Int) {
         Timber.d("BitmapRenderer.onSurfaceChanged($width x $height)")
         GLES20.glViewport(0, 0, width, height)
     }
 
-    override fun onDrawFrame(gl: GL10?) {
+    override fun onDrawFrame(): Boolean {
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
 
         GLES20.glUseProgram(program)
@@ -81,6 +79,7 @@ class BitmapWallpaperRenderer(
 
         GLES20.glDisableVertexAttribArray(aPos)
         GLES20.glDisableVertexAttribArray(aTex)
+        return false
     }
 
     override fun setOffset(xOffset: Float, yOffset: Float) { }

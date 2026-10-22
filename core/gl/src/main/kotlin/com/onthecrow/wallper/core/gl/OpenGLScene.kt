@@ -5,12 +5,12 @@ import com.onthecrow.wallper.core.model.CropRect
 import com.onthecrow.wallper.core.model.MediaInfo
 import timber.log.Timber
 
+/** The shader program and crop geometry shared by all video slots. GL thread only. */
 internal class OpenGLScene(
-    sceneWidth: Int,
-    sceneHeight: Int,
-    mediaInfo: MediaInfo,
+    private val sceneWidth: Int,
+    private val sceneHeight: Int,
+    private val mediaInfo: MediaInfo,
     rect: CropRect,
-    fullscreenTextureId: Int? = null,
 ) {
     private val programId: Int
     private val uMVPMatrixHandle: Int
@@ -42,13 +42,7 @@ internal class OpenGLScene(
         }
     """.trimIndent()
 
-    val fullscreenTexture = OpenGLExternalTexture(
-        textureWidth = sceneWidth,
-        textureHeight = sceneHeight,
-        verticesData = getVerticesData(mediaInfo, rect, mediaInfo.rotation),
-        externalTextureId = fullscreenTextureId,
-        rotate = mediaInfo.rotation,
-    )
+    private val verticesData = getVerticesData(mediaInfo, rect)
 
     init {
         GLES20.glViewport(0, 0, sceneWidth, sceneHeight)
@@ -88,18 +82,25 @@ internal class OpenGLScene(
         }
     }
 
-    fun release() {
-        fullscreenTexture.release()
+    fun createTexture() = OpenGLExternalTexture(
+        textureWidth = sceneWidth,
+        textureHeight = sceneHeight,
+        verticesData = verticesData,
+    )
+
+    /** @param deleteProgram false when the EGL context is already gone. */
+    fun release(deleteProgram: Boolean = true) {
+        if (deleteProgram) GLES20.glDeleteProgram(programId)
     }
 
-    fun updateFrame() {
+    fun draw(texture: OpenGLExternalTexture) {
         GLES20.glClearColor(0f, 0f, 0f, 1.0f)
         GLES20.glClear(GLES20.GL_DEPTH_BUFFER_BIT or GLES20.GL_COLOR_BUFFER_BIT)
 
         GLES20.glUseProgram(programId)
         checkGlError("glUseProgram")
 
-        fullscreenTexture.updateFrame(
+        texture.draw(
             aPositionHandle = aPositionHandle,
             aTextureCoordHandler = aTextureCoordHandler,
             uTexHandler = uTexMatrixHandle,
@@ -107,13 +108,8 @@ internal class OpenGLScene(
         )
     }
 
-    fun updateTextureParams(mediaInfo: MediaInfo, rect: CropRect, rotation: Int) {
-        fullscreenTexture.setVerticesData(getVerticesData(mediaInfo, rect, rotation))
-        fullscreenTexture.rotate = mediaInfo.rotation
-    }
-
-    private fun getVerticesData(mediaInfo: MediaInfo, rect: CropRect, rotation: Int): FloatArray {
-        val uvCoords = UVCoords.fromRect(mediaInfo.width, mediaInfo.height, rect, rotation)
+    private fun getVerticesData(mediaInfo: MediaInfo, rect: CropRect): FloatArray {
+        val uvCoords = UVCoords.fromRect(mediaInfo.displayWidth, mediaInfo.displayHeight, rect)
         return floatArrayOf(
             // X,   Y,      Z,     U,  V
             -1.0f, -1.0f, 1.0f, uvCoords.bottomLeft.u, uvCoords.bottomLeft.v,

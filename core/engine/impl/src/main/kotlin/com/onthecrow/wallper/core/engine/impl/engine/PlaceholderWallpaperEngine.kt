@@ -44,6 +44,14 @@ internal class PlaceholderWallpaperEngine(
         }
     }
 
+    override fun onSurfaceChanged(width: Int, height: Int) {
+        glThread?.onSurfaceCreatedOrChanged(width, height)
+    }
+
+    override fun onSurfaceDestroyed() {
+        glThread?.onSurfaceDestroyed()
+    }
+
     override fun pause() {
         Timber.d("PlaceholderWallpaperEngine paused")
         glThread?.onPauseRendering()

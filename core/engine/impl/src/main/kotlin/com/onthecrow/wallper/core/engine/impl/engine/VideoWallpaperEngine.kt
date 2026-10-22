@@ -1,45 +1,48 @@
 package com.onthecrow.wallper.core.engine.impl.engine
 
-import android.content.Context
 import android.view.SurfaceHolder
-import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.ExoPlayer
-import com.onthecrow.wallper.core.player.ExoPlayerFactory
+import com.onthecrow.wallper.core.player.PlayerMedia
+import com.onthecrow.wallper.core.player.WallperPlayerFactory
+import com.onthecrow.wallper.core.player.WallperPlayerState
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
 import timber.log.Timber
 
 /** Plays a video the editor has already cropped and trimmed, straight onto the wallpaper surface. */
-@UnstableApi
 internal class VideoWallpaperEngine(
-    context: Context,
-    exoPlayerFactory: ExoPlayerFactory,
     surfaceHolder: () -> SurfaceHolder,
     processedPath: String,
+    playerFactory: WallperPlayerFactory,
+    private val host: EngineHost,
 ) : WallpaperEngine() {
 
-    private var mediaPlayer: ExoPlayer? = null
+    private val player = playerFactory.create(PlayerMedia(processedPath))
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
     init {
         Timber.d("created")
-        mediaPlayer = exoPlayerFactory.create(context, processedPath).apply {
-            setVideoSurfaceHolder(surfaceHolder())
-            prepare()
-            play()
+        scope.launch {
+            player.state.first { it is WallperPlayerState.Failed }
+            host.showPlaceholder()
         }
+        player.setVideoSurface(surfaceHolder().surface)
+        player.play()
     }
 
-    override fun pause() {
-        Timber.d("paused")
-        mediaPlayer?.pause()
-    }
+    override fun pause() = player.pause()
 
-    override fun resume() {
-        Timber.d("resumed")
-        mediaPlayer?.play()
-    }
+    override fun resume() = player.play()
+
+    // The system takes the surface back once onSurfaceDestroyed returns; setVideoSurface waits for the decoder.
+    override fun onSurfaceDestroyed() = player.setVideoSurface(null)
 
     override fun release() {
         Timber.d("release")
-        mediaPlayer?.stop()
-        mediaPlayer?.release()
+        scope.cancel()
+        player.release()
     }
 }

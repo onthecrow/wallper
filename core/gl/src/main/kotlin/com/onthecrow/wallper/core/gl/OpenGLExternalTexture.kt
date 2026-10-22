@@ -6,47 +6,42 @@ import android.opengl.GLES11Ext
 import android.opengl.GLES20
 import android.opengl.Matrix
 import android.os.Handler
-import android.os.Looper
 import android.view.Surface
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
 
-
+/** An OES texture with the SurfaceTexture and Surface a player decodes into. GL thread only. */
 @SuppressLint("Recycle")
 internal class OpenGLExternalTexture(
-    val textureWidth: Int,
-    val textureHeight: Int,
+    private val textureWidth: Int,
+    private val textureHeight: Int,
     verticesData: FloatArray,
-    val externalTextureId: Int? = null,
-    var rotate: Int = Surface.ROTATION_0
 ) {
     private val mMVPMatrix = FloatArray(16)
     private val mTexMatrix = FloatArray(16)
-    private var verticesBuffer: FloatBuffer
+    private val verticesBuffer: FloatBuffer = ByteBuffer.allocateDirect(
+        verticesData.size * FLOAT_SIZE_BYTES
+    ).order(
+        ByteOrder.nativeOrder()
+    ).asFloatBuffer().also {
+        it.put(verticesData).position(0)
+    }
 
-    private var textureId: Int = -1
+    private val textureId: Int
+    private val surfaceTexture: SurfaceTexture
+    val surface: Surface
 
-    private var surfaceTexture: SurfaceTexture
-    var surface: Surface
+    private var lastFrameTimestampNs = 0L
 
     init {
         Matrix.setIdentityM(mTexMatrix, 0)
         Matrix.setIdentityM(mMVPMatrix, 0)
 
-        verticesBuffer = ByteBuffer.allocateDirect(
-            verticesData.size * FLOAT_SIZE_BYTES
-        ).order(
-            ByteOrder.nativeOrder()
-        ).asFloatBuffer().also {
-            it.put(verticesData).position(0)
-        }
-
-        textureId = externalTextureId
-            ?: IntArray(1).also {
-                GLES20.glGenTextures(1, it, 0)
-            }.let { it[0] }
-
+        textureId = IntArray(1).also {
+            GLES20.glGenTextures(1, it, 0)
+        }.let { it[0] }
+        GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, textureId)
         GLErrorUtils.checkGlError("glBindTexture textureId")
 
         GLES20.glTexParameterf(
@@ -62,30 +57,36 @@ internal class OpenGLExternalTexture(
         surface = Surface(surfaceTexture)
     }
 
-    fun setVerticesData(data: FloatArray) {
-        verticesBuffer = ByteBuffer.allocateDirect(
-            data.size * FLOAT_SIZE_BYTES
-        ).order(
-            ByteOrder.nativeOrder()
-        ).asFloatBuffer().also {
-            it.put(data).position(0)
-        }
+    fun setFrameListener(handler: Handler, listener: () -> Unit) {
+        surfaceTexture.setOnFrameAvailableListener({ listener() }, handler)
     }
 
-    fun release() {
-        verticesBuffer.clear()
+    /**
+     * Latches the newest queued image. Called on every draw, even without a frame callback: a SurfaceTexture
+     * stops calling onFrameAvailable while a frame sits unlatched, and this re-arms it.
+     *
+     * @return true if the image differs from the previously latched one.
+     */
+    fun latch(): Boolean {
+        surfaceTexture.updateTexImage()
+        val timestampNs = surfaceTexture.timestamp
+        val isNewFrame = timestampNs != 0L && timestampNs != lastFrameTimestampNs
+        lastFrameTimestampNs = timestampNs
+        return isNewFrame
+    }
+
+    /**
+     * @param deleteTexture false when the EGL context is already gone: the texture name may then belong
+     * to an object of the new context.
+     */
+    fun release(deleteTexture: Boolean = true) {
+        surfaceTexture.setOnFrameAvailableListener(null)
         surfaceTexture.release()
         surface.release()
+        if (deleteTexture) GLES20.glDeleteTextures(1, intArrayOf(textureId), 0)
     }
 
-    fun attachFrameListener(listener: () -> Unit) {
-        surfaceTexture.setOnFrameAvailableListener({
-            listener()
-        }, Handler(Looper.getMainLooper()))
-    }
-
-
-    fun updateFrame(
+    fun draw(
         aPositionHandle: Int,
         aTextureCoordHandler: Int,
         uTexHandler: Int,
@@ -93,8 +94,8 @@ internal class OpenGLExternalTexture(
     ) {
         GLES20.glViewport(0, 0, textureWidth, textureHeight)
 
-        surfaceTexture.updateTexImage()
-
+        // Maps upright frame coordinates onto the decoder's buffer: the video's rotation (the decoder
+        // applies it through the buffer transform), the vertical flip and the decoder's own crop.
         surfaceTexture.getTransformMatrix(mTexMatrix)
 
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
@@ -126,28 +127,6 @@ internal class OpenGLExternalTexture(
         GLErrorUtils.checkGlError("glVertexAttribPointer aTextureCoordHandler")
         GLES20.glEnableVertexAttribArray(aTextureCoordHandler)
         GLErrorUtils.checkGlError("glEnableVertexAttribArray aTextureCoordHandler")
-
-        Matrix.setIdentityM(mMVPMatrix, 0)
-        Matrix.setIdentityM(mTexMatrix, 0)
-
-        when (rotate) {
-            Surface.ROTATION_90 -> {
-                Matrix.rotateM(mTexMatrix, 0, 90f, 0f, 0f, 1f)
-                Matrix.translateM(mTexMatrix, 0, 0f, -1f, 0f)
-            }
-
-            Surface.ROTATION_180 -> {
-                Matrix.rotateM(mTexMatrix, 0, 180f, 0f, 0f, 1f)
-                Matrix.translateM(mTexMatrix, 0, -1f, -1f, 0f)
-            }
-
-            Surface.ROTATION_270 -> {
-                Matrix.rotateM(mTexMatrix, 0, 270f, 0f, 0f, 1f)
-                Matrix.translateM(mTexMatrix, 0, -1f, 0f, 0f)
-            }
-
-            else -> {}
-        }
 
         GLES20.glUniformMatrix4fv(uMvpHandler, 1, false, mMVPMatrix, 0)
         GLES20.glUniformMatrix4fv(uTexHandler, 1, false, mTexMatrix, 0)

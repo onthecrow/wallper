@@ -1,16 +1,16 @@
-@file:UnstableApi
-
 package com.onthecrow.wallper.core.engine.impl
 
 import android.app.WallpaperColors
 import android.graphics.BitmapFactory
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.service.wallpaper.WallpaperService
 import android.view.SurfaceHolder
 import androidx.core.graphics.drawable.toBitmap
-import androidx.media3.common.util.UnstableApi
 import com.onthecrow.wallper.core.engine.ActiveWallpaperSource
 import com.onthecrow.wallper.core.engine.WallpaperSpec
+import com.onthecrow.wallper.core.engine.impl.engine.EngineHost
 import com.onthecrow.wallper.core.engine.impl.engine.WallpaperEngine
 import com.onthecrow.wallper.core.engine.impl.engine.WallpaperEngineFactory
 import dagger.hilt.android.AndroidEntryPoint
@@ -20,6 +20,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -51,15 +52,25 @@ class WallperWallpaperService : WallpaperService() {
         Timber.d("onLowMemory")
     }
 
-    inner class GLEngine : Engine() {
+    inner class GLEngine : Engine(), EngineHost {
 
         private val engineScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+        private val mainHandler = Handler(Looper.getMainLooper())
+        private var destroyed = false
+
+        /** The wallpaper the current engine was created for. */
+        private var currentWallpaper: WallpaperSpec? = null
+
+        /** The wallpaper whose recovery budget ran out: shown as the placeholder until another one is chosen. */
+        private var failedWallpaper: WallpaperSpec? = null
         private var wallpaperEngine: WallpaperEngine? = null
         private var computeColorsJob: Job? = null
         private var computedColors: WallpaperColors? = null
         private var surfaceHolder: SurfaceHolder? = null
 
         private val activeWallpaper = activeWallpaperSource.activeWallpaperFlow
+            // The database re-emits on any table change; only a different wallpaper needs a new engine.
+            .distinctUntilChanged()
             .onEach { wallpaper ->
                 Timber.d("New selected wallpaper: $wallpaper")
                 createEngine(wallpaper)
@@ -82,6 +93,8 @@ class WallperWallpaperService : WallpaperService() {
         override fun onDestroy() {
             super.onDestroy()
             Timber.d("onDestroy()")
+            destroyed = true
+            mainHandler.removeCallbacksAndMessages(null)
             wallpaperEngine?.release()
             wallpaperEngine = null
             engineScope.cancel()
@@ -91,6 +104,23 @@ class WallperWallpaperService : WallpaperService() {
             super.onSurfaceDestroyed(holder)
             Timber.d("onSurfaceDestroyed()")
             wallpaperEngine?.pause()
+            wallpaperEngine?.onSurfaceDestroyed()
+        }
+
+        override fun onSurfaceChanged(holder: SurfaceHolder?, format: Int, width: Int, height: Int) {
+            super.onSurfaceChanged(holder, format, width, height)
+            wallpaperEngine?.onSurfaceChanged(width, height)
+        }
+
+        // EngineHost: called from the engines' threads.
+
+        override fun showPlaceholder() {
+            mainHandler.post {
+                if (destroyed) return@post
+                Timber.w("Recovery failed, showing the placeholder for $currentWallpaper")
+                failedWallpaper = currentWallpaper
+                createEngine()
+            }
         }
 
         override fun onSurfaceCreated(holder: SurfaceHolder?) {
@@ -107,7 +137,14 @@ class WallperWallpaperService : WallpaperService() {
             Timber.d("createEngine()")
             if (surfaceHolder == null) return
             wallpaperEngine?.release()
-            wallpaperEngine = wallpaperEngineFactory.create(baseContext, { surfaceHolder }, wallpaper)
+            if (wallpaper != currentWallpaper) {
+                currentWallpaper = wallpaper
+                failedWallpaper = null
+            }
+            val shownWallpaper = wallpaper?.takeIf { it != failedWallpaper }
+            wallpaperEngine = wallpaperEngineFactory
+                .create(baseContext, { surfaceHolder }, shownWallpaper, this)
+                .also { if (!isVisible) it.pause() }
             computeColors()
         }
 

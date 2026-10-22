@@ -2,6 +2,10 @@ package com.onthecrow.wallper.core.gl
 
 import com.onthecrow.wallper.core.model.CropRect
 
+/**
+ * Texture coordinates of the crop corners in the upright frame, origin at the bottom left, as
+ * SurfaceTexture's transform matrix expects them. Rotation is that matrix's job, not ours.
+ */
 internal class UVCoords(
     val topLeft: UVPoint,
     val topRight: UVPoint,
@@ -9,96 +13,18 @@ internal class UVCoords(
     val bottomRight: UVPoint,
 ) {
     companion object {
-        fun fromRect(originalWidth: Int, originalHeight: Int, rect: CropRect, rotation: Int): UVCoords {
-            val (width, height) = if (rotation == 90 || rotation == 270) {
-                originalHeight to originalWidth
-            } else {
-                originalWidth to originalHeight
-            }
-            // TODO clean this up via smart algorithm or math
-            val pointsList =
-                when (rotation) {
-                    90 -> listOf(
-                        UVPoint(
-                            rect.top.toFloat() / height.toFloat(),
-                            rect.right.toFloat() / width.toFloat(),
-                        ),
-                        UVPoint(
-                            rect.top.toFloat() / height.toFloat(),
-                            rect.left.toFloat() / width.toFloat(),
-                        ),
-                        UVPoint(
-                            rect.bottom.toFloat() / height.toFloat(),
-                            rect.right.toFloat() / width.toFloat(),
-                        ),
-                        UVPoint(
-                            rect.bottom.toFloat() / height.toFloat(),
-                            rect.left.toFloat() / width.toFloat(),
-                        ),
-                    )
-
-                    180 -> listOf(
-                        UVPoint(
-                            rect.right.toFloat() / width.toFloat(),
-                            rect.bottom.toFloat() / height.toFloat(),
-                        ),
-                        UVPoint(
-                            rect.left.toFloat() / width.toFloat(),
-                            rect.bottom.toFloat() / height.toFloat(),
-                        ),
-                        UVPoint(
-                            rect.right.toFloat() / width.toFloat(),
-                            rect.top.toFloat() / height.toFloat(),
-                        ),
-                        UVPoint(
-                            rect.left.toFloat() / width.toFloat(),
-                            rect.top.toFloat() / height.toFloat(),
-                        ),
-                    )
-
-                    270 -> listOf(
-                        UVPoint(
-                            rect.bottom.toFloat() / height.toFloat(),
-                            rect.left.toFloat() / width.toFloat(),
-                        ),
-                        UVPoint(
-                            rect.bottom.toFloat() / height.toFloat(),
-                            rect.right.toFloat() / width.toFloat(),
-                        ),
-                        UVPoint(
-                            rect.top.toFloat() / height.toFloat(),
-                            rect.left.toFloat() / width.toFloat(),
-                        ),
-                        UVPoint(
-                            rect.top.toFloat() / height.toFloat(),
-                            rect.right.toFloat() / width.toFloat(),
-                        ),
-                    )
-
-                    else -> listOf(
-                        UVPoint(
-                            rect.left.toFloat() / width.toFloat(),
-                            rect.top.toFloat() / height.toFloat(),
-                        ),
-                        UVPoint(
-                            rect.right.toFloat() / width.toFloat(),
-                            rect.top.toFloat() / height.toFloat(),
-                        ),
-                        UVPoint(
-                            rect.left.toFloat() / width.toFloat(),
-                            rect.bottom.toFloat() / height.toFloat(),
-                        ),
-                        UVPoint(
-                            rect.right.toFloat() / width.toFloat(),
-                            rect.bottom.toFloat() / height.toFloat(),
-                        ),
-                    )
-                }
+        /** [rect] is in pixels of the frame as shown, [frameWidth] x [frameHeight] after rotation. */
+        fun fromRect(frameWidth: Int, frameHeight: Int, rect: CropRect): UVCoords {
+            val left = rect.left.toFloat() / frameWidth
+            val right = rect.right.toFloat() / frameWidth
+            // Texture coordinates grow upwards, the crop rect downwards.
+            val top = 1f - rect.top.toFloat() / frameHeight
+            val bottom = 1f - rect.bottom.toFloat() / frameHeight
             return UVCoords(
-                topLeft = pointsList[0],
-                topRight = pointsList[1],
-                bottomLeft = pointsList[2],
-                bottomRight = pointsList[3],
+                topLeft = UVPoint(left, top),
+                topRight = UVPoint(right, top),
+                bottomLeft = UVPoint(left, bottom),
+                bottomRight = UVPoint(right, bottom),
             )
         }
     }

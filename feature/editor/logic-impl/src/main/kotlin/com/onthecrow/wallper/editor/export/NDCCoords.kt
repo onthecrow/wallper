@@ -2,30 +2,15 @@ package com.onthecrow.wallper.editor.export
 
 import com.onthecrow.wallper.core.model.CropRect
 
+/** A crop rect in normalized device coordinates: both axes from -1 to 1, y pointing up. */
 internal data class NDCCoords(val left: Float, val right: Float, val bottom: Float, val top: Float) {
     companion object {
-        fun fromRect(rect: CropRect, frameWidth: Float, frameHeight: Float): NDCCoords {
-            val left = if (rect.left < (frameWidth / 2)) {
-                -(1 - (rect.left / (frameWidth / 2)))
-            } else {
-                (rect.left - frameWidth / 2) / (frameWidth / 2)
-            }
-            val right = if (rect.right < (frameWidth / 2)) {
-                -(rect.right / (frameWidth / 2))
-            } else {
-                (rect.right - frameWidth / 2) / (frameWidth / 2)
-            }
-            val top = if (rect.top < (frameHeight / 2)) {
-                1 - (rect.top / (frameHeight / 2))
-            } else {
-                -((rect.top - frameHeight / 2) / (frameHeight / 2))
-            }
-            val bottom = if (rect.bottom < (frameHeight / 2)) {
-                rect.bottom / (frameHeight / 2)
-            } else {
-                -((rect.bottom - frameHeight / 2) / (frameHeight / 2))
-            }
-            return NDCCoords(left, right, bottom, top)
-        }
+        /** [rect] is in pixels of the upright [frameWidth] x [frameHeight] frame. */
+        fun fromRect(rect: CropRect, frameWidth: Float, frameHeight: Float) = NDCCoords(
+            left = 2 * rect.left / frameWidth - 1,
+            right = 2 * rect.right / frameWidth - 1,
+            bottom = 1 - 2 * rect.bottom / frameHeight,
+            top = 1 - 2 * rect.top / frameHeight,
+        )
     }
 }

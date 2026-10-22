@@ -32,6 +32,23 @@ JVM-only modules (`:core:model`, `*:logic-api`) run with `test`, not `testDebugU
   - never rename `com.onthecrow.wallper.core.engine.impl.WallperWallpaperService`; the system stores it as the selected wallpaper;
   - every Room schema change needs a migration and a migration test; schemas are exported to `<module>/schemas`.
 
+## Stall protection (see WALLPER_PLAYER_DESIGN.md)
+
+The player side and the GL side recover independently; there is no shared abstraction between them.
+
+- **Player (`core:player`).** `WallperPlayer` is a plain player to its consumers: `setVideoSurface`, `play`, `pause`, `release`, `state`. It never exposes its ExoPlayer engines.
+  - Consumers hand it a surface and show the placeholder on `WallperPlayerState.Failed`.
+  - `setVideoSurface` blocks until the decoder has let go of the previous surface, like ExoPlayer's, so the caller may release that surface right after.
+  - `EngineSupervisor` keeps two engines, both created first thing in `run()` (on the player thread; ExoPlayer throws on any other): the active one on the surface and a standby one, prepared and paused without a surface. On a stall it releases the active one, hands the surface to the standby (`setSurface`, `seekTo`, `play`) and creates a new standby in place of the stalled one. Engines are recreated only at a switch and after a long pause (> 15 s, both are released); there is no background work.
+  - `StallWatchdog` only reports a `StallCause`; it never fixes anything. The supervisor decides: switch to the standby, or `Failed` (content errors, or no standby left).
+  - `RetryPolicy` paces switches: 4 with delays of 0, 1, 3 and 5 s before each, reset 30 s after the last one. A standby that broke while waiting is recreated at the switch and costs an attempt.
+- **GL (`core:gl`).**
+  - `VideoWallpaperRenderer` owns one video texture per EGL context and reports its surface through `onVideoSurfaceCreated`. A lost context's texture is released only after the new one shows a frame.
+  - `RenderGuard` inside `WallpaperGLThread` repairs EGL.
+  - `GLWallpaperEngine` recreates a broken or hung GL thread without touching the player, limited by `GlRestartPolicy` (3 per 2 min). It detaches the player (`setVideoSurface(null)`) before the old GL thread exits.
+- Every ExoPlayer call happens on the player thread (`setLooper`). GL objects are touched only on the GL thread.
+- The supervisor, watchdog, policies and `RenderGuard` are tested on the JVM, with virtual coroutine time or fake clocks and fake engines. Keep Android types behind `ManagedEngine` / `RenderRepairs`.
+
 ## MVI (`core:mvi`)
 
 - `BaseViewModel(initialState, reducer)`: every event is folded by the reducer through `runningFold`. The event buffer is unbounded, so no event is dropped.

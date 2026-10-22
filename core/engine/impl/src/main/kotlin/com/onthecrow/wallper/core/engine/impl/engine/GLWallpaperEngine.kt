@@ -1,89 +1,192 @@
 package com.onthecrow.wallper.core.engine.impl.engine
 
-import android.content.Context
+import android.os.Handler
+import android.os.HandlerThread
+import android.os.SystemClock
+import android.view.Surface
 import android.view.SurfaceHolder
-import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.ExoPlayer
 import com.onthecrow.wallper.core.engine.WallpaperSpec
-import com.onthecrow.wallper.core.gl.GLWallpaperRenderer
 import com.onthecrow.wallper.core.gl.VideoRenderParams
 import com.onthecrow.wallper.core.gl.VideoWallpaperRenderer
 import com.onthecrow.wallper.core.gl.WallpaperGLThread
-import com.onthecrow.wallper.core.player.ExoPlayerFactory
+import com.onthecrow.wallper.core.gl.guard.GlRestartPolicy
+import com.onthecrow.wallper.core.player.PlayerMedia
+import com.onthecrow.wallper.core.player.WallperPlayerFactory
+import com.onthecrow.wallper.core.player.WallperPlayerState
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.android.asCoroutineDispatcher
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.launch
 import timber.log.Timber
+import java.util.concurrent.CountDownLatch
+import java.util.concurrent.TimeUnit
 
-/** Plays the original video and crops it on the GPU through UV coordinates. */
-@UnstableApi
+/**
+ * Plays the original video and crops it on the GPU through UV coordinates.
+ *
+ * Only binds the two sides together: the renderer's video surface goes to the player. Each side recovers
+ * on its own. The player replaces its decoder behind that surface; the GL side repairs EGL inside the GL
+ * thread, and a broken or hung GL thread is recreated here without touching the player.
+ */
 internal class GLWallpaperEngine(
-    context: Context,
-    exoPlayerFactory: ExoPlayerFactory,
     surfaceHolder: () -> SurfaceHolder,
     wallpaper: WallpaperSpec,
+    playerFactory: WallperPlayerFactory,
+    private val host: EngineHost,
 ) : WallpaperEngine() {
 
-    private var glThread: WallpaperGLThread? = null
-    private var mediaPlayer: ExoPlayer? = null
-    private var renderer: GLWallpaperRenderer? = null
+    private val holder = surfaceHolder()
+
+    @Volatile
+    private var surfaceWidth = holder.surfaceFrame.width()
+
+    @Volatile
+    private var surfaceHeight = holder.surfaceFrame.height()
+
+    // размеры и поворот видео сохранены в БД при создании обоев
+    private val renderParams = VideoRenderParams(surfaceWidth, surfaceHeight, wallpaper.crop, wallpaper.mediaInfo)
+
+    private val player = playerFactory.create(
+        PlayerMedia(wallpaper.sourcePath, wallpaper.clip.startMs, wallpaper.clip.endMs),
+    )
+
+    /** Frame callbacks and this class's coroutines, off the main thread. */
+    private val callbackThread = HandlerThread("WallpaperFrames").apply { start() }
+    private val callbackHandler = Handler(callbackThread.looper)
+    private val scope = CoroutineScope(SupervisorJob() + callbackHandler.asCoroutineDispatcher("WallpaperFrames"))
+
+    private val visible = MutableStateFlow(true)
+    private val framesExpected = combine(visible, player.state) { isVisible, state ->
+        isVisible && state == WallperPlayerState.Playing
+    }.stateIn(scope, SharingStarted.Eagerly, false)
+
+    private val glRestarts = GlRestartPolicy(SystemClock::elapsedRealtime)
+
+    @Volatile
+    private var gl = Gl()
+
+    @Volatile
+    private var released = false
 
     init {
         Timber.d("created")
-
-        val width = surfaceHolder().surfaceFrame.width()
-        val height = surfaceHolder().surfaceFrame.height()
-
-        // 1) медиаплеер
-        val player = exoPlayerFactory.create(
-            context,
-            wallpaper.sourcePath,
-            wallpaper.clip.startMs,
-            wallpaper.clip.endMs,
-        )
-        mediaPlayer = player
-
-        // 2) рендерер; размеры и поворот видео сохранены в БД при создании обоев
-        val videoRenderer = VideoWallpaperRenderer(
-            renderParams = VideoRenderParams(width, height, wallpaper.crop, wallpaper.mediaInfo),
-            onFrameAvailable = { glThread?.requestRender() },
-            onVideoSurfaceCreated = { surface -> mediaPlayer?.setVideoSurface(surface) },
-        )
-        renderer = videoRenderer
-
-        // 3) стартуем GL-поток
-        glThread = WallpaperGLThread(surfaceHolder(), videoRenderer).apply {
-            start()
-            onSurfaceCreatedOrChanged(width, height)
+        scope.launch {
+            player.state.first { it is WallperPlayerState.Failed }
+            host.showPlaceholder()
         }
-
-        // 4) запускаем плеер
-        player.prepare()
+        scope.launch { framesExpected.collect { gl.thread.setFramesExpected(it) } }
+        scope.launch { watchGlHeartbeat() }
         player.play()
     }
 
     override fun pause() {
         Timber.d("paused")
-        mediaPlayer?.pause()
-        glThread?.onPauseRendering()
+        visible.value = false
+        gl.thread.onPauseRendering()
+        player.pause()
     }
 
     override fun resume() {
         Timber.d("resumed")
-        glThread?.onResumeRendering()
-        mediaPlayer?.play()
+        visible.value = true
+        gl.thread.onResumeRendering()
+        gl.thread.requestRender()
+        player.play()
     }
+
+    override fun onSurfaceChanged(width: Int, height: Int) {
+        surfaceWidth = width
+        surfaceHeight = height
+        gl.thread.onSurfaceCreatedOrChanged(width, height)
+    }
+
+    override fun onSurfaceDestroyed() = gl.thread.onSurfaceDestroyed()
 
     override fun release() {
         Timber.d("released")
-        mediaPlayer?.stop()
-        mediaPlayer?.clearVideoSurface()
-        mediaPlayer?.release()
-        mediaPlayer = null
+        released = true
+        val stopped = CountDownLatch(1)
+        callbackHandler.post {
+            scope.cancel()
+            stopped.countDown()
+        }
+        stopped.await(STOP_TIMEOUT_MS, TimeUnit.MILLISECONDS)
+        player.release()
+        gl.thread.requestExitAndWait()
+        callbackThread.quitSafely()
+    }
 
-        // 2. Остановить GL-поток
-        glThread?.requestExitAndWait()
-        glThread = null
+    /** A GL thread stuck inside a driver call can't notice that itself. */
+    private suspend fun watchGlHeartbeat() {
+        framesExpected.collectLatest { expected ->
+            if (!expected) return@collectLatest
+            var expectedSinceMs = SystemClock.elapsedRealtime()
+            while (true) {
+                delay(HEARTBEAT_CHECK_MS)
+                val silentMs = SystemClock.elapsedRealtime() - maxOf(gl.thread.lastLoopAtMs, expectedSinceMs)
+                if (silentMs > GL_HEARTBEAT_TIMEOUT_MS) {
+                    restartGl("GL thread unresponsive for $silentMs ms")
+                    expectedSinceMs = SystemClock.elapsedRealtime()
+                }
+            }
+        }
+    }
 
-        // 3. Освободить OpenGLScene/текстуры/SurfaceTexture/Surface
-        renderer?.dispose()
-        renderer = null
+    /** Callback thread. Replaces a broken or hung GL thread; the player keeps playing. */
+    private fun restartGl(reason: String) {
+        if (released) return
+        Timber.w("Restarting GL: $reason")
+        if (!glRestarts.tryAcquire()) {
+            Timber.w("GL restart limit reached")
+            host.showPlaceholder()
+            return
+        }
+        // Waits until the decoder lets go of the old texture, which the old GL thread releases on exit.
+        player.setVideoSurface(null)
+        gl.thread.requestExitAndWait()
+        gl = Gl().apply {
+            if (!visible.value) thread.onPauseRendering()
+            thread.setFramesExpected(framesExpected.value)
+        }
+    }
+
+    /** One GL thread with its renderer. Recreated as a whole when GL can't be repaired in place. */
+    private inner class Gl {
+        val renderer = VideoWallpaperRenderer(
+            renderParams = renderParams,
+            callbackHandler = callbackHandler,
+            listener = object : VideoWallpaperRenderer.Listener {
+                override fun onFrameAvailable() = thread.requestRender()
+
+                override fun onVideoSurfaceCreated(surface: Surface) {
+                    if (gl === this@Gl && !released) player.setVideoSurface(surface)
+                }
+            },
+        )
+
+        val thread: WallpaperGLThread = WallpaperGLThread(
+            surfaceHolder = holder,
+            renderer = renderer,
+            renderGuardListener = { stall ->
+                callbackHandler.post { if (gl === this@Gl) restartGl("unrecoverable $stall") }
+            },
+        ).apply {
+            start()
+            onSurfaceCreatedOrChanged(surfaceWidth, surfaceHeight)
+        }
+    }
+
+    private companion object {
+        const val HEARTBEAT_CHECK_MS = 500L
+        const val GL_HEARTBEAT_TIMEOUT_MS = 2_000L
+        const val STOP_TIMEOUT_MS = 500L
     }
 }

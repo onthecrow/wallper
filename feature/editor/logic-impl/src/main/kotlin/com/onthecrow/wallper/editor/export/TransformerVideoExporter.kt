@@ -8,7 +8,6 @@ import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.effect.Crop
 import androidx.media3.effect.MatrixTransformation
-import androidx.media3.effect.ScaleAndRotateTransformation
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.Effects
@@ -100,16 +99,9 @@ internal class TransformerVideoExporter @Inject constructor(
     }
 
     @OptIn(UnstableApi::class)
-    private fun getVideoEffectsForVideo(
-        metadata: VideoMetadata,
-        ndcCoords: NDCCoords
-    ): List<MatrixTransformation> {
-        return listOf(
-            ScaleAndRotateTransformation.Builder()
-                .setRotationDegrees(metadata.rotation)
-                .build(),
-            Crop(ndcCoords.left, ndcCoords.right, ndcCoords.bottom, ndcCoords.top),
-        )
+    private fun getVideoEffectsForVideo(ndcCoords: NDCCoords): List<MatrixTransformation> {
+        // Transformer's decoder already turns frames upright, so the crop applies to the frame as shown.
+        return listOf(Crop(ndcCoords.left, ndcCoords.right, ndcCoords.bottom, ndcCoords.top))
     }
 
     @OptIn(UnstableApi::class)
@@ -136,8 +128,7 @@ internal class TransformerVideoExporter @Inject constructor(
                 Effects(
                     listOf(),
                     getVideoEffectsForVideo(
-                        videoMetadata,
-                        NDCCoords.fromRect(crop, videoMetadata.width, videoMetadata.height),
+                        NDCCoords.fromRect(crop, videoMetadata.displayWidth, videoMetadata.displayHeight),
                     )
                 )
             )
@@ -158,7 +149,10 @@ internal class TransformerVideoExporter @Inject constructor(
     private fun MediaMetadataRetriever.extractFloatMetadata(metadataKey: Int): Float =
         extractMetadata(metadataKey)?.toFloat() ?: throw IllegalStateException("Can't retrieve metadata!")
 
-    private class VideoMetadata(val width: Float, val height: Float, val rotation: Float)
+    private class VideoMetadata(val width: Float, val height: Float, val rotation: Float) {
+        val displayWidth: Float get() = if (rotation % 180f == 0f) width else height
+        val displayHeight: Float get() = if (rotation % 180f == 0f) height else width
+    }
 
     companion object {
         private const val DELAY_PROGRESS_RENEWAL = 500L
