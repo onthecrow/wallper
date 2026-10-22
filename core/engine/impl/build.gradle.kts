@@ -15,6 +15,7 @@ dependencies {
     implementation(projects.core.player)
     implementation(projects.core.resources)
     implementation(libs.androidx.core.ktx)
+    implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.appcompat.resources)
     implementation(libs.timber)
 }

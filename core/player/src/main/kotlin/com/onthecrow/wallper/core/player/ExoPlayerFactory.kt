@@ -1,28 +1,31 @@
 package com.onthecrow.wallper.core.player
 
 import android.content.Context
+import android.os.Looper
 import androidx.core.net.toUri
 import androidx.media3.common.MediaItem
-import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import javax.inject.Inject
 
-/** Players for the wallpaper service: lean, clipped to the chosen range and watched by [Watchhog]. */
-@UnstableApi
-class ExoPlayerFactory @Inject constructor(
-    private val watchhog: Watchhog,
-) {
-    fun create(context: Context, uri: String, startPosition: Long? = null, endPosition: Long? = null): ExoPlayer {
-        return createLeanExoPlayer(context).apply {
-            watchhog.attachPlayer(this)
-            setMediaItem(createMediaItem(uri, startPosition, endPosition))
+/** Players for the wallpaper service: lean, clipped to the chosen range, owned by the engine's player thread. */
+class ExoPlayerFactory @Inject constructor() {
+
+    fun create(
+        context: Context,
+        uri: String,
+        looper: Looper,
+        startPositionMs: Long? = null,
+        endPositionMs: Long? = null,
+    ): ExoPlayer {
+        return createLeanExoPlayer(context, looper).apply {
+            setMediaItem(createMediaItem(uri, startPositionMs, endPositionMs))
         }
     }
 
-    private fun createMediaItem(uri: String, startPosition: Long?, endPosition: Long?): MediaItem {
+    private fun createMediaItem(uri: String, startPositionMs: Long?, endPositionMs: Long?): MediaItem {
         val clippingConfiguration = MediaItem.ClippingConfiguration.Builder().apply {
-            startPosition?.let { setStartPositionMs(it) }
-            endPosition?.let { setEndPositionMs(it) }
+            startPositionMs?.let { setStartPositionMs(it) }
+            endPositionMs?.let { setEndPositionMs(it) }
         }
             .build()
 

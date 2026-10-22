@@ -77,7 +77,8 @@ internal fun EditorScreen(
                 val media = state.media
 
                 if (media != null) {
-                    val videoSize = IntSize(media.mediaInfo.width, media.mediaInfo.height)
+                    // The preview shows the video rotated upright, so the crop works in those pixels too.
+                    val videoSize = IntSize(media.mediaInfo.displayWidth, media.mediaInfo.displayHeight)
                     Box(
                         modifier = Modifier
                             .padding(32.dp)

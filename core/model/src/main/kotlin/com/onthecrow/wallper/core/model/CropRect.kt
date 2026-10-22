@@ -1,6 +1,9 @@
 package com.onthecrow.wallper.core.model
 
-/** A crop area in source-media pixels. Plain Kotlin replacement for `android.graphics.Rect`. */
+/**
+ * A crop area in pixels of the frame as shown, after the video's rotation
+ * ([MediaInfo.displayWidth] x [MediaInfo.displayHeight]). Plain Kotlin replacement for `android.graphics.Rect`.
+ */
 data class CropRect(
     val left: Int,
     val top: Int,
