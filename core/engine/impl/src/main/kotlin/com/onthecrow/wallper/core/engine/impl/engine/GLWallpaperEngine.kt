@@ -38,7 +38,7 @@ import java.util.concurrent.TimeUnit
  */
 internal class GLWallpaperEngine(
     surfaceHolder: () -> SurfaceHolder,
-    wallpaper: WallpaperSpec,
+    wallpaper: WallpaperSpec.Media,
     playerFactory: WallperPlayerFactory,
     private val host: EngineHost,
 ) : WallpaperEngine() {

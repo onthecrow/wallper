@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
-/** Feeds the wallpaper service from the wallpapers database. */
+/** Feeds the wallpaper service from the wallpapers database. An active built-in unknown to this version gives null. */
 internal class ActiveWallpaperSourceImpl @Inject constructor(
     private val wallpapersRepository: WallpapersRepository,
 ) : ActiveWallpaperSource {

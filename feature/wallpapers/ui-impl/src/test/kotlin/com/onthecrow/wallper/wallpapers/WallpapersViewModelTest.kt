@@ -1,8 +1,11 @@
 package com.onthecrow.wallper.wallpapers
 
 import android.content.Intent
+import com.onthecrow.wallper.blackhole.BlackHoleSettingsDestination
 import com.onthecrow.wallper.core.coroutines.DispatchersProvider
+import com.onthecrow.wallper.core.engine.BuiltInPreviews
 import com.onthecrow.wallper.core.engine.LiveWallpaperController
+import com.onthecrow.wallper.core.model.BuiltInWallpaper
 import com.onthecrow.wallper.core.model.ClipRange
 import com.onthecrow.wallper.core.model.CropRect
 import com.onthecrow.wallper.core.model.MediaInfo
@@ -16,6 +19,7 @@ import com.onthecrow.wallper.wallpapers.domain.DeleteWallpaperUseCase
 import com.onthecrow.wallper.wallpapers.domain.ObserveWallpapersUseCase
 import com.onthecrow.wallper.wallpapers.domain.model.Wallpaper
 import com.onthecrow.wallper.wallpapers.model.WallpaperItem
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -37,10 +41,11 @@ import kotlin.test.assertTrue
 class WallpapersViewModelTest {
 
     private val dispatcher = UnconfinedTestDispatcher()
-    private val wallpapers = MutableStateFlow(listOf(wallpaper(id = 1, type = MediaType.VIDEO)))
+    private val wallpapers = MutableStateFlow<List<Wallpaper>>(listOf(wallpaper(id = 1, type = MediaType.VIDEO)))
     private val activated = mutableListOf<Int>()
     private val deleted = mutableListOf<Int>()
     private val navigator = FakeNavigator()
+    private val previews = FakeBuiltInPreviews()
     private var mediaSupported = true
 
     @BeforeTest
@@ -66,6 +71,7 @@ class WallpapersViewModelTest {
         liveWallpaperController = object : LiveWallpaperController {
             override fun createSetWallpaperIntent(): Intent = error("not used in these tests")
         },
+        builtInPreviews = previews,
         navigator = navigator,
         dispatchersProvider = TestDispatchers(dispatcher),
     )
@@ -92,6 +98,46 @@ class WallpapersViewModelTest {
     }
 
     @Test
+    fun `a built-in shows a placeholder until its preview is rendered, which happens once`() = runTest(dispatcher) {
+        wallpapers.value = listOf(builtIn(id = 5), wallpaper(id = 1, type = MediaType.VIDEO))
+        val viewModel = createViewModel()
+
+        assertEquals(
+            listOf(WallpaperItem(5, null, false, BuiltInWallpaper.BLACK_HOLE), WallpaperItem(1, "thumbnail-1", false)),
+            viewModel.state.value.items,
+        )
+
+        previews.result.complete("previews/black_hole.png")
+        assertEquals("previews/black_hole.png", viewModel.state.value.items.first().picturePath)
+
+        wallpapers.value = listOf(builtIn(id = 5, isActive = true), wallpaper(id = 1, type = MediaType.VIDEO))
+        assertEquals(
+            WallpaperItem(5, "previews/black_hole.png", true, BuiltInWallpaper.BLACK_HOLE),
+            viewModel.state.value.items.first(),
+        )
+        assertEquals(listOf(BuiltInWallpaper.BLACK_HOLE), previews.requests)
+    }
+
+    @Test
+    fun `a preview that can't be rendered leaves the placeholder`() = runTest(dispatcher) {
+        wallpapers.value = listOf(builtIn(id = 5))
+        val viewModel = createViewModel()
+
+        previews.result.complete(null)
+
+        assertEquals(listOf(WallpaperItem(5, null, false, BuiltInWallpaper.BLACK_HOLE)), viewModel.state.value.items)
+    }
+
+    @Test
+    fun `settings of a built-in open its settings screen`() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+
+        viewModel.onEvent(WallpapersEvent.OnBuiltInSettingsClick(BuiltInWallpaper.BLACK_HOLE))
+
+        assertEquals(listOf<Destination>(BlackHoleSettingsDestination), navigator.destinations)
+    }
+
+    @Test
     fun `supported media opens the editor`() = runTest(dispatcher) {
         val viewModel = createViewModel()
 
@@ -113,7 +159,7 @@ class WallpapersViewModelTest {
         assertTrue(WallpapersEvent.OnUnsupportedMediaPicked in events)
     }
 
-    private fun wallpaper(id: Int, type: MediaType) = Wallpaper(
+    private fun wallpaper(id: Int, type: MediaType) = Wallpaper.Media(
         id = id,
         type = type,
         originalPath = "original-$id",
@@ -124,6 +170,19 @@ class WallpapersViewModelTest {
         mediaInfo = MediaInfo(10, 10, 0, 1000),
         isActive = false,
     )
+
+    private fun builtIn(id: Int, isActive: Boolean = false) =
+        Wallpaper.BuiltIn(id = id, wallpaper = BuiltInWallpaper.BLACK_HOLE, isActive = isActive)
+
+    /** Renders nothing until the test completes [result]. */
+    private class FakeBuiltInPreviews : BuiltInPreviews {
+        val result = CompletableDeferred<String?>()
+        val requests = mutableListOf<BuiltInWallpaper>()
+        override suspend fun preview(wallpaper: BuiltInWallpaper): String? {
+            requests += wallpaper
+            return result.await()
+        }
+    }
 
     private class FakeNavigator : Navigator {
         val destinations = mutableListOf<Destination>()

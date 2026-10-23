@@ -11,6 +11,9 @@ import javax.inject.Inject
 internal class ObserveWallpapersUseCaseImpl @Inject constructor(
     private val wallpapersRepository: WallpapersRepository,
 ) : ObserveWallpapersUseCase {
+    /** The sort is stable: each group keeps the database order. */
     override fun invoke(): Flow<List<Wallpaper>> =
-        wallpapersRepository.observeAll().map { entities -> entities.map { it.toDomain() } }
+        wallpapersRepository.observeAll().map { entities ->
+            entities.mapNotNull { it.toDomain() }.sortedBy { it !is Wallpaper.BuiltIn }
+        }
 }

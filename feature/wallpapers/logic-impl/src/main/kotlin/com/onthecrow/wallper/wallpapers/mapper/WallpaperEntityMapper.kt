@@ -1,6 +1,7 @@
 package com.onthecrow.wallper.wallpapers.mapper
 
 import com.onthecrow.wallper.core.engine.WallpaperSpec
+import com.onthecrow.wallper.core.model.BuiltInWallpaper
 import com.onthecrow.wallper.core.model.ClipRange
 import com.onthecrow.wallper.core.model.CropRect
 import com.onthecrow.wallper.core.model.MediaInfo
@@ -8,17 +9,23 @@ import com.onthecrow.wallper.wallpapers.data.database.WallpaperEntity
 import com.onthecrow.wallper.wallpapers.domain.model.NewWallpaper
 import com.onthecrow.wallper.wallpapers.domain.model.Wallpaper
 
-internal fun WallpaperEntity.toDomain() = Wallpaper(
-    id = id,
-    type = type,
-    originalPath = originalPath,
-    processedPath = processedPath,
-    thumbnailPath = thumbnailPath,
-    crop = CropRect(cropLeft, cropTop, cropRight, cropBottom),
-    clip = ClipRange(clipStartMs, clipEndMs),
-    mediaInfo = MediaInfo(mediaWidth, mediaHeight, mediaRotation, mediaDurationMs),
-    isActive = isActive,
-)
+/** Null for a built-in this app version doesn't know: such rows are skipped. */
+internal fun WallpaperEntity.toDomain(): Wallpaper? = when (builtIn) {
+    null -> Wallpaper.Media(
+        id = id,
+        type = type,
+        originalPath = originalPath,
+        processedPath = processedPath,
+        thumbnailPath = thumbnailPath,
+        crop = CropRect(cropLeft, cropTop, cropRight, cropBottom),
+        clip = ClipRange(clipStartMs, clipEndMs),
+        mediaInfo = MediaInfo(mediaWidth, mediaHeight, mediaRotation, mediaDurationMs),
+        isActive = isActive,
+    )
+    else -> BuiltInWallpaper.fromKey(builtIn)?.let { wallpaper ->
+        Wallpaper.BuiltIn(id = id, wallpaper = wallpaper, isActive = isActive)
+    }
+}
 
 internal fun NewWallpaper.toEntity() = WallpaperEntity(
     type = type,
@@ -38,12 +45,15 @@ internal fun NewWallpaper.toEntity() = WallpaperEntity(
     isActive = false,
 )
 
-internal fun Wallpaper.toSpec() = WallpaperSpec(
-    type = type,
-    sourcePath = originalPath,
-    processedPath = processedPath,
-    thumbnailPath = thumbnailPath,
-    crop = crop,
-    clip = clip,
-    mediaInfo = mediaInfo,
-)
+internal fun Wallpaper.toSpec(): WallpaperSpec = when (this) {
+    is Wallpaper.Media -> WallpaperSpec.Media(
+        type = type,
+        sourcePath = originalPath,
+        processedPath = processedPath,
+        thumbnailPath = thumbnailPath,
+        crop = crop,
+        clip = clip,
+        mediaInfo = mediaInfo,
+    )
+    is Wallpaper.BuiltIn -> WallpaperSpec.BuiltIn(wallpaper)
+}

@@ -1,7 +1,6 @@
 package com.onthecrow.wallper.wallpapers.di
 
 import android.content.Context
-import androidx.room.Room
 import com.onthecrow.wallper.core.engine.ActiveWallpaperSource
 import com.onthecrow.wallper.wallpapers.ActivateWallpaperUseCaseImpl
 import com.onthecrow.wallper.wallpapers.ActiveWallpaperSourceImpl
@@ -47,11 +46,7 @@ internal abstract class WallpapersLogicModule {
         @Provides
         @Singleton
         fun provideDatabase(@ApplicationContext context: Context): WallpapersDatabase =
-            Room.databaseBuilder(
-                context.createDeviceProtectedStorageContext(),
-                WallpapersDatabase::class.java,
-                WallpapersDatabase.NAME,
-            ).build()
+            WallpapersDatabase.builder(context.createDeviceProtectedStorageContext()).build()
 
         @Provides
         fun provideWallpaperDao(database: WallpapersDatabase): WallpaperDao = database.wallpaperDao()

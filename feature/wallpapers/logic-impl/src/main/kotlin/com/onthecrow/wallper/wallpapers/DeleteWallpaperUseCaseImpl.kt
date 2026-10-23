@@ -11,6 +11,8 @@ internal class DeleteWallpaperUseCaseImpl @Inject constructor(
 ) : DeleteWallpaperUseCase {
     override suspend fun invoke(id: Int) {
         val wallpaper = wallpapersRepository.get(id)
+        // Built-ins have no files, and the seeding would bring the row back on the next open anyway.
+        if (wallpaper.builtIn != null) return
         mediaStorage.delete(wallpaper.originalPath)
         wallpaper.processedPath?.let(mediaStorage::delete)
         mediaStorage.delete(wallpaper.thumbnailPath)

@@ -2,11 +2,13 @@ package com.onthecrow.wallper.core.engine.impl
 
 import android.app.WallpaperColors
 import android.graphics.BitmapFactory
+import android.graphics.Color
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.service.wallpaper.WallpaperService
 import android.view.SurfaceHolder
+import androidx.annotation.RequiresApi
 import androidx.core.graphics.drawable.toBitmap
 import com.onthecrow.wallper.core.engine.ActiveWallpaperSource
 import com.onthecrow.wallper.core.engine.WallpaperSpec
@@ -50,6 +52,18 @@ class WallperWallpaperService : WallpaperService() {
     override fun onLowMemory() {
         super.onLowMemory()
         Timber.d("onLowMemory")
+    }
+
+    /** The black hole: almost black with a warm amber accent, dark theme friendly (§11.4). */
+    @RequiresApi(Build.VERSION_CODES.O_MR1)
+    private fun builtInColors(): WallpaperColors {
+        val primary = Color.valueOf(0.03f, 0.025f, 0.02f)
+        val secondary = Color.valueOf(0.85f, 0.55f, 0.2f)
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            WallpaperColors(primary, secondary, null, WallpaperColors.HINT_SUPPORTS_DARK_THEME)
+        } else {
+            WallpaperColors(primary, secondary, null)
+        }
     }
 
     inner class GLEngine : Engine(), EngineHost {
@@ -112,6 +126,24 @@ class WallperWallpaperService : WallpaperService() {
             wallpaperEngine?.onSurfaceChanged(width, height)
         }
 
+        override fun onOffsetsChanged(
+            xOffset: Float,
+            yOffset: Float,
+            xOffsetStep: Float,
+            yOffsetStep: Float,
+            xPixelOffset: Int,
+            yPixelOffset: Int,
+        ) {
+            super.onOffsetsChanged(xOffset, yOffset, xOffsetStep, yOffsetStep, xPixelOffset, yPixelOffset)
+            wallpaperEngine?.onOffsetsChanged(xOffset, xOffsetStep)
+        }
+
+        // API 30+: the system zooms the wallpaper out while unlocking, opening the shade or an app.
+        override fun onZoomChanged(zoom: Float) {
+            super.onZoomChanged(zoom)
+            wallpaperEngine?.onZoomChanged(zoom)
+        }
+
         // EngineHost: called from the engines' threads.
 
         override fun showPlaceholder() {
@@ -143,7 +175,7 @@ class WallperWallpaperService : WallpaperService() {
             }
             val shownWallpaper = wallpaper?.takeIf { it != failedWallpaper }
             wallpaperEngine = wallpaperEngineFactory
-                .create(baseContext, { surfaceHolder }, shownWallpaper, this)
+                .create(baseContext, { surfaceHolder }, shownWallpaper, isPreview, this)
                 .also { if (!isVisible) it.pause() }
             computeColors()
         }
@@ -154,16 +186,21 @@ class WallperWallpaperService : WallpaperService() {
             computeColorsJob?.cancel()
             computeColorsJob = engineScope.launch(Dispatchers.IO) {
                 val wallpaper = activeWallpaper.value
+                if (wallpaper is WallpaperSpec.BuiltIn) {
+                    computedColors = builtInColors()
+                    notifyColorsChanged()
+                    return@launch
+                }
 
-                val bitmap = if (wallpaper == null) {
+                val bitmap = if (wallpaper is WallpaperSpec.Media) {
+                    BitmapFactory.decodeFile(wallpaper.thumbnailPath)
+                } else {
                     applicationContext.resources
                         .getDrawable(R.drawable.bg_engine_empty, null)
                         .toBitmap(
                             surfaceHolder?.surfaceFrame?.width() ?: 0,
                             surfaceHolder?.surfaceFrame?.height() ?: 0,
                         )
-                } else {
-                    BitmapFactory.decodeFile(wallpaper.thumbnailPath)
                 }
 
                 computedColors = bitmap?.let { WallpaperColors.fromBitmap(bitmap) }

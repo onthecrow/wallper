@@ -14,14 +14,14 @@ JVM-only modules (`:core:model`, `*:logic-api`) run with `test`, not `testDebugU
 ## Modules
 
 - `:app`: Application, MainActivity, `@StartDestination`. No feature code.
-- `:core:*`: `model` (pure Kotlin), `coroutines`, `mvi`, `navigation:api|impl`, `designsystem`, `resources`, `storage`, `gl`, `player`, `engine:api|impl` (the WallpaperService).
-- `:feature:<name>:{logic-api, logic-impl, ui-api, ui-impl}`: `wallpapers` (main screen, owns the wallpaper domain and Room), `editor` (add screen, media prep, Transformer export).
+- `:core:*`: `model` (pure Kotlin), `coroutines`, `mvi`, `navigation:api|impl`, `designsystem`, `resources`, `storage`, `gl`, `player`, `engine:api|impl` (the WallpaperService), `blackhole:physics` (pure Kotlin) and `blackhole:renderer` (GLES 3.0).
+- `:feature:<name>:{logic-api, logic-impl, ui-api, ui-impl}`: `wallpapers` (main screen, owns the wallpaper domain and Room), `editor` (add screen, media prep, Transformer export), `blackhole` (settings and debug screens of the built-in black hole; UI only).
 
 ## Dependency rules (enforced by `build-logic/.../ModuleBoundaries.kt`)
 
 - A feature sees another feature only through `ui-api` (navigation) and `logic-api` (domain). Only `:app` depends on `-impl`.
 - `core` never depends on `feature`. When core needs feature data, core declares a port (`ActiveWallpaperSource`) and the feature implements it.
-- `core:model`, `coroutines`, `storage`, `gl`, `player`, `engine:*` stay free of Compose and `core:designsystem`.
+- `core:model`, `coroutines`, `storage`, `gl`, `player`, `engine:*`, `blackhole:*` stay free of Compose and `core:designsystem`.
 - Everything in `-impl` is `internal`; Hilt modules are the only public surface.
 
 ## Invariants
@@ -48,6 +48,16 @@ The player side and the GL side recover independently; there is no shared abstra
   - `GLWallpaperEngine` recreates a broken or hung GL thread without touching the player, limited by `GlRestartPolicy` (3 per 2 min). It detaches the player (`setVideoSurface(null)`) before the old GL thread exits.
 - Every ExoPlayer call happens on the player thread (`setLooper`). GL objects are touched only on the GL thread.
 - The supervisor, watchdog, policies and `RenderGuard` are tested on the JVM, with virtual coroutine time or fake clocks and fake engines. Keep Android types behind `ManagedEngine` / `RenderRepairs`.
+
+## Built-in wallpapers and the black hole (see BLACKHOLE_PLAN.md)
+
+- A built-in wallpaper is a row of `wallpapers` with `built_in = BuiltInWallpaper.key`. The database seeds missing built-in rows on every open (`SeedBuiltInWallpapersCallback`); they are listed first, activate like any wallpaper and are never deleted (the use case refuses too). Never rename a `BuiltInWallpaper.key`.
+- `WallpaperSpec` is sealed: `Media` or `BuiltIn`. `WallpaperEngineFactory` maps `BuiltIn(BLACK_HOLE)` to `BlackHoleWallpaperEngine`.
+- Every tunable of the black hole lives in `BlackHoleParams` (`core:blackhole:physics`). Defaults start from BLACKHOLE_TZ.md §10; the look was tuned on a phone (BLACKHOLE_PLAN.md §9). User settings (`BlackHoleSettingsStore`, device-protected SharedPreferences) are applied on top with `BlackHoleSettings.applyTo`.
+- Lens tables depend only on `(r_c, N_α, N_φ, K)`. `LensTablesRepository` generates them once and caches them in device-protected `cacheDir/blackhole`. Bump `LensTables.FORMAT_VERSION` when the layout or the physics changes.
+- The camera orbits about the disk axis; the gyroscope and the launcher turn it on top in screen axes (`CameraPose.turned`), then the elevation is clamped. Their recoil is a principal-point shift (`FrameState.recoilX/Y`, half screen heights). The settings preview's drag turns the orbit itself (`setOrbitOffset`), with no recoil.
+- `BlackHoleRenderer` (GL thread only) is shared by the wallpaper, the list preview (`BlackHolePreviewRenderer`, EGL pbuffer) and the debug screen. Frames are paced by `Choreographer` on the engine's callback thread; animation phases come from `Long` nanoseconds, never a growing float.
+- Shaders live in `core/blackhole/renderer/src/main/assets/blackhole` (`#include` is resolved by `ShaderLibrary`). After editing them run `scripts/validate_blackhole_shaders.py` (the NDK's glslc); it catches compile errors without a device.
 
 ## MVI (`core:mvi`)
 

@@ -23,6 +23,8 @@ private val UI_FREE_MODULES = setOf(
     ":core:player",
     ":core:engine:api",
     ":core:engine:impl",
+    ":core:blackhole:physics",
+    ":core:blackhole:renderer",
 )
 
 /**
