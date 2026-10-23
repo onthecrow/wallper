@@ -18,7 +18,7 @@ Design docs: [WALLPER_PLAYER_DESIGN.md](WALLPER_PLAYER_DESIGN.md) (video playbac
 
 - `:app`: Application, MainActivity, `@StartDestination`. No feature code.
 - `:core:*`: `model` (pure Kotlin), `diagnostics` (pure Kotlin), `coroutines`, `mvi`, `navigation:api|impl`, `designsystem`, `resources`, `storage`, `gl`, `player`, `engine:api|impl` (the WallpaperService). Core knows no built-in wallpaper by name.
-- `:feature:<name>:{logic-api, logic-impl, ui-api, ui-impl}`: `wallpapers` (main screen, owns the wallpaper domain and Room), `editor` (add screen, media prep, Transformer export), `blackhole` (the built-in black hole: physics and the screens' ports in `logic-api`, the GLES 3.0 renderer, its engine and the settings store in `logic-impl`, settings and debug screens in `ui-impl`).
+- `:feature:<name>:{logic-api, logic-impl, ui-api, ui-impl}`: `wallpapers` (main screen, owns the wallpaper domain and Room), `editor` (add screen, media prep, Transformer export), `blackhole` (the built-in black hole: physics and the screens' ports in `logic-api`, the GLES 3.0 renderer, its engine and the settings store in `logic-impl`, settings and debug screens in `ui-impl`), `settings` (the app's settings screen; only `ui-api` and `ui-impl` until it keeps data of its own).
 
 ## Dependency rules (enforced by `build-logic/.../ModuleBoundaries.kt`)
 

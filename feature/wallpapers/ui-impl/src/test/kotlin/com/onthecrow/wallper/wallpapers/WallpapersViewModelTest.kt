@@ -14,6 +14,7 @@ import com.onthecrow.wallper.core.navigation.Destination
 import com.onthecrow.wallper.core.navigation.Navigator
 import com.onthecrow.wallper.editor.EditorDestination
 import com.onthecrow.wallper.editor.domain.IsMediaSupportedUseCase
+import com.onthecrow.wallper.settings.SettingsDestination
 import com.onthecrow.wallper.wallpapers.domain.ActivateWallpaperUseCase
 import com.onthecrow.wallper.wallpapers.domain.DeleteWallpaperUseCase
 import com.onthecrow.wallper.wallpapers.domain.ObserveWallpapersUseCase
@@ -72,6 +73,8 @@ class WallpapersViewModelTest {
         liveWallpaperController = object : LiveWallpaperController {
             override fun createSetWallpaperIntent(): Intent = error("not used in these tests")
             override fun isSupported(wallpaper: BuiltInWallpaper) = builtInsSupported
+            override fun isWallpaperSet(): Boolean = error("not used in these tests")
+            override fun wallpaperChanges(): Flow<Unit> = error("not used in these tests")
         },
         builtInPreviews = previews,
         navigator = navigator,
@@ -149,6 +152,15 @@ class WallpapersViewModelTest {
         viewModel.onEvent(WallpapersEvent.OnBuiltInSettingsClick(BuiltInWallpaper.BLACK_HOLE))
 
         assertEquals(listOf<Destination>(BlackHoleSettingsDestination), navigator.destinations)
+    }
+
+    @Test
+    fun `the settings button opens the settings screen`() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+
+        viewModel.onEvent(WallpapersEvent.OnSettingsClick)
+
+        assertEquals(listOf<Destination>(SettingsDestination), navigator.destinations)
     }
 
     @Test

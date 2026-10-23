@@ -14,6 +14,7 @@ dependencies {
     implementation(projects.feature.editor.uiApi)
     implementation(projects.feature.editor.logicApi)
     implementation(projects.feature.blackhole.uiApi)
+    implementation(projects.feature.settings.uiApi)
     implementation(projects.core.engine.api)
     implementation(projects.core.coroutines)
     implementation(projects.core.mvi)
