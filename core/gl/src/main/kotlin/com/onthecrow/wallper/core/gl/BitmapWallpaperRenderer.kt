@@ -9,7 +9,7 @@ import java.nio.ByteOrder
 import java.nio.FloatBuffer
 
 /**
- * Простой GL-рендерер: fullscreen quad с текстурой из битмапа.
+ * A plain GL renderer: a fullscreen quad textured with a bitmap.
  *
  * @param createBitmap rasterizes the picture for a surface of the given size; called once on the GL thread.
  */
@@ -183,7 +183,7 @@ class BitmapWallpaperRenderer(
     }
 
     private fun loadTexture() {
-        // Растеризуем картинку в битмап (один раз) и превращаем в текстуру
+        // Rasterize the picture into a bitmap once and upload it as a texture.
         val bmp: Bitmap = createBitmap(width, height)
 
         val texIds = IntArray(1)

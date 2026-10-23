@@ -11,7 +11,7 @@ import androidx.compose.ui.unit.dp
 /**
  * Contains the default values used by [ImageCropper]
  */
-object CropDefaults {
+internal object CropDefaults {
 
     /**
      * Properties effect crop behavior that should be passed to [CropState]
@@ -75,7 +75,7 @@ object CropDefaults {
  * is shared between ui and state.
  */
 @Immutable
-data class CropProperties internal constructor(
+internal data class CropProperties internal constructor(
     val handleSize: Float,
     val contentScale: ContentScale,
     val overlayRatio: Float,
@@ -95,7 +95,7 @@ data class CropProperties internal constructor(
  * by [CropState] or [Modifier.crop]
  */
 @Immutable
-data class CropStyle internal constructor(
+internal data class CropStyle internal constructor(
     val drawOverlay: Boolean,
     val drawGrid: Boolean,
     val strokeWidth: Dp,
@@ -108,7 +108,7 @@ data class CropStyle internal constructor(
 /**
  * Light, Dark or system controlled theme
  */
-enum class CropTheme{
+internal enum class CropTheme{
     Light,
     Dark,
     System

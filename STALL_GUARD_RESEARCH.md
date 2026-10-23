@@ -923,7 +923,7 @@ core:engine:impl                      GLWallpaperEngine ──┴──► Guard
 - **`OpenGLExternalTexture` удаляет свою GL-текстуру при освобождении.** Раньше она утекала.
 
 ### 14.4. Что проверить на Pixel 8
-1. Smoke-чеклист из `ARCHITECTURE_MIGRATION.md`.
+1. Smoke-проверка видеообоев: lock/unlock, смена обоев, системный выбор обоев.
 2. В логе (`wallper-log.txt`, теги `PlaybackGuard` и `RenderGuard`):
    - события `stall …`, `step …`, `recovered …`, `unrecoverable …`, `Recovery: …`;
    - сколько их и каких классов.

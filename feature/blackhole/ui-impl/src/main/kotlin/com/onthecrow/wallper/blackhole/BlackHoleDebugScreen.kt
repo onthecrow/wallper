@@ -34,7 +34,7 @@ import com.onthecrow.wallper.blackhole.view.SliderRow
 import com.onthecrow.wallper.blackhole.view.SwitchRow
 import com.onthecrow.wallper.blackhole.view.label
 import com.onthecrow.wallper.core.blackhole.physics.QualityLevel
-import com.onthecrow.wallper.core.blackhole.renderer.BlackHoleSettings
+import com.onthecrow.wallper.core.blackhole.physics.BlackHoleSettings
 import com.onthecrow.wallper.core.blackhole.renderer.DebugView
 import com.onthecrow.wallper.core.blackhole.renderer.LensMode
 

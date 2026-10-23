@@ -34,7 +34,7 @@ import kotlinx.coroutines.launch
  * @param onGestureEnd callback to notify that gesture finished return current
  * [CropData]  of this modifier
  */
-fun Modifier.crop(
+internal fun Modifier.crop(
     vararg keys: Any?,
     cropState: CropState,
     onDown: ((CropData) -> Unit)? = null,

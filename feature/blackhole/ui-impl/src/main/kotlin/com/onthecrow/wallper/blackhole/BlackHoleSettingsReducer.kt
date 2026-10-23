@@ -1,6 +1,8 @@
 package com.onthecrow.wallper.blackhole
 
-import com.onthecrow.wallper.core.blackhole.renderer.BlackHoleSettings
+import com.onthecrow.wallper.core.blackhole.physics.BlackHoleParams
+import com.onthecrow.wallper.core.blackhole.physics.BlackHoleSettings
+import com.onthecrow.wallper.core.blackhole.physics.lensTableKey
 import com.onthecrow.wallper.core.mvi.Reducer
 import javax.inject.Inject
 
@@ -10,7 +12,7 @@ internal class BlackHoleSettingsReducer @Inject constructor() :
 
     override suspend fun reduce(state: BlackHoleSettingsState, event: BlackHoleSettingsEvent): BlackHoleSettingsState =
         when (event) {
-            is BlackHoleSettingsEvent.OnSettingsChanged -> state.copy(settings = event.settings)
+            is BlackHoleSettingsEvent.OnSettingsChanged -> state.withSettings(event.settings)
             is BlackHoleSettingsEvent.OnQualityChange -> state.edit { copy(quality = event.quality) }
             is BlackHoleSettingsEvent.OnGyroToggle -> state.edit { copy(gyroEnabled = event.enabled) }
             is BlackHoleSettingsEvent.OnLauncherToggle -> state.edit { copy(launcherEnabled = event.enabled) }
@@ -23,6 +25,7 @@ internal class BlackHoleSettingsReducer @Inject constructor() :
             is BlackHoleSettingsEvent.OnSliderChange -> state.edit { event.slider.with(this, event.value) }
             is BlackHoleSettingsEvent.OnFreezeTimeToggle -> state.copy(isTimeFrozen = event.enabled)
             BlackHoleSettingsEvent.OnPanelToggle -> state.copy(isPanelExpanded = !state.isPanelExpanded)
+            BlackHoleSettingsEvent.OnAdvancedToggle -> state.copy(isAdvancedExpanded = !state.isAdvancedExpanded)
             // A late answer for a key the screen has moved on from is dropped.
             is BlackHoleSettingsEvent.OnTablesLoaded -> if (event.key == state.wantedTablesKey) {
                 state.copy(tables = event.tables, tablesKey = event.key, tablesError = null)
@@ -43,5 +46,12 @@ internal class BlackHoleSettingsReducer @Inject constructor() :
         }
 
     private inline fun BlackHoleSettingsState.edit(transform: BlackHoleSettings.() -> BlackHoleSettings) =
-        copy(settings = settings.transform())
+        withSettings(settings.transform())
+
+    /** Settings and what follows from them change together, and only when they really change. */
+    private fun BlackHoleSettingsState.withSettings(next: BlackHoleSettings): BlackHoleSettingsState {
+        if (next == settings) return this
+        val params = next.applyTo(BlackHoleParams())
+        return copy(settings = next, params = params, wantedTablesKey = lensTableKey(params, next.quality.startLevel))
+    }
 }

@@ -5,6 +5,8 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.opengl.GLSurfaceView
+import android.os.Handler
+import android.os.HandlerThread
 import android.view.Surface
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -25,20 +27,26 @@ internal fun PreviewGyroscope(view: GLSurfaceView, renderer: PreviewGlRenderer, 
         val sensorManager = view.context.getSystemService(SensorManager::class.java)
         val sensor = sensorManager?.getDefaultSensor(Sensor.TYPE_GAME_ROTATION_VECTOR)
             ?: sensorManager?.getDefaultSensor(Sensor.TYPE_ROTATION_VECTOR)
-        val listener = if (enabled && sensor != null) {
-            GyroListener(view, renderer) { currentInput }.also {
-                sensorManager.registerListener(it, sensor, SENSOR_PERIOD_US)
-            }
+        val reset = Runnable { view.queueEvent { renderer.setGyroTarget(0.0, 0.0) } }
+        if (!enabled || sensor == null) {
+            onPauseOrDispose { reset.run() }
         } else {
-            null
-        }
-        onPauseOrDispose {
-            listener?.let { sensorManager?.unregisterListener(it) }
-            view.queueEvent { renderer.setGyroTarget(0.0, 0.0) }
+            // 50 samples a second, off the main thread.
+            val thread = HandlerThread("PreviewGyroscope").apply { start() }
+            val handler = Handler(thread.looper)
+            val listener = GyroListener(view, renderer) { currentInput }
+            sensorManager.registerListener(listener, sensor, SENSOR_PERIOD_US, handler)
+            onPauseOrDispose {
+                sensorManager.unregisterListener(listener)
+                // After any sample still queued there, so none of them moves the camera again.
+                handler.post(reset)
+                thread.quitSafely()
+            }
         }
     }
 }
 
+/** Runs on the sensor thread; [input] reads Compose state, which is safe from any thread. */
 private class GyroListener(
     private val view: GLSurfaceView,
     private val renderer: PreviewGlRenderer,

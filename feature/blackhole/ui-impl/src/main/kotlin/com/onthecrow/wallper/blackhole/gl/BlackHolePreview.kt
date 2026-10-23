@@ -7,8 +7,11 @@ import android.view.MotionEvent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
@@ -43,32 +46,41 @@ internal fun BlackHolePreview(
             onFailure = { currentOnFailure(it) },
         )
     }
-    val view = remember {
-        GLSurfaceView(context).apply {
-            setEGLContextClientVersion(GLES_VERSION)
-            setRenderer(renderer)
-            renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY
-            when (dragMode) {
-                DragMode.GYRO -> emulateGyroOnDrag(renderer)
-                DragMode.ORBIT -> orbitOnDrag(renderer)
+    // The view belongs to the AndroidView node: a new node gets a new view, and the renderer takes the
+    // new context like after a pause.
+    var view by remember { mutableStateOf<GLSurfaceView?>(null) }
+    view?.let { glView ->
+        LifecycleResumeEffect(glView) {
+            glView.onResume()
+            val pacer = FramePacer(glView).apply { start() }
+            onPauseOrDispose {
+                pacer.stop()
+                glView.onPause()
             }
         }
-    }
-
-    LifecycleResumeEffect(view) {
-        view.onResume()
-        val pacer = FramePacer(view).apply { start() }
-        onPauseOrDispose {
-            pacer.stop()
-            view.onPause()
+        LaunchedEffect(glView, config) {
+            glView.queueEvent { renderer.setConfig(config) }
         }
+        PreviewGyroscope(glView, renderer, enabled = followsGyroscope, input = config.params.input)
     }
-    LaunchedEffect(view, config) {
-        view.queueEvent { renderer.setConfig(config) }
-    }
-    PreviewGyroscope(view, renderer, enabled = followsGyroscope, input = config.params.input)
 
-    AndroidView(factory = { view }, modifier = modifier)
+    key(dragMode) {
+        AndroidView(
+            factory = { viewContext ->
+                GLSurfaceView(viewContext).apply {
+                    setEGLContextClientVersion(GLES_VERSION)
+                    setRenderer(renderer)
+                    renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY
+                    when (dragMode) {
+                        DragMode.GYRO -> emulateGyroOnDrag(renderer)
+                        DragMode.ORBIT -> orbitOnDrag(renderer)
+                    }
+                }.also { view = it }
+            },
+            onRelease = { released -> if (view === released) view = null },
+            modifier = modifier,
+        )
+    }
 }
 
 /** Asks [view] for a frame on the vsyncs [FramePacing] picks at [PREVIEW_FPS]. Main thread. */

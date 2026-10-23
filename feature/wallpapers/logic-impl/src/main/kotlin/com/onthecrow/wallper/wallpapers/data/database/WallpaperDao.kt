@@ -9,7 +9,8 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 internal interface WallpaperDao {
 
-    @Query("SELECT * FROM wallpapers")
+    /** Built-ins first, then the user's wallpapers; each in the order they were added. */
+    @Query("SELECT * FROM wallpapers ORDER BY built_in IS NULL, id")
     fun observeAll(): Flow<List<WallpaperEntity>>
 
     @Query("SELECT * FROM wallpapers WHERE is_active = 1 LIMIT 1")

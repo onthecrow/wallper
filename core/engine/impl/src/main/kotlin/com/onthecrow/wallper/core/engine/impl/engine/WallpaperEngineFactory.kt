@@ -41,7 +41,7 @@ internal class WallpaperEngineFactory @Inject constructor(
                     VideoWallpaperEngine(surfaceHolder, processedPath, playerFactory, host)
                 wallpaper.type == MediaType.VIDEO ->
                     GLWallpaperEngine(surfaceHolder, wallpaper, playerFactory, host)
-                // TODO Images are not rendered yet and fall back to the placeholder (ARCHITECTURE_MIGRATION.md, TODO).
+                // TODO Images are not rendered yet and fall back to the placeholder.
                 else -> PlaceholderWallpaperEngine(baseContext, surfaceHolder)
             }
         }

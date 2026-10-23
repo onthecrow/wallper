@@ -8,7 +8,10 @@ import com.onthecrow.wallper.core.mvi.BaseViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import timber.log.Timber
@@ -33,16 +36,13 @@ internal class BlackHoleDebugViewModel @Inject constructor(
     private var tablesJob: Job? = null
 
     init {
-        eventFlow.onEach { event ->
-            when (event) {
-                // The reducer has folded the event in already, so the state names the tables it wants.
-                is BlackHoleDebugEvent.OnQualityChange,
-                BlackHoleDebugEvent.OnDistanceChangeFinished -> loadTables(state.value.wantedTablesKey)
-                else -> Unit
-            }
-        }.launchIn(viewModelScope)
-
-        loadTables(state.value.wantedTablesKey)
+        // The tables follow the state, whichever event moved the distance or the quality. A failed key
+        // waits until an edit clears the error, then it is tried again.
+        state.map { it.wantedTablesKey.takeIf { _ -> it.tablesError == null } }
+            .distinctUntilChanged()
+            .filterNotNull()
+            .onEach(::loadTables)
+            .launchIn(viewModelScope)
     }
 
     /** Only the newest key is worth the CPU: a load for an older one is cancelled. */

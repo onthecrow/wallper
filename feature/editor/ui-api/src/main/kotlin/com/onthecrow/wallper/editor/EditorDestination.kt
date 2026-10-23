@@ -6,7 +6,7 @@ import kotlinx.serialization.Serializable
 /**
  * Editor for a freshly picked media [uri].
  *
- * TODO Edit mode: open an existing wallpaper by id (ARCHITECTURE_MIGRATION.md, TODO).
+ * TODO Edit mode: open an existing wallpaper by id.
  */
 @Serializable
 data class EditorDestination(val uri: String) : Destination

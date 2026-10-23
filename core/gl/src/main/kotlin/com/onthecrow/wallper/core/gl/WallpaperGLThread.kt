@@ -15,8 +15,8 @@ import com.onthecrow.wallper.core.gl.guard.RenderRepairs
 import timber.log.Timber
 
 /**
- * Собственный GL-поток, который работает напрямую с SurfaceHolder от WallpaperService.Engine
- * и вызывает [GLWallpaperRenderer].
+ * A GL thread of its own that draws straight into the SurfaceHolder of a WallpaperService.Engine and
+ * drives a [GLWallpaperRenderer].
  *
  * With a [renderGuardListener] the thread owns a [RenderGuard]: swap failures and exceptions are repaired
  * here (new EGL surface or context), and what can't be repaired is reported to the listener.
@@ -66,16 +66,16 @@ class WallpaperGLThread(
         private set
 
     private val renderGuard = renderGuardListener?.let { listener ->
-        RenderGuard(Repairs(), listener, nowMs) { Timber.tag(TAG).d(it) }
+        RenderGuard(Repairs(), listener, nowMs) { Timber.tag(GUARD_TAG).d(it) }
     }
 
-    // EGL объекты
+    // EGL objects
     private var eglDisplay: EGLDisplay? = null
     private var eglConfig: EGLConfig? = null
     private var eglContext: EGLContext? = null
     private var eglSurface: EGLSurface? = null
 
-    // флаги для вызова onSurfaceCreated/onSurfaceChanged
+    // When to call onSurfaceCreated / onSurfaceChanged
     private var surfaceCreatedDelivered = false
     private var pendingSizeChange = false
 
@@ -96,9 +96,7 @@ class WallpaperGLThread(
     @Volatile
     private var eglSurfaceAlive = false
 
-    /**
-     * Вызывай, когда у Engine появился или изменился surface
-     */
+    /** The engine's surface was created or changed size. */
     fun onSurfaceCreatedOrChanged(width: Int, height: Int) {
         synchronized(lock) {
             hasSurface = true
@@ -111,7 +109,7 @@ class WallpaperGLThread(
     }
 
     /**
-     * Вызывай из onSurfaceDestroyed Engine. With [waitMs] > 0 it blocks until the EGL surface is
+     * Call from the engine's onSurfaceDestroyed. With [waitMs] > 0 it blocks until the EGL surface is
      * destroyed: the system may free the window right after onSurfaceDestroyed returns.
      */
     fun onSurfaceDestroyed(waitMs: Long = 0) {
@@ -232,7 +230,7 @@ class WallpaperGLThread(
                 val drawDue = canRender && !paused && (continuous || renderRequested)
                 val tasksDue = canRender && tasks.isNotEmpty()
                 if (needsSurface || drawDue || tasksDue) {
-                    // если режим "when dirty" — съедаем запрос
+                    // When dirty: this frame answers the request.
                     if (drawDue && !continuous) renderRequested = false
                     val drained = if (tasksDue) tasks.toList().also { tasks.clear() } else emptyList()
                     return Work(drained, drawDue, needsSurface)
@@ -254,7 +252,7 @@ class WallpaperGLThread(
         val display = eglDisplay ?: return
         val surface = eglSurface ?: return
         try {
-            // первый вход после создания контекста/поверхности
+            // The first frame on a new context or surface
             if (!surfaceCreatedDelivered) {
                 Timber.d("GLThread: onSurfaceCreated($surfaceWidth x $surfaceHeight)")
                 renderer.onSurfaceCreated()
@@ -268,10 +266,10 @@ class WallpaperGLThread(
                 pendingSizeChange = false
             }
 
-            // один кадр
+            // One frame
             val isNewFrame = renderer.onDrawFrame()
 
-            // вывод кадра на экран
+            // Show it
             if (!EGL14.eglSwapBuffers(display, surface)) {
                 val error = EGL14.eglGetError()
                 Timber.tag(TAG).w("eglSwapBuffers failed: 0x%x", error)
@@ -456,7 +454,8 @@ class WallpaperGLThread(
     }
 
     private companion object {
-        const val TAG = "RenderGuard"
+        const val TAG = "WallpaperGLThread"
+        const val GUARD_TAG = "RenderGuard"
         const val HEARTBEAT_MS = 500L
         const val EXIT_TIMEOUT_MS = 1_000L
     }

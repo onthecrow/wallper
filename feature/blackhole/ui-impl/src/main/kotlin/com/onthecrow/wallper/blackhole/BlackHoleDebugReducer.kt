@@ -1,12 +1,20 @@
 package com.onthecrow.wallper.blackhole
 
-import com.onthecrow.wallper.core.blackhole.renderer.BlackHoleSettings
+import com.onthecrow.wallper.core.blackhole.physics.BlackHoleSettings
+import com.onthecrow.wallper.core.blackhole.physics.lensTableKey
 import com.onthecrow.wallper.core.mvi.Reducer
 import javax.inject.Inject
 
 internal class BlackHoleDebugReducer @Inject constructor() : Reducer<BlackHoleDebugState, BlackHoleDebugEvent> {
 
     override suspend fun reduce(state: BlackHoleDebugState, event: BlackHoleDebugEvent): BlackHoleDebugState =
+        reduceEvent(state, event).let { next ->
+            // Every change of the params or the quality passes here.
+            val key = lensTableKey(next.params, next.quality)
+            if (key == next.wantedTablesKey) next else next.copy(wantedTablesKey = key)
+        }
+
+    private fun reduceEvent(state: BlackHoleDebugState, event: BlackHoleDebugEvent): BlackHoleDebugState =
         when (event) {
             is BlackHoleDebugEvent.OnSliderChange -> state.copy(params = event.slider.with(state.params, event.value))
             is BlackHoleDebugEvent.OnToggle -> state.copy(params = event.toggle.with(state.params, event.enabled))

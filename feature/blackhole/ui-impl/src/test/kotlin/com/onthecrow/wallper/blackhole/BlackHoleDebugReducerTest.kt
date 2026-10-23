@@ -6,11 +6,11 @@ import com.onthecrow.wallper.core.blackhole.physics.LensTableKey
 import com.onthecrow.wallper.core.blackhole.physics.LensTables
 import com.onthecrow.wallper.core.blackhole.physics.QualityLevel
 import com.onthecrow.wallper.core.blackhole.physics.QualitySetting
-import com.onthecrow.wallper.core.blackhole.renderer.BlackHoleSettings
+import com.onthecrow.wallper.core.blackhole.physics.BlackHoleSettings
 import com.onthecrow.wallper.core.blackhole.renderer.DebugOptions
 import com.onthecrow.wallper.core.blackhole.renderer.DebugView
 import com.onthecrow.wallper.core.blackhole.renderer.LensMode
-import com.onthecrow.wallper.core.blackhole.renderer.lensTableKey
+import com.onthecrow.wallper.core.blackhole.physics.lensTableKey
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals

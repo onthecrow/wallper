@@ -138,7 +138,7 @@ internal fun WallpapersScreen(
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.edit)) },
                                 onClick = {
-                                    // TODO Edit mode (ARCHITECTURE_MIGRATION.md, TODO): open the editor for this wallpaper.
+                                    // TODO Edit mode: open the editor for this wallpaper.
                                     expanded = false
                                 },
                             )

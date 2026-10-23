@@ -10,7 +10,7 @@ import androidx.compose.ui.graphics.nativeCanvas
 /**
  * Draw grid that is divided by 2 vertical and 2 horizontal lines for overlay
  */
-fun DrawScope.drawGrid(rect: Rect, strokeWidth: Float, color: Color) {
+internal fun DrawScope.drawGrid(rect: Rect, strokeWidth: Float, color: Color) {
 
     val width = rect.width
     val height = rect.height
@@ -41,7 +41,7 @@ fun DrawScope.drawGrid(rect: Rect, strokeWidth: Float, color: Color) {
 /**
  * Draw with layer to use [BlendMode]s
  */
-fun DrawScope.drawWithLayer(block: DrawScope.() -> Unit) {
+internal fun DrawScope.drawWithLayer(block: DrawScope.() -> Unit) {
     with(drawContext.canvas.nativeCanvas) {
         val checkPoint = saveLayer(null, null)
         block()

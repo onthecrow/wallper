@@ -3,19 +3,23 @@ package com.onthecrow.wallper.core.blackhole.renderer
 import android.opengl.GLES30
 import com.onthecrow.wallper.core.blackhole.physics.DiskParams
 import com.onthecrow.wallper.core.blackhole.physics.HazeParams
+import com.onthecrow.wallper.core.blackhole.physics.LensTableKey
 import com.onthecrow.wallper.core.blackhole.physics.LensTables
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.math.cos
 import kotlin.math.sin
 
-/** The trajectory tables on the GPU (§5.3): u(t, φ) as an R16F 2D array, φ_end as R32F. GL thread only. */
-internal class LensTextures(val tables: LensTables) {
+/**
+ * The trajectory tables on the GPU (§5.3): u(t, φ) as an R16F 2D array, φ_end as R32F. Keeps only their
+ * [key]: the CPU copy can go once uploaded. GL thread only.
+ */
+internal class LensTextures(tables: LensTables) {
+    val key: LensTableKey = tables.key
     val trajectories: Int = Gl.genTexture()
     val ends: Int = Gl.genTexture()
 
     init {
-        val key = tables.key
         GLES30.glPixelStorei(GLES30.GL_UNPACK_ALIGNMENT, 4)
         GLES30.glBindTexture(GLES30.GL_TEXTURE_2D_ARRAY, trajectories)
         // R16F from GL_FLOAT is a valid upload in ES 3.0, and R16F filters linearly everywhere (R32F doesn't).

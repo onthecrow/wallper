@@ -10,6 +10,7 @@ import android.opengl.GLES30
 import com.onthecrow.wallper.core.blackhole.physics.BlackHoleParams
 import com.onthecrow.wallper.core.blackhole.physics.BlackHoleScene
 import com.onthecrow.wallper.core.blackhole.physics.QualityLevel
+import com.onthecrow.wallper.core.blackhole.physics.lensTableKey
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.asCoroutineDispatcher
 import kotlinx.coroutines.withContext

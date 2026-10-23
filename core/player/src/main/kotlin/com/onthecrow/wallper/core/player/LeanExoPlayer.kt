@@ -21,23 +21,23 @@ import androidx.media3.exoplayer.upstream.DefaultAllocator
  */
 @OptIn(UnstableApi::class) // the allocator, load control tuning and decoder fallback
 fun createLeanExoPlayer(context: Context, looper: Looper? = null): ExoPlayer {
-    // 64КБ сегменты, тримим при reset’e
+    // 64 KB segments, trimmed on reset
     val allocator = DefaultAllocator(/* trimOnReset = */ true,
         C.DEFAULT_BUFFER_SEGMENT_SIZE
     )
 
     val loadControl = DefaultLoadControl.Builder()
-        // 1.5–5 c буфера обычно более чем достаточно для обоев
+        // 1.5–5 s of buffer is plenty for a looping wallpaper clip
         .setBufferDurationsMs(
             /* minBufferMs = */ 1500,
             /* maxBufferMs = */ 5000,
             /* bufferForPlaybackMs = */ 250,
             /* bufferForPlaybackAfterRebufferMs = */ 500
         )
-        // Приоритет «времени» над размером: не раздувать буфер сверх нужного времени
+        // Time over size: never buffer more than the durations above ask for
         .setPrioritizeTimeOverSizeThresholds(true)
         .setAllocator(allocator)
-        // todo внимательно очень с этим
+        // TODO Check the cap against high-bitrate clips: it bounds the buffer however long it is.
         .setTargetBufferBytes(16 * 1024 * 1024)
         .build()
 

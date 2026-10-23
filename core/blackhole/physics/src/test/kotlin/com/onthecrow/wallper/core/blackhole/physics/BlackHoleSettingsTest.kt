@@ -1,10 +1,5 @@
-package com.onthecrow.wallper.core.blackhole.renderer
+package com.onthecrow.wallper.core.blackhole.physics
 
-import com.onthecrow.wallper.core.blackhole.physics.BlackHoleParams
-import com.onthecrow.wallper.core.blackhole.physics.InputParams
-import com.onthecrow.wallper.core.blackhole.physics.QualityLevel
-import com.onthecrow.wallper.core.blackhole.physics.QualitySetting
-import com.onthecrow.wallper.core.blackhole.physics.StarMath
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -143,5 +138,45 @@ class BlackHoleSettingsTest {
         assertEquals(40.0, key.cameraDistance)
         assertEquals(512, key.nAlpha)
         assertEquals(512, key.nPhi)
+    }
+
+    @Test
+    fun `settings survive the store and only what was changed is written`() {
+        val changed = BlackHoleSettings(quality = QualitySetting.HIGH, cameraDistance = 40.0, recoilStrength = 0.0)
+
+        assertEquals(changed, BlackHoleSettings.decode(changed.encode()))
+        assertEquals("{}", BlackHoleSettings().encode())
+        assertFalse("gyroEnabled" in changed.encode())
+    }
+
+    @Test
+    fun `stored text from another version or a broken file still reads`() {
+        val future = """{"exposure":2.0,"someNewSetting":true,"quality":"ULTRA"}"""
+
+        assertEquals(BlackHoleSettings(exposure = 2.0), BlackHoleSettings.decode(future))
+        assertEquals(BlackHoleSettings(), BlackHoleSettings.decode("not json"))
+    }
+
+    @Test
+    fun `the old one-key-per-setting preferences move over without float noise`() {
+        val legacy = mapOf(
+            "quality" to "HIGH",
+            "gyro" to false,
+            "distance" to 44.2f,
+            "star_seed" to 7,
+            "star_count_v2" to 10f,
+            "star_sharpness" to 1f, // the very first versions: size and widening come from it
+            "unknown_key" to 1f,
+        )
+
+        val settings = BlackHoleSettings.fromLegacyPreferences(legacy)
+
+        assertEquals(QualitySetting.HIGH, settings.quality)
+        assertFalse(settings.gyroEnabled)
+        assertEquals(44.2, settings.cameraDistance)
+        assertEquals(7, settings.starSeed)
+        assertEquals(10.0, settings.starCount)
+        assertEquals(StarMath.sizePx(1.0), settings.starSizePx)
+        assertEquals(BlackHoleSettings().exposure, settings.exposure)
     }
 }
