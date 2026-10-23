@@ -86,6 +86,20 @@ class EditorViewModelTest {
     }
 
     @Test
+    fun `a preview that can't play shows the error and goes back once it is closed`() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+
+        viewModel.onEvent(EditorEvent.OnPreviewFailed(IllegalStateException("file gone")))
+
+        assertIs<ExportStatus.Error>(viewModel.state.value.exportStatus)
+        assertEquals(0, backNavigations)
+
+        viewModel.onEvent(EditorEvent.OnErrorDismiss)
+
+        assertEquals(1, backNavigations)
+    }
+
+    @Test
     fun `save exports the trimmed part and goes back on success`() = runTest(dispatcher) {
         val viewModel = createViewModel()
         viewModel.onEvent(EditorEvent.OnTrimChange(ClipRange(1_000, 5_000)))

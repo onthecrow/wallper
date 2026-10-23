@@ -2,6 +2,7 @@ package com.onthecrow.wallper.editor
 
 import com.onthecrow.wallper.core.model.ClipRange
 import com.onthecrow.wallper.core.mvi.Reducer
+import com.onthecrow.wallper.editor.domain.model.ExportStatus
 import javax.inject.Inject
 
 internal class EditorReducer @Inject constructor() : Reducer<EditorState, EditorEvent> {
@@ -16,6 +17,8 @@ internal class EditorReducer @Inject constructor() : Reducer<EditorState, Editor
                 trim = ClipRange(startMs = 0, endMs = event.media.mediaInfo.durationMs),
             )
             is EditorEvent.OnExportStatusChanged -> state.copy(exportStatus = event.status)
+            // The same dialog as an export error; closing it leaves the editor.
+            is EditorEvent.OnPreviewFailed -> state.copy(exportStatus = ExportStatus.Error(event.error))
             EditorEvent.OnErrorDismiss -> state.copy(exportStatus = null)
             is EditorEvent.OnSaveClick,
             EditorEvent.OnAdditionalProcessingInfoClick -> state

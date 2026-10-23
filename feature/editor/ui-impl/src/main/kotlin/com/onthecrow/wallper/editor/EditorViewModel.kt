@@ -31,15 +31,16 @@ internal class EditorViewModel @AssistedInject constructor(
         fun create(destination: EditorDestination): EditorViewModel
     }
 
-    /** The media couldn't be prepared: there is nothing to edit. Touched only on the main thread. */
+    /** The media couldn't be prepared or played: there is nothing to edit. Touched only on the main thread. */
     private var isMediaBroken = false
 
     init {
         eventFlow.onEach { event ->
             when (event) {
                 is EditorEvent.OnSaveClick -> createWallpaper(event.crop)
-                // A failed export can be saved again; a file that can't be read can't.
+                // A failed export can be saved again; a file that can't be read or played can't.
                 EditorEvent.OnErrorDismiss -> if (isMediaBroken) navigator.navigateBack()
+                is EditorEvent.OnPreviewFailed -> isMediaBroken = true
                 else -> Unit
             }
         }.launchIn(viewModelScope)
