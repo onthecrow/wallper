@@ -105,6 +105,7 @@ internal fun EditorScreen(
                             modifier = Modifier
                                 .fillMaxSize(),
                             videoUri = media.path,
+                            videoDurationMs = media.mediaInfo.durationMs,
                             videoSize = videoSize,
                             videoRange = state.timeLineRange,
                             uiSeek = state.seekPosition,

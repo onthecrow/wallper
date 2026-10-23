@@ -19,11 +19,11 @@ import com.onthecrow.wallper.wallpapers.domain.DeleteWallpaperUseCase
 import com.onthecrow.wallper.wallpapers.domain.ObserveWallpapersUseCase
 import com.onthecrow.wallper.wallpapers.domain.model.Wallpaper
 import com.onthecrow.wallper.wallpapers.model.WallpaperItem
-import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
@@ -98,7 +98,7 @@ class WallpapersViewModelTest {
     }
 
     @Test
-    fun `a built-in shows a placeholder until its preview is rendered, which happens once`() = runTest(dispatcher) {
+    fun `a built-in shows a placeholder until its preview is rendered, then follows new ones`() = runTest(dispatcher) {
         wallpapers.value = listOf(builtIn(id = 5), wallpaper(id = 1, type = MediaType.VIDEO))
         val viewModel = createViewModel()
 
@@ -107,14 +107,18 @@ class WallpapersViewModelTest {
             viewModel.state.value.items,
         )
 
-        previews.result.complete("previews/black_hole.png")
-        assertEquals("previews/black_hole.png", viewModel.state.value.items.first().picturePath)
+        previews.paths.emit("previews/black_hole_1.png")
+        assertEquals("previews/black_hole_1.png", viewModel.state.value.items.first().picturePath)
 
         wallpapers.value = listOf(builtIn(id = 5, isActive = true), wallpaper(id = 1, type = MediaType.VIDEO))
         assertEquals(
-            WallpaperItem(5, "previews/black_hole.png", true, BuiltInWallpaper.BLACK_HOLE),
+            WallpaperItem(5, "previews/black_hole_1.png", true, BuiltInWallpaper.BLACK_HOLE),
             viewModel.state.value.items.first(),
         )
+
+        // Its settings changed the picture, e.g. on the settings screen above the list.
+        previews.paths.emit("previews/black_hole_2.png")
+        assertEquals("previews/black_hole_2.png", viewModel.state.value.items.first().picturePath)
         assertEquals(listOf(BuiltInWallpaper.BLACK_HOLE), previews.requests)
     }
 
@@ -122,8 +126,6 @@ class WallpapersViewModelTest {
     fun `a preview that can't be rendered leaves the placeholder`() = runTest(dispatcher) {
         wallpapers.value = listOf(builtIn(id = 5))
         val viewModel = createViewModel()
-
-        previews.result.complete(null)
 
         assertEquals(listOf(WallpaperItem(5, null, false, BuiltInWallpaper.BLACK_HOLE)), viewModel.state.value.items)
     }
@@ -174,13 +176,13 @@ class WallpapersViewModelTest {
     private fun builtIn(id: Int, isActive: Boolean = false) =
         Wallpaper.BuiltIn(id = id, wallpaper = BuiltInWallpaper.BLACK_HOLE, isActive = isActive)
 
-    /** Renders nothing until the test completes [result]. */
+    /** Renders nothing until the test sends a path to [paths]. */
     private class FakeBuiltInPreviews : BuiltInPreviews {
-        val result = CompletableDeferred<String?>()
+        val paths = MutableSharedFlow<String>()
         val requests = mutableListOf<BuiltInWallpaper>()
-        override suspend fun preview(wallpaper: BuiltInWallpaper): String? {
+        override fun previews(wallpaper: BuiltInWallpaper): Flow<String> {
             requests += wallpaper
-            return result.await()
+            return paths
         }
     }
 

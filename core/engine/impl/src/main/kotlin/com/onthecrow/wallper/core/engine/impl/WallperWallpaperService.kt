@@ -6,6 +6,7 @@ import android.graphics.Color
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.service.wallpaper.WallpaperService
 import android.view.SurfaceHolder
 import androidx.annotation.RequiresApi
@@ -22,7 +23,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -54,6 +55,10 @@ class WallperWallpaperService : WallpaperService() {
         Timber.d("onLowMemory")
     }
 
+    private companion object {
+        const val PLACEHOLDER_RETRY_MS = 5 * 60_000L
+    }
+
     /** The black hole: almost black with a warm amber accent, dark theme friendly (§11.4). */
     @RequiresApi(Build.VERSION_CODES.O_MR1)
     private fun builtInColors(): WallpaperColors {
@@ -75,21 +80,38 @@ class WallperWallpaperService : WallpaperService() {
         /** The wallpaper the current engine was created for. */
         private var currentWallpaper: WallpaperSpec? = null
 
-        /** The wallpaper whose recovery budget ran out: shown as the placeholder until another one is chosen. */
+        /**
+         * The wallpaper whose recovery budget ran out: shown as the placeholder until the user picks a
+         * wallpaper (this one again too), or it is visible again after [PLACEHOLDER_RETRY_MS].
+         */
         private var failedWallpaper: WallpaperSpec? = null
+        private var failedAtMs = 0L
+
+        /** The user picked a wallpaper: the database emission that follows may retry the failed one. */
+        private var retryRequested = false
         private var wallpaperEngine: WallpaperEngine? = null
         private var computeColorsJob: Job? = null
         private var computedColors: WallpaperColors? = null
         private var surfaceHolder: SurfaceHolder? = null
 
         private val activeWallpaper = activeWallpaperSource.activeWallpaperFlow
-            // The database re-emits on any table change; only a different wallpaper needs a new engine.
-            .distinctUntilChanged()
             .onEach { wallpaper ->
-                Timber.d("New selected wallpaper: $wallpaper")
+                // The database re-emits on any table change. A new engine is for a different wallpaper,
+                // or for the failed one when the user picked it again.
+                val retry = retryRequested && failedWallpaper != null && wallpaper == failedWallpaper
+                retryRequested = false
+                if (wallpaper == currentWallpaper && !retry) return@onEach
+                Timber.d("New selected wallpaper: $wallpaper, retry=$retry")
+                if (retry) failedWallpaper = null
                 createEngine(wallpaper)
             }
             .stateIn(engineScope, SharingStarted.Eagerly, null)
+
+        init {
+            activeWallpaperSource.activations
+                .onEach { retryRequested = true }
+                .launchIn(engineScope)
+        }
 
         override fun onComputeColors(): WallpaperColors? {
             return computedColors
@@ -97,6 +119,13 @@ class WallperWallpaperService : WallpaperService() {
 
         override fun onVisibilityChanged(visible: Boolean) {
             super.onVisibilityChanged(visible)
+            // Whatever broke it (heat, a driver hiccup) may have passed by now.
+            if (visible && failedWallpaper != null && SystemClock.elapsedRealtime() - failedAtMs > PLACEHOLDER_RETRY_MS) {
+                Timber.i("Retrying $failedWallpaper")
+                failedWallpaper = null
+                createEngine()
+                return
+            }
             if (visible) {
                 wallpaperEngine?.resume()
             } else {
@@ -151,6 +180,7 @@ class WallperWallpaperService : WallpaperService() {
                 if (destroyed) return@post
                 Timber.w("Recovery failed, showing the placeholder for $currentWallpaper")
                 failedWallpaper = currentWallpaper
+                failedAtMs = SystemClock.elapsedRealtime()
                 createEngine()
             }
         }

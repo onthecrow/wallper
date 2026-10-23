@@ -23,6 +23,12 @@ object FramePacing {
         else -> minOf(frames.fpsIdle, quality.maxFpsIdle, MAX_FPS)
     }
 
+    /**
+     * Whether the GL thread should expect frames, which arms its heartbeat. From the paced rate, the same
+     * on every API level: a still frame (heat, power save) expects none.
+     */
+    fun expectsFrames(visible: Boolean, targetFps: Int): Boolean = visible && targetFps != STILL
+
     /** Whether the vsync at [frameNanos] should be drawn; skips vsyncs on 90 and 120 Hz displays. */
     fun isDue(frameNanos: Long, lastDrawnNanos: Long, targetFps: Int, vsyncNanos: Long): Boolean {
         if (targetFps <= 0) return false

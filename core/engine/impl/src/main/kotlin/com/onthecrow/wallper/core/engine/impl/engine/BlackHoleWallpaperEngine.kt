@@ -13,7 +13,6 @@ import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.PowerManager
-import android.os.SystemClock
 import android.view.Choreographer
 import android.view.Display
 import android.view.Surface
@@ -37,17 +36,14 @@ import com.onthecrow.wallper.core.blackhole.renderer.BlackHoleSettingsStore
 import com.onthecrow.wallper.core.blackhole.renderer.LensTablesRepository
 import com.onthecrow.wallper.core.blackhole.renderer.lensTableKey
 import com.onthecrow.wallper.core.gl.WallpaperGLThread
-import com.onthecrow.wallper.core.gl.guard.GlRestartPolicy
+import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.android.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import timber.log.Timber
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 
 /**
  * The built-in black hole (BLACKHOLE_TZ.md §11): a [BlackHoleRenderer] on its own ES 3.0 GL thread, fed
@@ -67,15 +63,18 @@ internal class BlackHoleWallpaperEngine(
 
     private val holder = surfaceHolder()
 
-    @Volatile
-    private var surfaceWidth = holder.surfaceFrame.width()
-
-    @Volatile
-    private var surfaceHeight = holder.surfaceFrame.height()
-
     private val callbackThread = HandlerThread("BlackHoleFrames").apply { start() }
     private val handler = Handler(callbackThread.looper)
-    private val scope = CoroutineScope(SupervisorJob() + handler.asCoroutineDispatcher("BlackHoleFrames"))
+
+    // What escapes (the tables out of memory, a settings bug) ends in the placeholder, not in a crash of
+    // the process that draws the wallpaper.
+    private val scope = CoroutineScope(
+        SupervisorJob() + handler.asCoroutineDispatcher("BlackHoleFrames") +
+            CoroutineExceptionHandler { _, error ->
+                Timber.tag(TAG).e(error, "Black hole failed")
+                host.showPlaceholder()
+            },
+    )
 
     private val sensorManager = context.getSystemService(SensorManager::class.java)
     private val powerManager = context.getSystemService(PowerManager::class.java)
@@ -102,11 +101,10 @@ internal class BlackHoleWallpaperEngine(
     private var stillDrawn = false
     private var lastSensorNanos = 0L
     private var gyroRegistered = false
+    /** Only to skip repeated `Surface.setFrameRate` calls (API 30+); [pacedFps] is what frames follow. */
     private var appliedFrameRate = -1
     @Volatile
     private var released = false
-
-    private val glRestarts = GlRestartPolicy(SystemClock::elapsedRealtime)
     private val choreographer: Choreographer by lazy { Choreographer.getInstance() } // the callback looper's
     private val frameCallback = Choreographer.FrameCallback(::onVsync)
 
@@ -132,11 +130,20 @@ internal class BlackHoleWallpaperEngine(
         null
     }
 
-    @Volatile
-    private var gl: Gl = Gl(currentLevel())
+    private val gl = RestartableGl(
+        holder = holder,
+        handler = handler,
+        onGiveUp = host::showPlaceholder,
+        afterRestart = {
+            stillDrawn = false
+            scheduleFrame()
+        },
+        newSession = { Gl(currentLevel()) },
+    )
 
     init {
         Timber.tag(TAG).d("created, preview=$isPreview")
+        gl.start()
         handler.post {
             ContextCompat.registerReceiver(
                 context, powerReceiver, IntentFilter(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED),
@@ -151,7 +158,6 @@ internal class BlackHoleWallpaperEngine(
             onVisible(true)
         }
         scope.launch { settingsStore.settings.collect(::onSettings) }
-        scope.launch { watchGlHeartbeat() }
     }
 
     override fun pause() {
@@ -163,9 +169,7 @@ internal class BlackHoleWallpaperEngine(
     }
 
     override fun onSurfaceChanged(width: Int, height: Int) {
-        surfaceWidth = width
-        surfaceHeight = height
-        gl.thread.onSurfaceCreatedOrChanged(width, height)
+        gl.onSurfaceChanged(width, height)
         handler.post {
             stillDrawn = false
             scheduleFrame()
@@ -174,7 +178,7 @@ internal class BlackHoleWallpaperEngine(
 
     // The system frees the window right after this returns: wait for the EGL surface to go.
     override fun onSurfaceDestroyed() {
-        gl.thread.onSurfaceDestroyed(waitMs = SURFACE_DESTROY_WAIT_MS)
+        gl.onSurfaceDestroyed(SURFACE_DESTROY_WAIT_MS)
     }
 
     override fun onOffsetsChanged(xOffset: Float, xOffsetStep: Float) {
@@ -194,7 +198,6 @@ internal class BlackHoleWallpaperEngine(
     override fun release() {
         Timber.tag(TAG).d("released")
         released = true
-        val stopped = CountDownLatch(1)
         handler.post {
             scope.cancel()
             choreographer.removeFrameCallback(frameCallback)
@@ -203,10 +206,9 @@ internal class BlackHoleWallpaperEngine(
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 powerManager?.removeThermalStatusListener(thermalListener as PowerManager.OnThermalStatusChangedListener)
             }
-            stopped.countDown()
         }
-        stopped.await(STOP_TIMEOUT_MS, TimeUnit.MILLISECONDS)
-        gl.thread.requestExitAndWait()
+        // Runs after the teardown above on the callback thread, and waits for both.
+        gl.release(STOP_TIMEOUT_MS)
         callbackThread.quitSafely()
     }
 
@@ -218,7 +220,7 @@ internal class BlackHoleWallpaperEngine(
             gyro.reset()
             scene.resetInputs()
             registerGyro()
-            gl.thread.onResumeRendering()
+            gl.setVisible(true)
             stillDrawn = false
             lastDrawnNanos = Long.MIN_VALUE
             draw(System.nanoTime()) // a fresh frame right away, never a stale one
@@ -228,7 +230,7 @@ internal class BlackHoleWallpaperEngine(
             unregisterGyro()
             choreographer.removeFrameCallback(frameCallback)
             frameScheduled = false
-            gl.thread.onPauseRendering()
+            gl.setVisible(false)
         }
         updateFramesExpected()
     }
@@ -242,7 +244,7 @@ internal class BlackHoleWallpaperEngine(
             quality = newQualityController(next).apply { onThermal(thermal) }
             applyQuality()
         }
-        val current = gl
+        val current = gl.current
         val nextParams = params
         current.thread.post { current.renderer.setParams(nextParams) }
         if (visible && params.input.gyroEnabled) registerGyro() else unregisterGyro()
@@ -287,7 +289,9 @@ internal class BlackHoleWallpaperEngine(
 
     private fun applyQuality() {
         val level = currentLevel()
-        val current = gl
+        val current = gl.current
+        // New shader defines: the next frame compiles them.
+        gl.expectSlowFrame()
         current.thread.post { current.renderer.setQuality(level) }
         loadTables()
     }
@@ -304,7 +308,7 @@ internal class BlackHoleWallpaperEngine(
         tablesJob = scope.launch {
             val loaded = tablesRepository.get(key)
             tables = loaded
-            val current = gl
+            val current = gl.current
             current.thread.post { current.renderer.setTables(loaded) }
             stillDrawn = false
             scheduleFrame()
@@ -321,7 +325,10 @@ internal class BlackHoleWallpaperEngine(
         frameScheduled = false
         if (!visible) return
         val target = targetFps(frameNanos)
-        pacedFps = target
+        if (target != pacedFps) {
+            pacedFps = target
+            updateFramesExpected()
+        }
         applyFrameRate(target)
         if (target == FramePacing.STILL) {
             if (!stillDrawn) {
@@ -335,9 +342,9 @@ internal class BlackHoleWallpaperEngine(
     }
 
     private fun draw(frameNanos: Long) {
-        val gl = gl
-        gl.glRenderer.submit(scene.frame(frameNanos))
-        gl.thread.requestRender()
+        val current = gl.current
+        current.glRenderer.submit(scene.frame(frameNanos))
+        current.thread.requestRender()
         lastDrawnNanos = frameNanos
     }
 
@@ -352,14 +359,13 @@ internal class BlackHoleWallpaperEngine(
     private fun applyFrameRate(target: Int) {
         if (target == appliedFrameRate || Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
         appliedFrameRate = target
-        updateFramesExpected()
         runCatching {
             holder.surface.setFrameRate(target.toFloat(), Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
         }
     }
 
     private fun updateFramesExpected() {
-        gl.thread.setFramesExpected(visible && appliedFrameRate != FramePacing.STILL && thermal != ThermalLevel.SEVERE)
+        gl.setFramesExpected(FramePacing.expectsFrames(visible, pacedFps))
     }
 
     private fun vsyncNanos(): Long = (1e9 / (display?.refreshRate?.takeIf { it > 0f } ?: 60f)).toLong()
@@ -393,44 +399,8 @@ internal class BlackHoleWallpaperEngine(
         scheduleFrame()
     }
 
-    /** A GL thread stuck inside a driver call can't notice that itself. */
-    private suspend fun watchGlHeartbeat() {
-        while (true) {
-            delay(HEARTBEAT_CHECK_MS)
-            val current = gl
-            if (!visible || appliedFrameRate == FramePacing.STILL) continue
-            val silentMs = SystemClock.elapsedRealtime() - current.thread.lastLoopAtMs
-            if (silentMs > GL_HEARTBEAT_TIMEOUT_MS && SystemClock.elapsedRealtime() - current.startedAtMs > GL_HEARTBEAT_TIMEOUT_MS) {
-                restartGl("GL thread unresponsive for $silentMs ms")
-            }
-        }
-    }
-
-    private fun restartGl(reason: String) {
-        if (released) return
-        Timber.tag(TAG).w("Restarting GL: $reason")
-        if (!glRestarts.tryAcquire()) {
-            Timber.tag(TAG).w("GL restart limit reached")
-            host.showPlaceholder()
-            return
-        }
-        gl.thread.requestExitAndWait()
-        gl = Gl(currentLevel()).apply {
-            if (!visible) thread.onPauseRendering()
-        }
-        updateFramesExpected()
-        stillDrawn = false
-        scheduleFrame()
-    }
-
-    private fun onRendererFailed(error: Throwable) {
-        Timber.tag(TAG).e(error, "Black hole can't render here")
-        host.showPlaceholder()
-    }
-
     /** One GL thread with its own renderer: a restart never shares GL state with an abandoned thread. */
-    private inner class Gl(level: QualityLevel) {
-        val startedAtMs = SystemClock.elapsedRealtime()
+    private inner class Gl(level: QualityLevel) : RestartableGl.Session {
         val renderer = BlackHoleRenderer(context.assets).apply {
             setQuality(level)
             setParams(params)
@@ -438,27 +408,20 @@ internal class BlackHoleWallpaperEngine(
             onGpuTimeMs = { ms -> handler.post { onGpuTime(ms) } }
             onNoGpuTimer = { handler.post { onNoGpuTimer() } }
         }
-        val glRenderer = BlackHoleGlRenderer(renderer) { error ->
-            handler.post { if (gl === this@Gl) onRendererFailed(error) }
-        }
-        val thread: WallpaperGLThread = WallpaperGLThread(
+        val glRenderer = BlackHoleGlRenderer(renderer) { error -> gl.fail(this@Gl, error) }
+        override val thread: WallpaperGLThread = WallpaperGLThread(
             surfaceHolder = holder,
             renderer = glRenderer,
-            renderGuardListener = { stall -> handler.post { if (gl === this@Gl) restartGl("unrecoverable $stall") } },
+            renderGuardListener = { stall -> gl.restart(this@Gl, "unrecoverable $stall") },
             glesVersion = 3,
-            onInitFailed = { error -> handler.post { if (gl === this@Gl) onRendererFailed(error) } },
-        ).apply {
-            start()
-            onSurfaceCreatedOrChanged(surfaceWidth, surfaceHeight)
-        }
+            onInitFailed = { error -> gl.fail(this@Gl, error) },
+        )
     }
 
     private companion object {
         const val TAG = "BlackHole"
         const val GYRO_PERIOD_US = 20_000
-        const val HEARTBEAT_CHECK_MS = 500L
-        const val GL_HEARTBEAT_TIMEOUT_MS = 2_000L
-        const val STOP_TIMEOUT_MS = 500L
+        const val STOP_TIMEOUT_MS = 1_500L
         const val SURFACE_DESTROY_WAIT_MS = 1_000L
     }
 }

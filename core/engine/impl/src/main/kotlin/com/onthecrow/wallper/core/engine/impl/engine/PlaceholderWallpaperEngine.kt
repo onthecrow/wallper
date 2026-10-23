@@ -48,8 +48,9 @@ internal class PlaceholderWallpaperEngine(
         glThread?.onSurfaceCreatedOrChanged(width, height)
     }
 
+    // The system may free the window right after this returns: wait for the EGL surface to go.
     override fun onSurfaceDestroyed() {
-        glThread?.onSurfaceDestroyed()
+        glThread?.onSurfaceDestroyed(waitMs = SURFACE_DESTROY_WAIT_MS)
     }
 
     override fun pause() {
@@ -71,5 +72,9 @@ internal class PlaceholderWallpaperEngine(
 
         renderer?.dispose()
         renderer = null
+    }
+
+    private companion object {
+        const val SURFACE_DESTROY_WAIT_MS = 1_000L
     }
 }

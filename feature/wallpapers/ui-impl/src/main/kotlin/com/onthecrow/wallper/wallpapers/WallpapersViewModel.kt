@@ -37,8 +37,8 @@ internal class WallpapersViewModel @Inject constructor(
     private val dispatchersProvider: DispatchersProvider,
 ) : BaseViewModel<WallpapersEvent, WallpapersState, WallpapersReducer>(WallpapersState(), reducer) {
 
-    /** Built-ins whose preview has been asked for. Touched only from [eventFlow], on the main thread. */
-    private val requestedPreviews = mutableSetOf<BuiltInWallpaper>()
+    /** Built-ins whose previews are followed. Touched only from [eventFlow], on the main thread. */
+    private val followedPreviews = mutableSetOf<BuiltInWallpaper>()
 
     init {
         eventFlow.onEach { event ->
@@ -46,7 +46,7 @@ internal class WallpapersViewModel @Inject constructor(
                 is WallpapersEvent.OnWallpaperClick -> activateWallpaper(event.id)
                 is WallpapersEvent.OnDeleteClick -> deleteWallpaper(event.id)
                 is WallpapersEvent.OnBuiltInSettingsClick -> navigator.navigate(event.wallpaper.settingsDestination())
-                is WallpapersEvent.OnWallpapersChanged -> event.items.mapNotNull { it.builtIn }.forEach(::loadPreview)
+                is WallpapersEvent.OnWallpapersChanged -> event.items.mapNotNull { it.builtIn }.forEach(::followPreview)
                 is WallpapersEvent.OnMediaPicked -> openEditor(event.uri)
                 WallpapersEvent.OnSettingsClick -> onEvent(
                     WallpapersEvent.OpenLiveWallpaperChooser(liveWallpaperController.createSetWallpaperIntent())
@@ -85,14 +85,16 @@ internal class WallpapersViewModel @Inject constructor(
         }
     }
 
-    /** Once per built-in: the first render may take seconds, the card shows a placeholder until then. */
-    private fun loadPreview(wallpaper: BuiltInWallpaper) {
-        if (!requestedPreviews.add(wallpaper)) return
-        viewModelScope.launch(dispatchersProvider.io) {
-            builtInPreviews.preview(wallpaper)?.let { path ->
-                onEvent(WallpapersEvent.OnBuiltInPreviewLoaded(wallpaper, path))
-            }
-        }
+    /**
+     * Once per built-in, for as long as the list lives: a new picture comes after its settings change.
+     * The first render may take seconds; the card shows a placeholder until then.
+     */
+    private fun followPreview(wallpaper: BuiltInWallpaper) {
+        if (!followedPreviews.add(wallpaper)) return
+        builtInPreviews.previews(wallpaper)
+            .onEach { path -> onEvent(WallpapersEvent.OnBuiltInPreviewLoaded(wallpaper, path)) }
+            .flowOn(dispatchersProvider.io)
+            .launchIn(viewModelScope)
     }
 
     private fun BuiltInWallpaper.settingsDestination(): Destination = when (this) {

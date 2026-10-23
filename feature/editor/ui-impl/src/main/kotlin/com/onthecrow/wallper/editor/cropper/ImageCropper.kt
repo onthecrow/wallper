@@ -40,6 +40,7 @@ import kotlinx.coroutines.delay
 fun ImageCropper(
     modifier: Modifier = Modifier,
     videoUri: String,
+    videoDurationMs: Long,
     videoSize: IntSize,
     videoRange: ClosedFloatingPointRange<Float>,
     uiSeek: Float?,
@@ -148,6 +149,7 @@ fun ImageCropper(
         ImageCropper(
             modifier = imageModifier,
             videoUri = videoUri,
+            videoDurationMs = videoDurationMs,
             videoRange = videoRange,
             uiSeek = uiSeek,
             videoSeek = videoSeek,
@@ -167,6 +169,7 @@ fun ImageCropper(
 private fun ImageCropper(
     modifier: Modifier,
     videoUri: String,
+    videoDurationMs: Long,
     videoRange: ClosedFloatingPointRange<Float>,
     uiSeek: Float?,
     videoSeek: Float?,
@@ -193,6 +196,7 @@ private fun ImageCropper(
                 // todo draw video
                 VideoSurface(
                     videoUri,
+                    durationMs = videoDurationMs,
                     videoRange = videoRange,
                     seek = uiSeek,
                 )

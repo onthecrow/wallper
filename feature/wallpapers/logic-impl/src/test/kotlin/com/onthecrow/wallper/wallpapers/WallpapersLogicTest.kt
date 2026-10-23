@@ -10,18 +10,24 @@ import com.onthecrow.wallper.wallpapers.data.WallpapersRepository
 import com.onthecrow.wallper.wallpapers.data.database.WallpaperEntity
 import com.onthecrow.wallper.wallpapers.domain.model.NewWallpaper
 import com.onthecrow.wallper.wallpapers.domain.model.Wallpaper
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
 import kotlin.test.assertNull
 
+@OptIn(ExperimentalCoroutinesApi::class)
 class WallpapersLogicTest {
 
     private val dao = FakeWallpaperDao()
     private val storage = FakeMediaStorage()
     private val repository = WallpapersRepository(dao)
+    private val activations = WallpaperActivations()
 
     private val newWallpaper = NewWallpaper(
         type = MediaType.VIDEO,
@@ -51,25 +57,39 @@ class WallpapersLogicTest {
         val save = SaveWallpaperUseCaseImpl(repository)
         save(newWallpaper)
         save(newWallpaper.copy(originalPath = "originals/b"))
-        val source = ActiveWallpaperSourceImpl(repository)
+        val source = ActiveWallpaperSourceImpl(repository, activations)
         assertNull(source.activeWallpaperFlow.first())
 
-        ActivateWallpaperUseCaseImpl(repository)(1)
-        ActivateWallpaperUseCaseImpl(repository)(2)
+        ActivateWallpaperUseCaseImpl(repository, activations)(1)
+        ActivateWallpaperUseCaseImpl(repository, activations)(2)
 
         assertEquals(listOf(2), dao.rows.value.filter { it.isActive }.map { it.id })
         assertEquals("originals/b", assertIs<WallpaperSpec.Media>(source.activeWallpaperFlow.first()).sourcePath)
     }
 
     @Test
+    fun `every pick reaches the engine, the active wallpaper picked again too`() = runTest {
+        SaveWallpaperUseCaseImpl(repository)(newWallpaper)
+        val source = ActiveWallpaperSourceImpl(repository, activations)
+        val picks = mutableListOf<Unit>()
+        val collecting = backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { source.activations.toList(picks) }
+
+        ActivateWallpaperUseCaseImpl(repository, activations)(1)
+        ActivateWallpaperUseCaseImpl(repository, activations)(1)
+
+        assertEquals(2, picks.size)
+        collecting.cancel()
+    }
+
+    @Test
     fun `an active built-in feeds the engine its key`() = runTest {
         dao.rows.value = listOf(builtInEntity(id = 1, key = BuiltInWallpaper.BLACK_HOLE.key))
 
-        ActivateWallpaperUseCaseImpl(repository)(1)
+        ActivateWallpaperUseCaseImpl(repository, activations)(1)
 
         assertEquals(
             WallpaperSpec.BuiltIn(BuiltInWallpaper.BLACK_HOLE),
-            ActiveWallpaperSourceImpl(repository).activeWallpaperFlow.first(),
+            ActiveWallpaperSourceImpl(repository, activations).activeWallpaperFlow.first(),
         )
     }
 
@@ -93,7 +113,7 @@ class WallpapersLogicTest {
         dao.rows.value += builtInEntity(id = 2, key = "from_a_newer_version", isActive = true)
 
         assertEquals(listOf(1), ObserveWallpapersUseCaseImpl(repository)().first().map { it.id })
-        assertNull(ActiveWallpaperSourceImpl(repository).activeWallpaperFlow.first())
+        assertNull(ActiveWallpaperSourceImpl(repository, activations).activeWallpaperFlow.first())
     }
 
     @Test
