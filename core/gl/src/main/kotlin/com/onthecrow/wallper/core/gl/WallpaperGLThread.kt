@@ -4,6 +4,7 @@ import android.opengl.EGL14
 import android.opengl.EGLConfig
 import android.opengl.EGLContext
 import android.opengl.EGLDisplay
+import android.opengl.EGLExt
 import android.opengl.EGLSurface
 import android.opengl.GLES20
 import android.os.SystemClock
@@ -20,6 +21,9 @@ import timber.log.Timber
  * here (new EGL surface or context), and what can't be repaired is reported to the listener.
  * [lastLoopAtMs] (in [nowMs] time, elapsedRealtime by default) lets the owner notice a thread that hangs
  * inside a driver call, which no in-thread check can.
+ *
+ * @param glesVersion 2 or 3. If the device can't create such a context, [onInitFailed] is called and the
+ * thread ends.
  */
 class WallpaperGLThread(
     private val surfaceHolder: SurfaceHolder,
@@ -27,6 +31,8 @@ class WallpaperGLThread(
     private val continuous: Boolean = false,
     renderGuardListener: RenderGuard.Listener? = null,
     private val nowMs: () -> Long = SystemClock::elapsedRealtime,
+    private val glesVersion: Int = 2,
+    private val onInitFailed: ((Throwable) -> Unit)? = null,
 ) : Thread("WallpaperGLThread") {
 
     @Volatile
@@ -75,6 +81,10 @@ class WallpaperGLThread(
     /** Creating the EGL surface failed; don't retry in a loop, wait for a repair. */
     private var surfaceBroken = false
 
+    /** An EGL surface exists on the window; [onSurfaceDestroyed] can wait for it to go. */
+    @Volatile
+    private var eglSurfaceAlive = false
+
     /**
      * Вызывай, когда у Engine появился или изменился surface
      */
@@ -90,12 +100,22 @@ class WallpaperGLThread(
     }
 
     /**
-     * Вызывай из onSurfaceDestroyed Engine
+     * Вызывай из onSurfaceDestroyed Engine. With [waitMs] > 0 it blocks until the EGL surface is
+     * destroyed: the system may free the window right after onSurfaceDestroyed returns.
      */
-    fun onSurfaceDestroyed() {
+    fun onSurfaceDestroyed(waitMs: Long = 0) {
         synchronized(lock) {
             hasSurface = false
             lock.notifyAll()
+            val deadline = SystemClock.uptimeMillis() + waitMs
+            while (waitMs > 0 && eglSurfaceAlive && running && isAlive) {
+                val remaining = deadline - SystemClock.uptimeMillis()
+                if (remaining <= 0) {
+                    Timber.tag(TAG).w("EGL surface not destroyed in $waitMs ms")
+                    break
+                }
+                lock.wait(remaining)
+            }
         }
     }
 
@@ -151,7 +171,13 @@ class WallpaperGLThread(
 
     override fun run() {
         try {
-            initEgl()
+            try {
+                initEgl()
+            } catch (t: Throwable) {
+                Timber.tag(TAG).e(t, "No OpenGL ES $glesVersion context")
+                onInitFailed?.invoke(t)
+                return
+            }
 
             while (true) {
                 val work = awaitWork() ?: break
@@ -187,6 +213,7 @@ class WallpaperGLThread(
                 if (!hasSurface && hasEglSurface()) {
                     destroyEglSurface()
                     surfaceCreatedDelivered = false
+                    lock.notifyAll() // onSurfaceDestroyed may be waiting for this
                 }
 
                 val canRender = hasSurface && surfaceWidth > 0 && surfaceHeight > 0 && !surfaceBroken
@@ -295,7 +322,7 @@ class WallpaperGLThread(
         eglConfig = chooseEglConfig(display)
 
         val attribList = intArrayOf(
-            EGL14.EGL_CONTEXT_CLIENT_VERSION, 2,
+            EGL14.EGL_CONTEXT_CLIENT_VERSION, glesVersion,
             EGL14.EGL_NONE
         )
         eglContext = EGL14.eglCreateContext(
@@ -332,6 +359,7 @@ class WallpaperGLThread(
             return false
         }
         eglSurface = newSurface
+        eglSurfaceAlive = true
         pendingSizeChange = true
         return true
     }
@@ -349,6 +377,7 @@ class WallpaperGLThread(
             EGL14.eglDestroySurface(display, surface)
         }
         eglSurface = EGL14.EGL_NO_SURFACE
+        eglSurfaceAlive = false
     }
 
     private fun destroyEgl() {
@@ -367,7 +396,7 @@ class WallpaperGLThread(
 
     private fun chooseEglConfig(display: EGLDisplay): EGLConfig {
         val attribList = intArrayOf(
-            EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
+            EGL14.EGL_RENDERABLE_TYPE, if (glesVersion >= 3) EGLExt.EGL_OPENGL_ES3_BIT_KHR else EGL14.EGL_OPENGL_ES2_BIT,
             EGL14.EGL_RED_SIZE, 8,
             EGL14.EGL_GREEN_SIZE, 8,
             EGL14.EGL_BLUE_SIZE, 8,
