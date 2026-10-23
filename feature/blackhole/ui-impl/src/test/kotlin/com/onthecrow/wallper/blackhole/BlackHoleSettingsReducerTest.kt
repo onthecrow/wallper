@@ -29,6 +29,7 @@ class BlackHoleSettingsReducerTest {
         state = reducer.reduce(state, BlackHoleSettingsEvent.OnOpacityFalloffToggle(false))
         state = reducer.reduce(state, BlackHoleSettingsEvent.OnIdleFpsChange(24))
         state = reducer.reduce(state, BlackHoleSettingsEvent.OnOptimizedRenderingToggle(false))
+        state = reducer.reduce(state, BlackHoleSettingsEvent.OnLensCustomToggle(true))
 
         assertEquals(
             BlackHoleSettings(
@@ -40,6 +41,7 @@ class BlackHoleSettingsReducerTest {
                 diskOpacityFalloff = false,
                 idleFps = 24,
                 optimizedRendering = false,
+                lensCustom = true,
             ),
             state.settings,
         )

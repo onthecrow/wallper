@@ -8,6 +8,7 @@ uniform vec2 uPrincipal;        // projection centre offset in NDC
 uniform float uRc;
 uniform float uAlphaC;          // angular radius of the shadow
 uniform float uLensStrength;    // 1 is physical; the sky only
+uniform vec2 uLensFade;         // angles from the hole where that strength fades out; beyond π: never
 uniform float uExposure;
 uniform int uTonemapper;
 uniform int uDebugView;         // 0 image, 1 table parameter t, 2 disk image index, 3 sky footprint
@@ -73,7 +74,8 @@ float dopplerFactor(Ray ray, float r) {
 
 vec3 skyDirection(Ray ray, float phiEnd) {
     float straight = PI - ray.alpha;
-    float phi = straight + uLensStrength * (phiEnd - straight);
+    float strength = uLensStrength * (1.0 - smoothstep(uLensFade.x, uLensFade.y, ray.alpha));
+    float phi = straight + strength * (phiEnd - straight);
     return cos(phi) * ray.e1 + sin(phi) * ray.e2;
 }
 

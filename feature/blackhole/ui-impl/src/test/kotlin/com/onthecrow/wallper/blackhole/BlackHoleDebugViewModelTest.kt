@@ -2,10 +2,10 @@ package com.onthecrow.wallper.blackhole
 
 import com.onthecrow.wallper.blackhole.model.DebugSlider
 import com.onthecrow.wallper.blackhole.model.DebugToggle
-import com.onthecrow.wallper.blackhole.source.BlackHoleSettingsSource
+import com.onthecrow.wallper.blackhole.physics.BlackHoleSettings
 import com.onthecrow.wallper.blackhole.physics.QualityLevel
 import com.onthecrow.wallper.blackhole.physics.QualitySetting
-import com.onthecrow.wallper.blackhole.physics.BlackHoleSettings
+import com.onthecrow.wallper.blackhole.source.BlackHoleSettingsSource
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow

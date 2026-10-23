@@ -2,15 +2,15 @@ package com.onthecrow.wallper.blackhole
 
 import com.onthecrow.wallper.blackhole.model.DebugSlider
 import com.onthecrow.wallper.blackhole.model.DebugToggle
+import com.onthecrow.wallper.blackhole.physics.BlackHoleSettings
 import com.onthecrow.wallper.blackhole.physics.LensTableKey
 import com.onthecrow.wallper.blackhole.physics.LensTables
 import com.onthecrow.wallper.blackhole.physics.QualityLevel
 import com.onthecrow.wallper.blackhole.physics.QualitySetting
-import com.onthecrow.wallper.blackhole.physics.BlackHoleSettings
+import com.onthecrow.wallper.blackhole.physics.lensTableKey
 import com.onthecrow.wallper.blackhole.renderer.DebugOptions
 import com.onthecrow.wallper.blackhole.renderer.DebugView
 import com.onthecrow.wallper.blackhole.renderer.LensMode
-import com.onthecrow.wallper.blackhole.physics.lensTableKey
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals

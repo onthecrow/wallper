@@ -86,8 +86,41 @@ class BlackHoleSettingsTest {
 
     @Test
     fun `the lens strength reaches the sky lensing and stays in range`() {
-        assertEquals(0.3, BlackHoleSettings(lensStrength = 0.3).applyTo(BlackHoleParams()).lens.strength)
-        assertEquals(2.0, BlackHoleSettings(lensStrength = 5.0).applyTo(BlackHoleParams()).lens.strength)
+        assertEquals(0.3, BlackHoleSettings(lensCustom = true, lensStrength = 0.3).applyTo(BlackHoleParams()).lens.strength)
+        assertEquals(2.0, BlackHoleSettings(lensCustom = true, lensStrength = 5.0).applyTo(BlackHoleParams()).lens.strength)
+    }
+
+    @Test
+    fun `the lens sliders apply only while the switch is on, and their defaults keep the physical lens`() {
+        val shaped = BlackHoleSettings(lensStrength = 0.5, lensFadeStart = 3.0, lensFadeEnd = 6.0)
+        assertEquals(LensParams(), shaped.applyTo(BlackHoleParams()).lens)
+
+        assertEquals(LensParams(), BlackHoleSettings(lensCustom = true).applyTo(BlackHoleParams()).lens)
+        assertEquals(Double.POSITIVE_INFINITY, BlackHoleSettings(lensCustom = true).applyTo(BlackHoleParams()).lens.fadeEnd)
+
+        val lens = shaped.copy(lensCustom = true).applyTo(BlackHoleParams()).lens
+        assertEquals(0.5, lens.strength)
+        assertEquals(3.0, lens.fadeStart)
+        assertEquals(6.0, lens.fadeEnd)
+    }
+
+    @Test
+    fun `a lens fade is never narrower than half a shadow radius`() {
+        val lens = BlackHoleSettings(lensCustom = true, lensFadeStart = 4.0, lensFadeEnd = 2.0).applyTo(BlackHoleParams()).lens
+
+        assertEquals(4.0, lens.fadeStart)
+        assertEquals(4.0 + BlackHoleSettings.MIN_LENS_FADE, lens.fadeEnd)
+    }
+
+    @Test
+    fun `the render resolution caps every quality level in steps of 5 percent`() {
+        val frames = BlackHoleSettings(renderScale = 0.83).applyTo(BlackHoleParams()).frames
+
+        assertEquals(0.85, frames.maxRenderScale)
+        assertEquals(0.85f, QualityLevel.HIGH.effectiveRenderScale(frames))
+        assertEquals(QualityLevel.MEDIUM.renderScale, QualityLevel.MEDIUM.effectiveRenderScale(frames))
+        assertEquals(0.5, BlackHoleSettings(renderScale = 0.1).applyTo(BlackHoleParams()).frames.maxRenderScale)
+        assertEquals(1f, QualityLevel.HIGH.effectiveRenderScale(BlackHoleParams().frames))
     }
 
     @Test

@@ -34,9 +34,12 @@ object StarMath {
         return StarLayer(cells = cells, density = finerDensity, flux = layer.flux)
     }
 
-    /** σ in radians for [sizePx] render pixels at the centre of a [renderHeightPx] tall frame. */
-    fun sigmaRad(sizePx: Double, tanHalfFovY: Double, renderHeightPx: Int): Double =
-        sizePx * 2 * tanHalfFovY / renderHeightPx.coerceAtLeast(1)
+    /**
+     * σ in radians for [sizePx] screen pixels at the centre of a [screenHeightPx] tall screen. Screen, not
+     * render pixels: a lower render scale must not make the stars bigger and brighter.
+     */
+    fun sigmaRad(sizePx: Double, tanHalfFovY: Double, screenHeightPx: Int): Double =
+        sizePx * 2 * tanHalfFovY / screenHeightPx.coerceAtLeast(1)
 
     /**
      * Mean radiance of a layer whose stars got smaller than a pixel: density · E[mag] · 2πσ² per mean

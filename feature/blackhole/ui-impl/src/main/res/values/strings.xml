@@ -20,6 +20,15 @@
     <string name="black_hole_disk_roll">Disk tilt on screen: %1$.0f°</string>
     <string name="black_hole_lens_strength">Gravitational lens: ×%1$.2f</string>
     <string name="black_hole_lens_strength_hint">1 is physical. Lower brings the lens ring closer to the shadow (about 0.1 hugs it), higher pushes it further out</string>
+    <string name="black_hole_lens_custom">Shape the lens</string>
+    <string name="black_hole_lens_custom_hint">Off: the lens as physics makes it, reaching far across the sky. On: its strength and where it fades out</string>
+    <string name="black_hole_lens_fade_start">Lens fades from: %1$.1f× the shadow</string>
+    <string name="black_hole_lens_fade_start_hint">Distance from the hole, in shadow radii, where the bending starts to weaken</string>
+    <string name="black_hole_lens_fade_end">Lens ends at: %1$.1f× the shadow</string>
+    <string name="black_hole_lens_fade_end_none">Lens ends: nowhere, as in physics</string>
+    <string name="black_hole_lens_fade_end_hint">Where the bending is gone. Close to the start, the stars at the edge bunch up into a ring</string>
+    <string name="black_hole_render_scale">Render resolution: %1$d%%</string>
+    <string name="black_hole_render_scale_hint">The black hole is drawn at this share of the screen and scaled up: lower is cheaper and a little softer. The quality never goes above it</string>
     <string name="black_hole_disk_speed">Disk rotation speed: ×%1$.2f</string>
     <string name="black_hole_disk_brightness">Disk brightness: ×%1$.2f</string>
     <string name="black_hole_disk_opacity">Disk opacity: %1$.2f</string>

@@ -10,6 +10,7 @@ import com.onthecrow.wallper.blackhole.physics.QualityLevel
 import com.onthecrow.wallper.blackhole.physics.StarLayer
 import com.onthecrow.wallper.blackhole.physics.StarMath
 import com.onthecrow.wallper.blackhole.physics.Tonemapper
+import com.onthecrow.wallper.blackhole.physics.effectiveRenderScale
 import java.util.Random
 import kotlin.math.PI
 import kotlin.math.cos
@@ -94,6 +95,7 @@ internal class BlackHoleRenderer(assets: AssetManager) : BlackHoleFrameRenderer 
             haze?.release()
             haze = null
         }
+        if (quality.effectiveRenderScale(old.frames) != quality.effectiveRenderScale(params.frames)) releaseTargets()
         if (old.programDefines() != params.programDefines()) {
             programs?.release()
             programs = null
@@ -121,7 +123,10 @@ internal class BlackHoleRenderer(assets: AssetManager) : BlackHoleFrameRenderer 
             diskDetail?.release()
             diskDetail = null
         }
-        if (old.renderScale != level.renderScale || old.bloomLevels != level.bloomLevels) releaseTargets()
+        val frames = params.frames
+        if (old.effectiveRenderScale(frames) != level.effectiveRenderScale(frames) || old.bloomLevels != level.bloomLevels) {
+            releaseTargets()
+        }
         starRotationSeed = Int.MIN_VALUE // one rotation per star layer
     }
 
@@ -255,8 +260,15 @@ internal class BlackHoleRenderer(assets: AssetManager) : BlackHoleFrameRenderer 
         // The recoil is in half screen heights on both axes: x shrinks to NDC by the aspect.
         program.set("uPrincipal", (frame.principalX + frame.recoilX / aspect).toFloat(), (frame.principalY + frame.recoilY).toFloat())
         program.set("uRc", rc)
-        program.set("uAlphaC", LensMath.alphaC(rc))
+        val alphaC = LensMath.alphaC(rc)
+        program.set("uAlphaC", alphaC)
         program.set("uLensStrength", params.lens.strength)
+        val skyLens = params.lens
+        if (skyLens.fadeEnd.isInfinite()) {
+            program.set("uLensFade", NO_FADE, NO_FADE + 1f)
+        } else {
+            program.set("uLensFade", (skyLens.fadeStart * alphaC).toFloat(), (skyLens.fadeEnd * alphaC).toFloat())
+        }
         program.set("uExposure", params.post.exposure)
         program.setInt("uTonemapper", params.post.tonemapper.index)
         program.setInt("uDebugView", debug.view.ordinal)
@@ -288,7 +300,7 @@ internal class BlackHoleRenderer(assets: AssetManager) : BlackHoleFrameRenderer 
         program.set("uDopplerStrength", if (params.doppler.enabled) params.doppler.strength else 0.0)
 
         val stars = params.stars
-        val sigma = StarMath.sigmaRad(stars.sizePx, frame.tanHalfFovY, target.height)
+        val sigma = StarMath.sigmaRad(stars.sizePx, frame.tanHalfFovY, surfaceHeight)
         program.texture("uHaze", UNIT_HAZE, GLES30.GL_TEXTURE_CUBE_MAP, haze?.texture ?: 0)
         program.set("uHazeEnabled", if (params.haze.enabled) 1f else 0f)
         program.set("uStarsEnabled", if (stars.enabled) 1f else 0f)
@@ -418,8 +430,9 @@ internal class BlackHoleRenderer(assets: AssetManager) : BlackHoleFrameRenderer 
     }
 
     private fun createTargets(caps: GlCaps) {
-        val width = (surfaceWidth * quality.renderScale).toInt().coerceAtLeast(1)
-        val height = (surfaceHeight * quality.renderScale).toInt().coerceAtLeast(1)
+        val scale = quality.effectiveRenderScale(params.frames)
+        val width = (surfaceWidth * scale).toInt().coerceAtLeast(1)
+        val height = (surfaceHeight * scale).toInt().coerceAtLeast(1)
         for (candidate in caps.targetFormats) {
             val target = RenderTarget.create(width, height, candidate) ?: continue
             val previousFormat = format
@@ -564,6 +577,9 @@ internal class BlackHoleRenderer(assets: AssetManager) : BlackHoleFrameRenderer 
         const val UNIT_DISK = 2
         const val UNIT_HAZE = 3
         const val FP_MAX = 0.05f
+
+        /** A fade past any angle a ray can have: the lens keeps its physical reach. */
+        const val NO_FADE = 10f
         const val DIFF_SCALE = 10f
         const val LDR_THRESHOLD = 0.8f
         const val MAX_ANISOTROPY = 8f
