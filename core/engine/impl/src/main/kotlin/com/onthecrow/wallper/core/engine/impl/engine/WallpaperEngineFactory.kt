@@ -2,19 +2,17 @@ package com.onthecrow.wallper.core.engine.impl.engine
 
 import android.content.Context
 import android.view.SurfaceHolder
-import com.onthecrow.wallper.core.blackhole.renderer.BlackHoleSettingsStore
-import com.onthecrow.wallper.core.blackhole.renderer.LensTablesRepository
+import com.onthecrow.wallper.core.engine.EngineHost
+import com.onthecrow.wallper.core.engine.WallpaperEngine
 import com.onthecrow.wallper.core.engine.WallpaperSpec
-import com.onthecrow.wallper.core.model.BuiltInWallpaper
+import com.onthecrow.wallper.core.engine.impl.BuiltInWallpapers
 import com.onthecrow.wallper.core.model.MediaType
 import com.onthecrow.wallper.core.player.WallperPlayerFactory
 import javax.inject.Inject
 
 internal class WallpaperEngineFactory @Inject constructor(
     private val playerFactory: WallperPlayerFactory,
-    private val blackHoleSettings: BlackHoleSettingsStore,
-    private val lensTables: LensTablesRepository,
-    private val autoQuality: AutoQualityMemory,
+    private val builtIns: BuiltInWallpapers,
 ) {
     /**
      * @param wallpaper the wallpaper to show, or null for the placeholder.
@@ -28,12 +26,9 @@ internal class WallpaperEngineFactory @Inject constructor(
         host: EngineHost,
     ): WallpaperEngine = when (wallpaper) {
         null -> PlaceholderWallpaperEngine(baseContext, surfaceHolder)
-        is WallpaperSpec.BuiltIn -> when (wallpaper.wallpaper) {
-            BuiltInWallpaper.BLACK_HOLE ->
-                BlackHoleWallpaperEngine(
-                    baseContext, surfaceHolder, isPreview, host, blackHoleSettings, lensTables, autoQuality,
-                )
-        }
+        is WallpaperSpec.BuiltIn -> builtIns[wallpaper.wallpaper]
+            ?.createEngine(baseContext, surfaceHolder, isPreview, host)
+            ?: PlaceholderWallpaperEngine(baseContext, surfaceHolder)
         is WallpaperSpec.Media -> {
             val processedPath = wallpaper.processedPath
             when {

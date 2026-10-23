@@ -11,5 +11,6 @@ android {
 dependencies {
     api(projects.core.model)
     implementation(projects.core.diagnostics)
+    implementation(libs.kotlinx.coroutines.android)
     implementation(libs.timber)
 }

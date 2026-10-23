@@ -11,7 +11,6 @@ android {
 
 dependencies {
     api(projects.core.engine.api)
-    implementation(projects.core.blackhole.renderer)
     implementation(projects.core.diagnostics)
     implementation(projects.core.gl)
     implementation(projects.core.player)

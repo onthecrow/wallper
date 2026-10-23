@@ -17,15 +17,15 @@ Design docs: [WALLPER_PLAYER_DESIGN.md](WALLPER_PLAYER_DESIGN.md) (video playbac
 ## Modules
 
 - `:app`: Application, MainActivity, `@StartDestination`. No feature code.
-- `:core:*`: `model` (pure Kotlin), `diagnostics` (pure Kotlin), `coroutines`, `mvi`, `navigation:api|impl`, `designsystem`, `resources`, `storage`, `gl`, `player`, `engine:api|impl` (the WallpaperService), `blackhole:physics` (pure Kotlin) and `blackhole:renderer` (GLES 3.0).
-- `:feature:<name>:{logic-api, logic-impl, ui-api, ui-impl}`: `wallpapers` (main screen, owns the wallpaper domain and Room), `editor` (add screen, media prep, Transformer export), `blackhole` (settings and debug screens of the built-in black hole; UI only).
+- `:core:*`: `model` (pure Kotlin), `diagnostics` (pure Kotlin), `coroutines`, `mvi`, `navigation:api|impl`, `designsystem`, `resources`, `storage`, `gl`, `player`, `engine:api|impl` (the WallpaperService). Core knows no built-in wallpaper by name.
+- `:feature:<name>:{logic-api, logic-impl, ui-api, ui-impl}`: `wallpapers` (main screen, owns the wallpaper domain and Room), `editor` (add screen, media prep, Transformer export), `blackhole` (the built-in black hole: physics and the screens' ports in `logic-api`, the GLES 3.0 renderer, its engine and the settings store in `logic-impl`, settings and debug screens in `ui-impl`).
 
 ## Dependency rules (enforced by `build-logic/.../ModuleBoundaries.kt`)
 
 - A feature sees another feature only through `ui-api` (navigation) and `logic-api` (domain). Only `:app` depends on `-impl`.
 - Inside a feature, logic never depends on UI: `ui-impl` → `ui-api`, `logic-api`; `logic-impl` → `logic-api`. `logic-api` is plain Kotlin (`wallper.jvm.library`).
 - `core` never depends on `feature`. When core needs feature data, core declares a port (`ActiveWallpaperSource`) and the feature implements it.
-- `core:model`, `coroutines`, `storage`, `gl`, `player`, `engine:*`, `blackhole:*` stay free of Compose and `core:designsystem`.
+- `core:model`, `coroutines`, `storage`, `gl`, `player`, `engine:*` and every feature `logic-*` stay free of Compose and `core:designsystem`.
 - Everything in `-impl` is `internal`; Hilt modules are the only public surface.
 
 ## Invariants
@@ -50,7 +50,7 @@ The player side and the GL side recover independently; there is no shared abstra
 - **GL (`core:gl`).**
   - `VideoWallpaperRenderer` owns one video texture per EGL context and reports its surface through `onVideoSurfaceCreated`. A lost context's texture is released only after the new one shows a frame.
   - `RenderGuard` inside `WallpaperGLThread` repairs EGL.
-  - `RestartableGl` (`core:engine:impl`) owns the GL thread of the video and black-hole engines: the heartbeat (armed only while frames are expected; the first frames after a shader compile get 10 s), restarts limited by `GlRestartPolicy` (3 per 2 min), the teardown on the callback thread. It replaces a thread only once it has exited: one stuck in the driver still holds the window, so the engine gives up. The video engine detaches the player (`setVideoSurface(null)`) before the old GL thread exits.
+  - `RestartableGl` (`core:gl`) owns the GL thread of the video and black-hole engines: the heartbeat (armed only while frames are expected; the first frames after a shader compile get 10 s), restarts limited by `GlRestartPolicy` (3 per 2 min), the teardown on the callback thread. It replaces a thread only once it has exited: one stuck in the driver still holds the window, so the engine gives up. The video engine detaches the player (`setVideoSurface(null)`) before the old GL thread exits.
   - A wallpaper that gave up shows the placeholder until the user picks a wallpaper, that one too (`ActiveWallpaperSource.activations`), or until it is visible again 5 min later.
 - Every ExoPlayer call happens on the player thread (`setLooper`). GL objects are touched only on the GL thread.
 - The supervisor, watchdog, policies and `RenderGuard` are tested on the JVM, with virtual coroutine time or fake clocks and fake engines. Keep Android types behind `ManagedEngine` / `RenderRepairs`.
@@ -58,14 +58,14 @@ The player side and the GL side recover independently; there is no shared abstra
 ## Built-in wallpapers and the black hole (see BLACKHOLE_PLAN.md)
 
 - A built-in wallpaper is a row of `wallpapers` with `built_in = BuiltInWallpaper.key`. `built_in` has a unique index (schema v3), and the database seeds missing built-in rows on every open (`SeedBuiltInWallpapersCallback`, `INSERT OR IGNORE`); they are listed first (`ORDER BY built_in IS NULL, id`), activate like any wallpaper and are never deleted (the use case refuses too). Never rename a `BuiltInWallpaper.key`.
-- `WallpaperSpec` is sealed: `Media` or `BuiltIn`. `WallpaperEngineFactory` maps `BuiltIn(BLACK_HOLE)` to `BlackHoleWallpaperEngine`.
-- Every tunable of the black hole lives in `BlackHoleParams` (`core:blackhole:physics`). Defaults start from BLACKHOLE_TZ.md §10; the look was tuned on a phone (BLACKHOLE_PLAN.md §9). User settings are applied on top with `BlackHoleSettings.applyTo`.
-- `BlackHoleSettings` (`core:blackhole:physics`, with its ranges) is `@Serializable`. `BlackHoleSettingsStore` keeps it as one JSON string in device-protected SharedPreferences, only the fields that differ from the defaults. A new setting is a new field with a default: old JSON still reads, unknown keys are ignored. Never rename a field; its name is the stored key.
+- `WallpaperSpec` is sealed: `Media` or `BuiltIn`. A built-in's feature binds a `BuiltInWallpaperProvider` (`core:engine:api`) with `@IntoSet`: its engine, colours, list stills and whether the device can draw it. The service, `WallpaperEngineFactory`, `BuiltInPreviews` and `LiveWallpaperController.isSupported` look it up by key (`BuiltInWallpapers`); a key without a provider shows the placeholder. A new built-in needs no change in core beyond its `BuiltInWallpaper` key.
+- Every tunable of the black hole lives in `BlackHoleParams` (`feature:blackhole:logic-api`). Defaults start from BLACKHOLE_TZ.md §10; the look was tuned on a phone (BLACKHOLE_PLAN.md §9). User settings are applied on top with `BlackHoleSettings.applyTo`.
+- `BlackHoleSettings` (`logic-api`, with its ranges) is `@Serializable`. `BlackHoleSettingsStore` keeps it as one JSON string in device-protected SharedPreferences, only the fields that differ from the defaults. A new setting is a new field with a default: old JSON still reads, unknown keys are ignored. Never rename a field; its name is the stored key.
 - Lens tables depend only on `(r_c, N_α, N_φ, K)`. `LensTablesRepository` generates them once and caches them in device-protected `cacheDir/blackhole` (`LensTableFiles`: every quality of the current r_c, K and format). Nothing keeps them in memory: the renderer drops its copy once they are on the GPU and asks again after a lost context (`onTablesLost`). Bump `LensTables.FORMAT_VERSION` when the layout or the physics changes.
 - Built-ins the device can't draw (no ES 3.0) are hidden from the list (`LiveWallpaperController.isSupported`).
 - The camera orbits about the disk axis; the gyroscope and the launcher turn it on top in screen axes (`CameraPose.turned`), then the elevation is clamped. Their recoil is a principal-point shift (`FrameState.recoilX/Y`, half screen heights). The settings preview's drag turns the orbit itself (`setOrbitOffset`), with no recoil.
-- `BlackHoleRenderer` (GL thread only) is shared by the wallpaper, the list preview (`BlackHolePreviewRenderer`, EGL pbuffer) and the debug screen. Frames are paced by `Choreographer` on the engine's callback thread; animation phases come from `Long` nanoseconds, never a growing float.
-- Shaders live in `core/blackhole/renderer/src/main/assets/blackhole` (`#include` is resolved by `ShaderLibrary`). After editing them run `./gradlew validateBlackHoleShaders` (also part of `check`): it compiles them for every quality level without a device, as GLSL ES 3.00 with glslangValidator, or as 3.10 with the NDK's glslc when that is all there is.
+- `BlackHoleRenderer` (GL thread only) is shared by the wallpaper, the list preview (`BlackHolePreviewRenderer`, EGL pbuffer) and the settings and debug screens. The screens see it as `BlackHoleFrameRenderer` from `BlackHoleRendererFactory` (`logic-api`), handed to the preview through `LocalBlackHoleRenderers` by the navigation entries. Frames are paced by `Choreographer` on the engine's callback thread; animation phases come from `Long` nanoseconds, never a growing float.
+- Shaders live in `feature/blackhole/logic-impl/src/main/assets/blackhole` (`#include` is resolved by `ShaderLibrary`). After editing them run `./gradlew validateBlackHoleShaders` (also part of `check`): it compiles them for every quality level without a device, as GLSL ES 3.00 with glslangValidator, or as 3.10 with the NDK's glslc when that is all there is.
 
 ## Diagnostics (`core:diagnostics`)
 

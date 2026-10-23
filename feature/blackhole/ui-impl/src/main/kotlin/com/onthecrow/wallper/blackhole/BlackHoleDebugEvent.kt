@@ -2,11 +2,11 @@ package com.onthecrow.wallper.blackhole
 
 import com.onthecrow.wallper.blackhole.model.DebugSlider
 import com.onthecrow.wallper.blackhole.model.DebugToggle
-import com.onthecrow.wallper.core.blackhole.physics.LensTableKey
-import com.onthecrow.wallper.core.blackhole.physics.LensTables
-import com.onthecrow.wallper.core.blackhole.physics.QualityLevel
-import com.onthecrow.wallper.core.blackhole.renderer.DebugView
-import com.onthecrow.wallper.core.blackhole.renderer.LensMode
+import com.onthecrow.wallper.blackhole.physics.LensTableKey
+import com.onthecrow.wallper.blackhole.physics.LensTables
+import com.onthecrow.wallper.blackhole.physics.QualityLevel
+import com.onthecrow.wallper.blackhole.renderer.DebugView
+import com.onthecrow.wallper.blackhole.renderer.LensMode
 import com.onthecrow.wallper.core.mvi.Event
 
 internal sealed interface BlackHoleDebugEvent : Event {

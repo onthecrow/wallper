@@ -1,7 +1,7 @@
 package com.onthecrow.wallper.blackhole.model
 
-import com.onthecrow.wallper.core.blackhole.physics.StarMath
-import com.onthecrow.wallper.core.blackhole.physics.BlackHoleSettings
+import com.onthecrow.wallper.blackhole.physics.StarMath
+import com.onthecrow.wallper.blackhole.physics.BlackHoleSettings
 
 /** A slider of the settings screen and the setting it edits. */
 internal enum class SettingsSlider(val range: ClosedFloatingPointRange<Double>) {

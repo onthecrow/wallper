@@ -12,8 +12,9 @@ private val FEATURE_LAYERS = setOf("logic-api", "logic-impl", "ui-api", "ui-impl
 private val CROSS_FEATURE_LAYERS = setOf("logic-api", "ui-api")
 
 /**
- * Modules the wallpaper service is built from. They must stay free of Compose and the design system:
- * the service has no UI and starts in direct boot.
+ * Core modules the wallpaper service is built from; every feature `logic-*` module is UI-free too (the
+ * built-in wallpapers' engines live there). No Compose, no design system: the service has no UI and
+ * starts in direct boot.
  */
 private val UI_FREE_MODULES = setOf(
     ":core:model",
@@ -24,8 +25,6 @@ private val UI_FREE_MODULES = setOf(
     ":core:player",
     ":core:engine:api",
     ":core:engine:impl",
-    ":core:blackhole:physics",
-    ":core:blackhole:renderer",
 )
 
 /**
@@ -52,7 +51,7 @@ internal fun Project.enforceModuleBoundaries() {
     }
 
     val isLogic = group == "feature" && layer?.startsWith("logic-") == true
-    val isUiFree = path in UI_FREE_MODULES
+    val isUiFree = path in UI_FREE_MODULES || isLogic
 
     afterEvaluate {
         configurations.forEach { configuration ->

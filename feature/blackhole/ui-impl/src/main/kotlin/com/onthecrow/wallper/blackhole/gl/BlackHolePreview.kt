@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.opengl.GLSurfaceView
 import android.view.Choreographer
 import android.view.MotionEvent
+import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -12,11 +13,13 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.LifecycleResumeEffect
-import com.onthecrow.wallper.core.blackhole.physics.FramePacing
+import com.onthecrow.wallper.blackhole.physics.FramePacing
+import com.onthecrow.wallper.blackhole.renderer.BlackHoleRendererFactory
 
 /**
  * An ES 3.0 [GLSurfaceView] drawing [config] at most [PREVIEW_FPS] times a second, the wallpaper's rate
@@ -36,12 +39,17 @@ internal fun BlackHolePreview(
     modifier: Modifier = Modifier,
     followsGyroscope: Boolean = false,
 ) {
-    val context = LocalContext.current
+    // Android Studio previews have no GL and no renderer factory: the controls around still show.
+    if (LocalInspectionMode.current) {
+        Box(modifier = modifier)
+        return
+    }
+    val renderers = LocalBlackHoleRenderers.current
     val currentOnStats by rememberUpdatedState(onStats)
     val currentOnFailure by rememberUpdatedState(onFailure)
     val renderer = remember {
         PreviewGlRenderer(
-            assets = context.assets,
+            renderer = renderers.create(),
             onStats = { fps, gpuMs -> currentOnStats(fps, gpuMs) },
             onFailure = { currentOnFailure(it) },
         )
@@ -81,6 +89,11 @@ internal fun BlackHolePreview(
             modifier = modifier,
         )
     }
+}
+
+/** Where the preview's renderer comes from: logic-impl, provided by the screens' navigation entries. */
+internal val LocalBlackHoleRenderers = staticCompositionLocalOf<BlackHoleRendererFactory> {
+    error("No BlackHoleRendererFactory: provide LocalBlackHoleRenderers around the screen")
 }
 
 /** Asks [view] for a frame on the vsyncs [FramePacing] picks at [PREVIEW_FPS]. Main thread. */

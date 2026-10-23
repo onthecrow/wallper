@@ -2,11 +2,11 @@ package com.onthecrow.wallper.blackhole
 
 import com.onthecrow.wallper.blackhole.model.PictureLayer
 import com.onthecrow.wallper.blackhole.model.SettingsSlider
-import com.onthecrow.wallper.core.blackhole.physics.LensTableKey
-import com.onthecrow.wallper.core.blackhole.physics.LensTables
-import com.onthecrow.wallper.core.blackhole.physics.QualitySetting
-import com.onthecrow.wallper.core.blackhole.physics.StarMath
-import com.onthecrow.wallper.core.blackhole.physics.BlackHoleSettings
+import com.onthecrow.wallper.blackhole.physics.LensTableKey
+import com.onthecrow.wallper.blackhole.physics.LensTables
+import com.onthecrow.wallper.blackhole.physics.QualitySetting
+import com.onthecrow.wallper.blackhole.physics.StarMath
+import com.onthecrow.wallper.blackhole.physics.BlackHoleSettings
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals

@@ -33,10 +33,10 @@ import com.onthecrow.wallper.blackhole.view.SectionTitle
 import com.onthecrow.wallper.blackhole.view.SliderRow
 import com.onthecrow.wallper.blackhole.view.SwitchRow
 import com.onthecrow.wallper.blackhole.view.label
-import com.onthecrow.wallper.core.blackhole.physics.QualityLevel
-import com.onthecrow.wallper.core.blackhole.physics.BlackHoleSettings
-import com.onthecrow.wallper.core.blackhole.renderer.DebugView
-import com.onthecrow.wallper.core.blackhole.renderer.LensMode
+import com.onthecrow.wallper.blackhole.physics.QualityLevel
+import com.onthecrow.wallper.blackhole.physics.BlackHoleSettings
+import com.onthecrow.wallper.blackhole.renderer.DebugView
+import com.onthecrow.wallper.blackhole.renderer.LensMode
 
 /** The live renderer under a stats overlay, with the tuning controls in a collapsible bottom panel. */
 @Composable

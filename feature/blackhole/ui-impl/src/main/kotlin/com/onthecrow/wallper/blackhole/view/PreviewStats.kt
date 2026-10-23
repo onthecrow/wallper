@@ -14,7 +14,7 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.onthecrow.wallper.blackhole.ui.R
-import com.onthecrow.wallper.core.blackhole.physics.QualityLevel
+import com.onthecrow.wallper.blackhole.physics.QualityLevel
 
 /** FPS, GPU time, the quality level and any loading or shader problem, over a live preview. */
 @Composable

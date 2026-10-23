@@ -1,12 +1,12 @@
 package com.onthecrow.wallper.blackhole
 
 import com.onthecrow.wallper.blackhole.gl.PreviewConfig
-import com.onthecrow.wallper.core.blackhole.physics.BlackHoleParams
-import com.onthecrow.wallper.core.blackhole.physics.BlackHoleSettings
-import com.onthecrow.wallper.core.blackhole.physics.LensTableKey
-import com.onthecrow.wallper.core.blackhole.physics.LensTables
-import com.onthecrow.wallper.core.blackhole.physics.QualityLevel
-import com.onthecrow.wallper.core.blackhole.physics.lensTableKey
+import com.onthecrow.wallper.blackhole.physics.BlackHoleParams
+import com.onthecrow.wallper.blackhole.physics.BlackHoleSettings
+import com.onthecrow.wallper.blackhole.physics.LensTableKey
+import com.onthecrow.wallper.blackhole.physics.LensTables
+import com.onthecrow.wallper.blackhole.physics.QualityLevel
+import com.onthecrow.wallper.blackhole.physics.lensTableKey
 import com.onthecrow.wallper.core.mvi.State
 
 internal data class BlackHoleSettingsState(

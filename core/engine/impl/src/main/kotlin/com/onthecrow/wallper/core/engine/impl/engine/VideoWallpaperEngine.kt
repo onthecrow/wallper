@@ -1,6 +1,8 @@
 package com.onthecrow.wallper.core.engine.impl.engine
 
 import android.view.SurfaceHolder
+import com.onthecrow.wallper.core.engine.EngineHost
+import com.onthecrow.wallper.core.engine.WallpaperEngine
 import com.onthecrow.wallper.core.player.PlayerMedia
 import com.onthecrow.wallper.core.player.WallperPlayerFactory
 import com.onthecrow.wallper.core.player.WallperPlayerState

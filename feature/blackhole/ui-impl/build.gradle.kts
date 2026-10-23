@@ -12,7 +12,7 @@ android {
 
 dependencies {
     implementation(projects.feature.blackhole.uiApi)
-    implementation(projects.core.blackhole.renderer)
+    implementation(projects.feature.blackhole.logicApi)
     implementation(projects.core.coroutines)
     implementation(projects.core.mvi)
     implementation(projects.core.navigation.api)

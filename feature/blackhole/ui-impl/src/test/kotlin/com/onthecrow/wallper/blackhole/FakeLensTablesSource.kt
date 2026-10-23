@@ -1,8 +1,8 @@
 package com.onthecrow.wallper.blackhole
 
 import com.onthecrow.wallper.blackhole.source.LensTablesSource
-import com.onthecrow.wallper.core.blackhole.physics.LensTableKey
-import com.onthecrow.wallper.core.blackhole.physics.LensTables
+import com.onthecrow.wallper.blackhole.physics.LensTableKey
+import com.onthecrow.wallper.blackhole.physics.LensTables
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 

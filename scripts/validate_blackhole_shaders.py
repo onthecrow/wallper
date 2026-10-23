@@ -20,9 +20,9 @@ import sys
 import tempfile
 
 ROOT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..')
-ASSETS = os.path.join(ROOT, 'core', 'blackhole', 'renderer', 'src', 'main', 'assets', 'blackhole')
-PARAMS = os.path.join(ROOT, 'core', 'blackhole', 'physics', 'src', 'main', 'kotlin', 'com', 'onthecrow', 'wallper',
-                      'core', 'blackhole', 'physics', 'BlackHoleParams.kt')
+ASSETS = os.path.join(ROOT, 'feature', 'blackhole', 'logic-impl', 'src', 'main', 'assets', 'blackhole')
+PARAMS = os.path.join(ROOT, 'feature', 'blackhole', 'logic-api', 'src', 'main', 'kotlin', 'com', 'onthecrow', 'wallper',
+                      'blackhole', 'physics', 'BlackHoleParams.kt')
 STAGES = {'.vert': 'vert', '.frag': 'frag'}
 # LensMath.PHI_MAX and PHI_END_MAX as BlackHoleRenderer prints them; their values don't change what compiles.
 LENS_DEFINES = {'PHI_MAX': '9.42477796', 'PHI_END_MAX': '25.13274123'}

@@ -5,8 +5,8 @@ import com.onthecrow.wallper.blackhole.model.SettingsSlider
 import com.onthecrow.wallper.blackhole.source.BlackHoleSettingsSource
 import com.onthecrow.wallper.blackhole.source.DebuggableBuild
 import com.onthecrow.wallper.blackhole.source.LensTablesSource
-import com.onthecrow.wallper.core.blackhole.physics.BlackHoleSettings
-import com.onthecrow.wallper.core.blackhole.physics.LensTableKey
+import com.onthecrow.wallper.blackhole.physics.BlackHoleSettings
+import com.onthecrow.wallper.blackhole.physics.LensTableKey
 import com.onthecrow.wallper.core.mvi.BaseViewModel
 import com.onthecrow.wallper.core.navigation.Navigator
 import dagger.hilt.android.lifecycle.HiltViewModel

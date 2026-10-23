@@ -3,7 +3,6 @@ package com.onthecrow.wallper.core.engine.impl
 import android.app.WallpaperColors
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Color
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -13,11 +12,10 @@ import android.view.SurfaceHolder
 import androidx.annotation.RequiresApi
 import androidx.core.graphics.drawable.toBitmap
 import com.onthecrow.wallper.core.engine.ActiveWallpaperSource
+import com.onthecrow.wallper.core.engine.EngineHost
+import com.onthecrow.wallper.core.engine.WallpaperEngine
 import com.onthecrow.wallper.core.engine.WallpaperSpec
-import com.onthecrow.wallper.core.engine.impl.engine.EngineHost
-import com.onthecrow.wallper.core.engine.impl.engine.WallpaperEngine
 import com.onthecrow.wallper.core.engine.impl.engine.WallpaperEngineFactory
-import com.onthecrow.wallper.core.model.BuiltInWallpaper
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -42,6 +40,9 @@ class WallperWallpaperService : WallpaperService() {
 
     @Inject
     internal lateinit var wallpaperEngineFactory: WallpaperEngineFactory
+
+    @Inject
+    internal lateinit var builtIns: BuiltInWallpapers
 
     override fun onCreateEngine(): Engine {
         Timber.d("onCreateEngine")
@@ -76,23 +77,6 @@ class WallperWallpaperService : WallpaperService() {
         var sample = 1
         while (bounds.outWidth / (sample * 2) >= COLORS_SIZE) sample *= 2
         return BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample })
-    }
-
-    @RequiresApi(Build.VERSION_CODES.O_MR1)
-    private fun BuiltInWallpaper.colors(): WallpaperColors = when (this) {
-        BuiltInWallpaper.BLACK_HOLE -> blackHoleColors()
-    }
-
-    /** The black hole: almost black with a warm amber accent, dark theme friendly (§11.4). */
-    @RequiresApi(Build.VERSION_CODES.O_MR1)
-    private fun blackHoleColors(): WallpaperColors {
-        val primary = Color.valueOf(0.03f, 0.025f, 0.02f)
-        val secondary = Color.valueOf(0.85f, 0.55f, 0.2f)
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            WallpaperColors(primary, secondary, null, WallpaperColors.HINT_SUPPORTS_DARK_THEME)
-        } else {
-            WallpaperColors(primary, secondary, null)
-        }
     }
 
     inner class GLEngine : Engine(), EngineHost {
@@ -254,7 +238,7 @@ class WallperWallpaperService : WallpaperService() {
             computeColorsJob?.cancel()
             computeColorsJob = engineScope.launch(Dispatchers.IO) {
                 computedColors = when (wallpaper) {
-                    is WallpaperSpec.BuiltIn -> wallpaper.wallpaper.colors()
+                    is WallpaperSpec.BuiltIn -> builtIns[wallpaper.wallpaper]?.colors()
                     is WallpaperSpec.Media -> decodeSmall(wallpaper.thumbnailPath)?.let(::colorsOf)
                     null -> {
                         val frame = surfaceHolder?.surfaceFrame

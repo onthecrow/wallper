@@ -1,7 +1,7 @@
 package com.onthecrow.wallper.blackhole.model
 
-import com.onthecrow.wallper.core.blackhole.physics.BlackHoleParams
-import com.onthecrow.wallper.core.blackhole.physics.BlackHoleSettings
+import com.onthecrow.wallper.blackhole.physics.BlackHoleParams
+import com.onthecrow.wallper.blackhole.physics.BlackHoleSettings
 
 /**
  * A slider of the debug screen that edits one of [BlackHoleParams] and needs nothing else: unlike the
