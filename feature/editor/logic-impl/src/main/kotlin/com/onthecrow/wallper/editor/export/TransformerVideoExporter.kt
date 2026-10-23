@@ -28,6 +28,7 @@ import kotlinx.coroutines.flow.callbackFlow
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 /** Media3 Transformer export. Transformer must be driven from the main looper, hence `flowOn(main)`. */
@@ -43,6 +44,8 @@ internal class TransformerVideoExporter @Inject constructor(
         crop: CropRect,
         clip: ClipRange,
     ): Flow<ExportStatus> = callbackFlow {
+        // Reading the metadata is disk work: off the main thread, which only drives the Transformer.
+        val item = withContext(dispatchersProvider.io) { getEditedMediaItemForVideo(inputPath, crop, clip) }
         val transformer = getTransformer(
             onCompleted = {
                 trySend(ExportStatus.Success)
@@ -53,7 +56,7 @@ internal class TransformerVideoExporter @Inject constructor(
                 close()
             }
         )
-        transformer.start(getEditedMediaItemForVideo(inputPath, crop, clip), outputPath)
+        transformer.start(item, outputPath)
         trySend(ExportStatus.InProgress())
         val progressJob = launch {
             val progressHolder = ProgressHolder()
@@ -136,13 +139,17 @@ internal class TransformerVideoExporter @Inject constructor(
     }
 
     private fun getVideoMetadata(inputPath: String): VideoMetadata {
-        return MediaMetadataRetriever().run {
-            setDataSource(inputPath)
-            VideoMetadata(
-                extractFloatMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH),
-                extractFloatMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT),
-                extractFloatMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION),
-            ).also { release() }
+        // MediaMetadataRetriever is AutoCloseable only since API 29, so no use {} here.
+        val retriever = MediaMetadataRetriever()
+        try {
+            retriever.setDataSource(inputPath)
+            return VideoMetadata(
+                retriever.extractFloatMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH),
+                retriever.extractFloatMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT),
+                retriever.extractFloatMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION),
+            )
+        } finally {
+            retriever.release()
         }
     }
 

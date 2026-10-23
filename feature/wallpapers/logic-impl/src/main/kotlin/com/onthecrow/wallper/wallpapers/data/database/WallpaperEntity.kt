@@ -2,11 +2,13 @@ package com.onthecrow.wallper.wallpapers.data.database
 
 import androidx.room.ColumnInfo
 import androidx.room.Entity
+import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.onthecrow.wallper.core.model.BuiltInWallpaper
 import com.onthecrow.wallper.core.model.MediaType
 
-@Entity(tableName = "wallpapers")
+/** One row per built-in at most: [builtIn] is unique (NULLs, the media rows, don't clash in SQLite). */
+@Entity(tableName = "wallpapers", indices = [Index(value = ["built_in"], unique = true)])
 internal data class WallpaperEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     @ColumnInfo(name = "type") val type: MediaType,

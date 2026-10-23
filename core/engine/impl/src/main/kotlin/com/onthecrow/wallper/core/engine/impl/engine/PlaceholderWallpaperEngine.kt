@@ -11,8 +11,7 @@ import com.onthecrow.wallper.core.gl.WallpaperGLThread
 import timber.log.Timber
 
 /**
- * GL-плейсхолдер, который рисует брендинг (bg_engine_empty.xml)
- * через WallpaperGLThread / OpenGL.
+ * The placeholder: draws the branding (bg_engine_empty.xml) once on a [WallpaperGLThread].
  */
 internal class PlaceholderWallpaperEngine(
     context: Context,
@@ -35,11 +34,10 @@ internal class PlaceholderWallpaperEngine(
         }
         renderer = brandingRenderer
 
-        // continuous = false → можем потом переключиться на when-dirty, но для плейсхолдера не критично
+        // When dirty: one still frame, redrawn only when the surface changes.
         glThread = WallpaperGLThread(surfaceHolder(), brandingRenderer, continuous = false).apply {
             start()
             onSurfaceCreatedOrChanged(width, height)
-            // один раз попросим кадр
             requestRender()
         }
     }

@@ -39,7 +39,7 @@ class VideoWallpaperRenderer(
         Timber.d("onSurfaceCreated")
         GLES20.glDisable(GLES20.GL_DEPTH_TEST)
         GLES20.glDisable(GLES20.GL_STENCIL_TEST)
-        GLES20.glDisable(GLES20.GL_BLEND)    // если не рисуете полупрозрачность
+        GLES20.glDisable(GLES20.GL_BLEND) // nothing here is translucent
         GLES20.glDisable(GLES20.GL_DITHER)
         val newScene = OpenGLScene(
             sceneHeight = renderParams.height,

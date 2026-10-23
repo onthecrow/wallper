@@ -2,10 +2,10 @@ package com.onthecrow.wallper.blackhole
 
 import com.onthecrow.wallper.blackhole.model.PictureLayer
 import com.onthecrow.wallper.blackhole.model.SettingsSlider
+import com.onthecrow.wallper.core.blackhole.physics.BlackHoleSettings
 import com.onthecrow.wallper.core.blackhole.physics.LensTableKey
 import com.onthecrow.wallper.core.blackhole.physics.LensTables
 import com.onthecrow.wallper.core.blackhole.physics.QualitySetting
-import com.onthecrow.wallper.core.blackhole.renderer.BlackHoleSettings
 import com.onthecrow.wallper.core.mvi.Event
 
 internal sealed interface BlackHoleSettingsEvent : Event {
@@ -23,13 +23,15 @@ internal sealed interface BlackHoleSettingsEvent : Event {
     data object OnResetClick : BlackHoleSettingsEvent
     data object OnDebugClick : BlackHoleSettingsEvent
 
-    // User actions, stored when the drag ends: a new distance regenerates the lens tables
+    // User actions, stored when the drag ends: a new distance regenerates the lens tables. The ViewModel
+    // stores the last value it got with OnSliderChange.
     data class OnSliderChange(val slider: SettingsSlider, val value: Double) : BlackHoleSettingsEvent
     data class OnSliderChangeFinished(val slider: SettingsSlider) : BlackHoleSettingsEvent
 
     // The preview only, never stored
     data class OnFreezeTimeToggle(val enabled: Boolean) : BlackHoleSettingsEvent
     data object OnPanelToggle : BlackHoleSettingsEvent
+    data object OnAdvancedToggle : BlackHoleSettingsEvent
 
     // Internal events
     data class OnSettingsChanged(val settings: BlackHoleSettings) : BlackHoleSettingsEvent

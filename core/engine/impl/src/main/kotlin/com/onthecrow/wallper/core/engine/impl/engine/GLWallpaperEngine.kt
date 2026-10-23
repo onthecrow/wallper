@@ -39,7 +39,7 @@ internal class GLWallpaperEngine(
 
     private val holder = surfaceHolder()
 
-    // размеры и поворот видео сохранены в БД при создании обоев
+    // The video size and rotation were stored with the wallpaper when it was created.
     private val renderParams = VideoRenderParams(
         holder.surfaceFrame.width(), holder.surfaceFrame.height(), wallpaper.crop, wallpaper.mediaInfo,
     )

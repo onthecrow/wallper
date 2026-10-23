@@ -2,12 +2,12 @@ package com.onthecrow.wallper.blackhole
 
 import com.onthecrow.wallper.blackhole.gl.PreviewConfig
 import com.onthecrow.wallper.core.blackhole.physics.BlackHoleParams
+import com.onthecrow.wallper.core.blackhole.physics.BlackHoleSettings
 import com.onthecrow.wallper.core.blackhole.physics.LensTableKey
 import com.onthecrow.wallper.core.blackhole.physics.LensTables
 import com.onthecrow.wallper.core.blackhole.physics.QualityLevel
-import com.onthecrow.wallper.core.blackhole.renderer.BlackHoleSettings
+import com.onthecrow.wallper.core.blackhole.physics.lensTableKey
 import com.onthecrow.wallper.core.blackhole.renderer.DebugOptions
-import com.onthecrow.wallper.core.blackhole.renderer.lensTableKey
 import com.onthecrow.wallper.core.mvi.State
 
 /** Everything here is local to the debug screen: neither the wallpaper nor the stored settings see it. */
@@ -15,6 +15,8 @@ internal data class BlackHoleDebugState(
     val params: BlackHoleParams,
     /** Fixed by hand here, no automatic choice; starts from the stored one, Auto on Medium. */
     val quality: QualityLevel,
+    /** The tables [params] and [quality] need; the reducer keeps it in step. */
+    val wantedTablesKey: LensTableKey = lensTableKey(params, quality),
     val debugOptions: DebugOptions = DebugOptions(),
     /** θ and ψ below replace the orbit. */
     val isManualCamera: Boolean = false,
@@ -34,8 +36,6 @@ internal data class BlackHoleDebugState(
     val renderFailure: String? = null,
     val isPanelExpanded: Boolean = true,
 ) : State {
-
-    val wantedTablesKey: LensTableKey get() = lensTableKey(params, quality)
 
     val isTablesLoading: Boolean get() = tablesKey != wantedTablesKey && tablesError == null
 

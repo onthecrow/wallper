@@ -2,10 +2,13 @@
 
 package com.onthecrow.wallper.blackhole
 
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
@@ -35,18 +38,18 @@ import com.onthecrow.wallper.blackhole.model.SettingsSlider
 import com.onthecrow.wallper.blackhole.ui.R
 import com.onthecrow.wallper.blackhole.view.ChoiceRow
 import com.onthecrow.wallper.blackhole.view.ControlsSheet
-import com.onthecrow.wallper.blackhole.view.SHEET_HEIGHT_FRACTION
 import com.onthecrow.wallper.blackhole.view.PreviewStats
+import com.onthecrow.wallper.blackhole.view.SHEET_HEIGHT_FRACTION
 import com.onthecrow.wallper.blackhole.view.SectionTitle
 import com.onthecrow.wallper.blackhole.view.SliderRow
 import com.onthecrow.wallper.blackhole.view.SwitchRow
+import com.onthecrow.wallper.core.blackhole.physics.BlackHoleSettings
 import com.onthecrow.wallper.core.blackhole.physics.QualitySetting
-import com.onthecrow.wallper.core.blackhole.renderer.BlackHoleSettings
 import kotlin.math.roundToInt
 
 /**
- * The live preview on the whole screen (a drag turns the camera) with every user setting in a bottom
- * sheet over it, stored as they change.
+ * The live preview on the whole screen (a drag turns the camera) with the user settings in a bottom sheet
+ * over it, stored as they change. What most people change comes first; the rest waits under Advanced.
  */
 @Composable
 internal fun BlackHoleSettingsScreen(
@@ -70,14 +73,16 @@ internal fun BlackHoleSettingsScreen(
                 .padding(8.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
-            PreviewStats(
-                fps = state.fps,
-                gpuMs = state.gpuMs,
-                quality = state.quality,
-                isTablesLoading = state.isTablesLoading,
-                tablesError = state.tablesError,
-                renderFailure = state.renderFailure,
-            )
+            if (state.isDebugAvailable) {
+                PreviewStats(
+                    fps = state.fps,
+                    gpuMs = state.gpuMs,
+                    quality = state.quality,
+                    isTablesLoading = state.isTablesLoading,
+                    tablesError = state.tablesError,
+                    renderFailure = state.renderFailure,
+                )
+            }
             Text(
                 text = stringResource(R.string.black_hole_preview_drag_hint),
                 style = MaterialTheme.typography.labelSmall,
@@ -87,6 +92,11 @@ internal fun BlackHoleSettingsScreen(
                     .padding(horizontal = 6.dp, vertical = 2.dp),
             )
         }
+        // Only what the list shows goes in: the frame stats change every second and must not recompose it.
+        val settings = state.settings
+        val isAdvancedExpanded = state.isAdvancedExpanded
+        val isTimeFrozen = state.isTimeFrozen
+        val isDebugAvailable = state.isDebugAvailable
         ControlsSheet(
             title = stringResource(R.string.black_hole_settings_title),
             isExpanded = state.isPanelExpanded,
@@ -94,15 +104,64 @@ internal fun BlackHoleSettingsScreen(
             maxContentHeight = maxHeight * SHEET_HEIGHT_FRACTION,
             modifier = Modifier.align(Alignment.BottomCenter),
         ) {
-            SettingsList(state, onEvent)
+            SettingsList(settings, isAdvancedExpanded, isTimeFrozen, isDebugAvailable, onEvent)
         }
     }
 }
 
 @Composable
-private fun SettingsList(state: BlackHoleSettingsState, onEvent: (BlackHoleSettingsEvent) -> Unit) {
-    val settings = state.settings
+private fun ColumnScope.SettingsList(
+    settings: BlackHoleSettings,
+    isAdvancedExpanded: Boolean,
+    isTimeFrozen: Boolean,
+    isDebugAvailable: Boolean,
+    onEvent: (BlackHoleSettingsEvent) -> Unit,
+) {
+    BasicSettings(settings, onEvent)
+    HorizontalDivider(modifier = Modifier.padding(top = 16.dp))
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onEvent(BlackHoleSettingsEvent.OnAdvancedToggle) }
+            .padding(vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = stringResource(R.string.black_hole_advanced),
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = stringResource(if (isAdvancedExpanded) R.string.black_hole_debug_hide else R.string.black_hole_debug_show),
+            style = MaterialTheme.typography.labelLarge,
+            color = MaterialTheme.colorScheme.primary,
+        )
+    }
+    AnimatedVisibility(visible = isAdvancedExpanded) {
+        Column {
+            AdvancedSettings(settings, isTimeFrozen, onEvent)
+        }
+    }
 
+    HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+    ) {
+        TextButton(onClick = { onEvent(BlackHoleSettingsEvent.OnResetClick) }) {
+            Text(text = stringResource(R.string.black_hole_reset))
+        }
+        if (isDebugAvailable) {
+            Button(onClick = { onEvent(BlackHoleSettingsEvent.OnDebugClick) }) {
+                Text(text = stringResource(R.string.black_hole_debug_renderer))
+            }
+        }
+    }
+}
+
+/** Quality, how the picture moves with the phone, and the few looks people tune first. */
+@Composable
+private fun BasicSettings(settings: BlackHoleSettings, onEvent: (BlackHoleSettingsEvent) -> Unit) {
     SectionTitle(stringResource(R.string.black_hole_quality))
     ChoiceRow(
         options = QualitySetting.entries,
@@ -118,12 +177,60 @@ private fun SettingsList(state: BlackHoleSettingsState, onEvent: (BlackHoleSetti
         checked = settings.gyroEnabled,
         onCheckedChange = { onEvent(BlackHoleSettingsEvent.OnGyroToggle(it)) },
     )
+    SettingsSliderRow(
+        slider = SettingsSlider.GYRO_SENSITIVITY,
+        label = stringResource(R.string.black_hole_gyro_sensitivity, settings.gyroSensitivity),
+        supportingText = stringResource(R.string.black_hole_gyro_sensitivity_hint),
+        settings = settings,
+        onEvent = onEvent,
+        enabled = settings.gyroEnabled,
+    )
     SwitchRow(
         text = stringResource(R.string.black_hole_launcher),
         supportingText = stringResource(R.string.black_hole_launcher_hint),
         checked = settings.launcherEnabled,
         onCheckedChange = { onEvent(BlackHoleSettingsEvent.OnLauncherToggle(it)) },
     )
+
+    SectionTitle(stringResource(R.string.black_hole_picture))
+    SettingsSliderRow(
+        slider = SettingsSlider.DISK_SPEED,
+        label = stringResource(R.string.black_hole_disk_speed, settings.diskSpeed),
+        supportingText = stringResource(R.string.black_hole_disk_speed_hint),
+        settings = settings,
+        onEvent = onEvent,
+    )
+    SettingsSliderRow(
+        slider = SettingsSlider.ELEVATION,
+        label = stringResource(R.string.black_hole_elevation, settings.elevationDeg),
+        supportingText = stringResource(R.string.black_hole_elevation_hint),
+        settings = settings,
+        onEvent = onEvent,
+    )
+    SettingsSliderRow(
+        slider = SettingsSlider.EXPOSURE,
+        label = stringResource(R.string.black_hole_exposure, settings.exposure),
+        settings = settings,
+        onEvent = onEvent,
+    )
+    SettingsSliderRow(
+        slider = SettingsSlider.STAR_COUNT,
+        label = stringResource(R.string.black_hole_star_count, settings.starCount),
+        settings = settings,
+        onEvent = onEvent,
+    )
+    OutlinedButton(onClick = { onEvent(BlackHoleSettingsEvent.OnShuffleStarsClick) }) {
+        Text(text = stringResource(R.string.black_hole_shuffle_stars))
+    }
+}
+
+@Composable
+private fun AdvancedSettings(
+    settings: BlackHoleSettings,
+    isTimeFrozen: Boolean,
+    onEvent: (BlackHoleSettingsEvent) -> Unit,
+) {
+    SectionTitle(stringResource(R.string.black_hole_motion))
     SwitchRow(
         text = stringResource(R.string.black_hole_zoom_out),
         supportingText = stringResource(R.string.black_hole_zoom_out_hint),
@@ -135,7 +242,6 @@ private fun SettingsList(state: BlackHoleSettingsState, onEvent: (BlackHoleSetti
         checked = settings.orbitEnabled,
         onCheckedChange = { onEvent(BlackHoleSettingsEvent.OnOrbitToggle(it)) },
     )
-    ResponseRows(settings, onEvent)
     SettingsSliderRow(
         slider = SettingsSlider.ORBIT_PERIOD,
         label = stringResource(R.string.black_hole_orbit_period, settings.orbitPeriodSec.roundToInt()),
@@ -143,15 +249,9 @@ private fun SettingsList(state: BlackHoleSettingsState, onEvent: (BlackHoleSetti
         onEvent = onEvent,
         enabled = settings.orbitEnabled,
     )
+    ResponseRows(settings, onEvent)
 
     SectionTitle(stringResource(R.string.black_hole_camera))
-    SettingsSliderRow(
-        slider = SettingsSlider.ELEVATION,
-        label = stringResource(R.string.black_hole_elevation, settings.elevationDeg),
-        supportingText = stringResource(R.string.black_hole_elevation_hint),
-        settings = settings,
-        onEvent = onEvent,
-    )
     SettingsSliderRow(
         slider = SettingsSlider.DISK_ROLL,
         label = stringResource(R.string.black_hole_disk_roll, settings.diskRollDeg),
@@ -182,13 +282,6 @@ private fun SettingsList(state: BlackHoleSettingsState, onEvent: (BlackHoleSetti
         onEvent = onEvent,
     )
     SettingsSliderRow(
-        slider = SettingsSlider.DISK_SPEED,
-        label = stringResource(R.string.black_hole_disk_speed, settings.diskSpeed),
-        supportingText = stringResource(R.string.black_hole_disk_speed_hint),
-        settings = settings,
-        onEvent = onEvent,
-    )
-    SettingsSliderRow(
         slider = SettingsSlider.DISK_BRIGHTNESS,
         label = stringResource(R.string.black_hole_disk_brightness, settings.diskBrightness),
         settings = settings,
@@ -209,18 +302,6 @@ private fun SettingsList(state: BlackHoleSettingsState, onEvent: (BlackHoleSetti
     SettingsSliderRow(
         slider = SettingsSlider.BLOOM_INTENSITY,
         label = stringResource(R.string.black_hole_bloom_intensity, settings.bloomIntensity),
-        settings = settings,
-        onEvent = onEvent,
-    )
-    SettingsSliderRow(
-        slider = SettingsSlider.EXPOSURE,
-        label = stringResource(R.string.black_hole_exposure, settings.exposure),
-        settings = settings,
-        onEvent = onEvent,
-    )
-    SettingsSliderRow(
-        slider = SettingsSlider.STAR_COUNT,
-        label = stringResource(R.string.black_hole_star_count, settings.starCount),
         settings = settings,
         onEvent = onEvent,
     )
@@ -257,9 +338,6 @@ private fun SettingsList(state: BlackHoleSettingsState, onEvent: (BlackHoleSetti
         onEvent = onEvent,
         enabled = settings.dopplerEnabled,
     )
-    OutlinedButton(onClick = { onEvent(BlackHoleSettingsEvent.OnShuffleStarsClick) }) {
-        Text(text = stringResource(R.string.black_hole_shuffle_stars))
-    }
 
     SectionTitle(stringResource(R.string.black_hole_layers))
     FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -272,8 +350,8 @@ private fun SettingsList(state: BlackHoleSettingsState, onEvent: (BlackHoleSetti
             )
         }
         FilterChip(
-            selected = state.isTimeFrozen,
-            onClick = { onEvent(BlackHoleSettingsEvent.OnFreezeTimeToggle(!state.isTimeFrozen)) },
+            selected = isTimeFrozen,
+            onClick = { onEvent(BlackHoleSettingsEvent.OnFreezeTimeToggle(!isTimeFrozen)) },
             label = { Text(text = stringResource(R.string.black_hole_freeze_preview)) },
         )
     }
@@ -285,21 +363,6 @@ private fun SettingsList(state: BlackHoleSettingsState, onEvent: (BlackHoleSetti
         label = { stringResource(R.string.black_hole_fps, it) },
         onSelect = { onEvent(BlackHoleSettingsEvent.OnIdleFpsChange(it)) },
     )
-
-    HorizontalDivider(modifier = Modifier.padding(vertical = 16.dp))
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-    ) {
-        TextButton(onClick = { onEvent(BlackHoleSettingsEvent.OnResetClick) }) {
-            Text(text = stringResource(R.string.black_hole_reset))
-        }
-        if (state.isDebugAvailable) {
-            Button(onClick = { onEvent(BlackHoleSettingsEvent.OnDebugClick) }) {
-                Text(text = stringResource(R.string.black_hole_debug_renderer))
-            }
-        }
-    }
 }
 
 /** The state follows the drag; the store gets the value on release. */
@@ -323,17 +386,9 @@ private fun SettingsSliderRow(
     )
 }
 
-/** How the camera answers the gyroscope and the launcher, and the recoil of the hole. */
+/** How the camera answers the gyroscope and the launcher, and the recoil of the hole; the strength is basic. */
 @Composable
 private fun ResponseRows(settings: BlackHoleSettings, onEvent: (BlackHoleSettingsEvent) -> Unit) {
-    SettingsSliderRow(
-        slider = SettingsSlider.GYRO_SENSITIVITY,
-        label = stringResource(R.string.black_hole_gyro_sensitivity, settings.gyroSensitivity),
-        supportingText = stringResource(R.string.black_hole_gyro_sensitivity_hint),
-        settings = settings,
-        onEvent = onEvent,
-        enabled = settings.gyroEnabled,
-    )
     SettingsSliderRow(
         slider = SettingsSlider.GYRO_SMOOTHING,
         label = stringResource(R.string.black_hole_gyro_smoothing, settings.gyroSmoothing * 100),

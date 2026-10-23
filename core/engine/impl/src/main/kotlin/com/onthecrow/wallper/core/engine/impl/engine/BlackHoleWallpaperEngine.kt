@@ -23,7 +23,6 @@ import com.onthecrow.wallper.core.blackhole.physics.BlackHoleScene
 import com.onthecrow.wallper.core.blackhole.physics.FramePacing
 import com.onthecrow.wallper.core.blackhole.physics.GyroTracker
 import com.onthecrow.wallper.core.blackhole.physics.LensTableKey
-import com.onthecrow.wallper.core.blackhole.physics.LensTables
 import com.onthecrow.wallper.core.blackhole.physics.QualityController
 import com.onthecrow.wallper.core.blackhole.physics.QualityLevel
 import com.onthecrow.wallper.core.blackhole.physics.QualitySetting
@@ -31,10 +30,10 @@ import com.onthecrow.wallper.core.blackhole.physics.Quaternion
 import com.onthecrow.wallper.core.blackhole.physics.ThermalLevel
 import com.onthecrow.wallper.core.blackhole.renderer.BlackHoleGlRenderer
 import com.onthecrow.wallper.core.blackhole.renderer.BlackHoleRenderer
-import com.onthecrow.wallper.core.blackhole.renderer.BlackHoleSettings
+import com.onthecrow.wallper.core.blackhole.physics.BlackHoleSettings
 import com.onthecrow.wallper.core.blackhole.renderer.BlackHoleSettingsStore
 import com.onthecrow.wallper.core.blackhole.renderer.LensTablesRepository
-import com.onthecrow.wallper.core.blackhole.renderer.lensTableKey
+import com.onthecrow.wallper.core.blackhole.physics.lensTableKey
 import com.onthecrow.wallper.core.diagnostics.Diagnostics
 import com.onthecrow.wallper.core.gl.WallpaperGLThread
 import kotlinx.coroutines.CoroutineExceptionHandler
@@ -89,7 +88,6 @@ internal class BlackHoleWallpaperEngine(
     private var quality: QualityController = newQualityController(settings)
     private val gpuTimeCallback: (Double) -> Unit = { ms -> handler.post { onGpuTime(ms) } }
     private val rotationQuaternion = FloatArray(4)
-    private var tables: LensTables? = null
     private var tablesKey: LensTableKey? = null
     private var tablesJob: Job? = null
     private var visible = true
@@ -138,6 +136,8 @@ internal class BlackHoleWallpaperEngine(
         handler = handler,
         onGiveUp = host::showPlaceholder,
         afterRestart = {
+            // A new renderer starts without tables; nothing keeps a CPU copy of them.
+            reloadTables()
             stillDrawn = false
             wake()
         },
@@ -337,12 +337,16 @@ internal class BlackHoleWallpaperEngine(
         tablesJob?.cancel()
         tablesJob = scope.launch {
             val loaded = tablesRepository.get(key)
-            tables = loaded
             val current = gl.current
             current.thread.post { current.renderer.setTables(loaded) }
             stillDrawn = false
             wake()
         }
+    }
+
+    private fun reloadTables() {
+        tablesKey = null
+        loadTables()
     }
 
     /** A frame callback after [delayMs], or the next vsync; nothing if one is already coming. */
@@ -450,7 +454,7 @@ internal class BlackHoleWallpaperEngine(
         val renderer = BlackHoleRenderer(context.assets).apply {
             setQuality(level)
             setParams(params)
-            tables?.let(::setTables)
+            onTablesLost = { handler.post { if (gl.isCurrent(this@Gl)) reloadTables() } }
             onGpuTimeMs = if (isMeasuringGpu()) gpuTimeCallback else null
             onNoGpuTimer = { handler.post { onNoGpuTimer() } }
         }

@@ -56,7 +56,9 @@ internal class WallpapersViewModel @Inject constructor(
         }.launchIn(viewModelScope)
 
         observeWallpapersUseCase()
-            .map { wallpapers -> wallpapers.map { it.toItem() } }
+            .map { wallpapers ->
+                wallpapers.map { it.toItem() }.filter { item -> item.builtIn?.let(liveWallpaperController::isSupported) ?: true }
+            }
             .onEach { items -> onEvent(WallpapersEvent.OnWallpapersChanged(items)) }
             .catch { onEvent(WallpapersEvent.OnWallpapersLoadFailed(it.message.orEmpty())) }
             .flowOn(dispatchersProvider.io)

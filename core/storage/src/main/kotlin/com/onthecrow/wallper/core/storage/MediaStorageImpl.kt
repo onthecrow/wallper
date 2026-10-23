@@ -14,10 +14,11 @@ internal class MediaStorageImpl @Inject constructor(
     @param:ApplicationContext private val context: Context,
 ) : MediaStorage {
 
+    // All device-protected, like the database: the wallpaper reads the media and the thumbnail (its
+    // colours) before the first unlock. External storage isn't there yet then, and may be missing at all.
     private val deviceProtectedContext = context.createDeviceProtectedStorageContext()
-    private val externalDir = deviceProtectedContext.getExternalFilesDir(null)
-    private val tempDir = File(externalDir, "temp")
-    private val thumbnailsDir = File(externalDir, "thumbnails")
+    private val tempDir = File(deviceProtectedContext.cacheDir, "temp")
+    private val thumbnailsDir = File(deviceProtectedContext.filesDir, "thumbnails")
     private val originalsDir = deviceProtectedContext.filesDir
 
     override val tempMediaFile = File(tempDir, "tempFile")

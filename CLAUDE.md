@@ -1,7 +1,7 @@
 # Wallper
 
 Android live wallpaper app: the user crops a video, Wallper plays it as the live wallpaper.
-Architecture, decisions and the migration log live in [ARCHITECTURE_MIGRATION.md](ARCHITECTURE_MIGRATION.md).
+Design docs: [WALLPER_PLAYER_DESIGN.md](WALLPER_PLAYER_DESIGN.md) (video playback and stalls), [BLACKHOLE_PLAN.md](BLACKHOLE_PLAN.md) (the black hole). Open review findings and the release plan: [CODE_REVIEW.md](CODE_REVIEW.md).
 
 ## Build and test
 
@@ -23,13 +23,15 @@ Architecture, decisions and the migration log live in [ARCHITECTURE_MIGRATION.md
 ## Dependency rules (enforced by `build-logic/.../ModuleBoundaries.kt`)
 
 - A feature sees another feature only through `ui-api` (navigation) and `logic-api` (domain). Only `:app` depends on `-impl`.
+- Inside a feature, logic never depends on UI: `ui-impl` → `ui-api`, `logic-api`; `logic-impl` → `logic-api`. `logic-api` is plain Kotlin (`wallper.jvm.library`).
 - `core` never depends on `feature`. When core needs feature data, core declares a port (`ActiveWallpaperSource`) and the feature implements it.
 - `core:model`, `coroutines`, `storage`, `gl`, `player`, `engine:*`, `blackhole:*` stay free of Compose and `core:designsystem`.
 - Everything in `-impl` is `internal`; Hilt modules are the only public surface.
 
 ## Invariants
 
-- The wallpaper service is `directBootAware`: everything it reads (Room DB, media files) lives in device-protected storage. `Application.onCreate` and the Hilt graph must not touch credential-encrypted storage.
+- The wallpaper service is `directBootAware`: everything it reads (Room DB, media files, thumbnails) lives in device-protected storage, temp files in its `cacheDir`. `Application.onCreate` and the Hilt graph must not touch credential-encrypted storage.
+- No cloud backup (`allowBackup="false"`, `data_extraction_rules.xml`): the videos don't fit its quota. A device-to-device transfer still moves everything.
 - GL calls only from the EGL thread (`WallpaperGLThread`). Transformer only from the main looper (`TransformerVideoExporter` uses `flowOn(main)`).
 - After the store release:
   - never rename `com.onthecrow.wallper.core.engine.impl.WallperWallpaperService`; the system stores it as the selected wallpaper;
@@ -55,10 +57,12 @@ The player side and the GL side recover independently; there is no shared abstra
 
 ## Built-in wallpapers and the black hole (see BLACKHOLE_PLAN.md)
 
-- A built-in wallpaper is a row of `wallpapers` with `built_in = BuiltInWallpaper.key`. The database seeds missing built-in rows on every open (`SeedBuiltInWallpapersCallback`); they are listed first, activate like any wallpaper and are never deleted (the use case refuses too). Never rename a `BuiltInWallpaper.key`.
+- A built-in wallpaper is a row of `wallpapers` with `built_in = BuiltInWallpaper.key`. `built_in` has a unique index (schema v3), and the database seeds missing built-in rows on every open (`SeedBuiltInWallpapersCallback`, `INSERT OR IGNORE`); they are listed first (`ORDER BY built_in IS NULL, id`), activate like any wallpaper and are never deleted (the use case refuses too). Never rename a `BuiltInWallpaper.key`.
 - `WallpaperSpec` is sealed: `Media` or `BuiltIn`. `WallpaperEngineFactory` maps `BuiltIn(BLACK_HOLE)` to `BlackHoleWallpaperEngine`.
-- Every tunable of the black hole lives in `BlackHoleParams` (`core:blackhole:physics`). Defaults start from BLACKHOLE_TZ.md §10; the look was tuned on a phone (BLACKHOLE_PLAN.md §9). User settings (`BlackHoleSettingsStore`, device-protected SharedPreferences) are applied on top with `BlackHoleSettings.applyTo`.
-- Lens tables depend only on `(r_c, N_α, N_φ, K)`. `LensTablesRepository` generates them once and caches them in device-protected `cacheDir/blackhole`. Bump `LensTables.FORMAT_VERSION` when the layout or the physics changes.
+- Every tunable of the black hole lives in `BlackHoleParams` (`core:blackhole:physics`). Defaults start from BLACKHOLE_TZ.md §10; the look was tuned on a phone (BLACKHOLE_PLAN.md §9). User settings are applied on top with `BlackHoleSettings.applyTo`.
+- `BlackHoleSettings` (`core:blackhole:physics`, with its ranges) is `@Serializable`. `BlackHoleSettingsStore` keeps it as one JSON string in device-protected SharedPreferences, only the fields that differ from the defaults. A new setting is a new field with a default: old JSON still reads, unknown keys are ignored. Never rename a field; its name is the stored key.
+- Lens tables depend only on `(r_c, N_α, N_φ, K)`. `LensTablesRepository` generates them once and caches them in device-protected `cacheDir/blackhole` (`LensTableFiles`: every quality of the current r_c, K and format). Nothing keeps them in memory: the renderer drops its copy once they are on the GPU and asks again after a lost context (`onTablesLost`). Bump `LensTables.FORMAT_VERSION` when the layout or the physics changes.
+- Built-ins the device can't draw (no ES 3.0) are hidden from the list (`LiveWallpaperController.isSupported`).
 - The camera orbits about the disk axis; the gyroscope and the launcher turn it on top in screen axes (`CameraPose.turned`), then the elevation is clamped. Their recoil is a principal-point shift (`FrameState.recoilX/Y`, half screen heights). The settings preview's drag turns the orbit itself (`setOrbitOffset`), with no recoil.
 - `BlackHoleRenderer` (GL thread only) is shared by the wallpaper, the list preview (`BlackHolePreviewRenderer`, EGL pbuffer) and the debug screen. Frames are paced by `Choreographer` on the engine's callback thread; animation phases come from `Long` nanoseconds, never a growing float.
 - Shaders live in `core/blackhole/renderer/src/main/assets/blackhole` (`#include` is resolved by `ShaderLibrary`). After editing them run `./gradlew validateBlackHoleShaders` (also part of `check`): it compiles them for every quality level without a device, as GLSL ES 3.00 with glslangValidator, or as 3.10 with the NDK's glslc when that is all there is.
@@ -74,6 +78,7 @@ The player side and the GL side recover independently; there is no shared abstra
 
 - `BaseViewModel(initialState, reducer)`: every event is folded by the reducer through `runningFold`. The event buffer is unbounded, so no event is dropped.
 - Side effects live in the ViewModel's `eventFlow.onEach { when (event) ... }`. Their results come back as internal events through `onEvent(...)`.
+- An effect takes its data from its event, never from `state.value`: the reducer folds the same event on another collector, and which one runs first isn't guaranteed. An effect that follows the state collects `state.map { ... }.distinctUntilChanged()`.
 - One-off UI effects (Toast, starting an Intent) are events the screen collects from `eventFlow`. Navigation goes through the injected `Navigator`.
 - The reducer is pure and returns `state` for side-effect-only events. Screens are stateless `(state, [eventFlow], onEvent, modifier)`.
 - Test the reducer directly. Test the ViewModel with hand-written fakes and `Dispatchers.setMain(UnconfinedTestDispatcher())`. No mocking library.

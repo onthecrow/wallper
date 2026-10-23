@@ -26,7 +26,7 @@ import kotlin.math.roundToInt
  * @param minDimension minimum size of the overlay, if null defaults to handleSize * 2
  * empty space on sides or edges of parent
  */
-class DynamicCropState internal constructor(
+internal class DynamicCropState internal constructor(
     private var handleSize: Float,
     imageSize: IntSize,
     containerSize: IntSize,

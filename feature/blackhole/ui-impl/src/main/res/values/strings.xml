@@ -6,6 +6,7 @@
     <string name="black_hole_quality_low">Low</string>
     <string name="black_hole_quality_medium">Medium</string>
     <string name="black_hole_quality_high">High</string>
+    <string name="black_hole_advanced">Advanced</string>
     <string name="black_hole_motion">Motion</string>
     <string name="black_hole_gyroscope">Gyroscope</string>
     <string name="black_hole_gyroscope_hint">The view follows the tilt of the phone a little</string>

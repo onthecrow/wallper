@@ -1,11 +1,12 @@
 package com.onthecrow.wallper.blackhole
 
 import androidx.lifecycle.viewModelScope
+import com.onthecrow.wallper.blackhole.model.SettingsSlider
 import com.onthecrow.wallper.blackhole.source.BlackHoleSettingsSource
 import com.onthecrow.wallper.blackhole.source.DebuggableBuild
 import com.onthecrow.wallper.blackhole.source.LensTablesSource
+import com.onthecrow.wallper.core.blackhole.physics.BlackHoleSettings
 import com.onthecrow.wallper.core.blackhole.physics.LensTableKey
-import com.onthecrow.wallper.core.blackhole.renderer.BlackHoleSettings
 import com.onthecrow.wallper.core.mvi.BaseViewModel
 import com.onthecrow.wallper.core.navigation.Navigator
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -21,6 +22,8 @@ import kotlin.random.Random
 /**
  * Writes the settings to the store and keeps the live preview fed: it loads the lens tables whenever
  * the stored settings ask for other ones (a new distance or quality).
+ *
+ * Effects read their events, never [state]: the reducer folds the same events on its own collector.
  */
 @HiltViewModel
 internal class BlackHoleSettingsViewModel @Inject constructor(
@@ -34,9 +37,14 @@ internal class BlackHoleSettingsViewModel @Inject constructor(
     reducer,
 ) {
 
+    private val isDebugAvailable = debuggableBuild.isDebuggable()
+
     /** Touched only from [eventFlow] and [init], on the main thread. */
     private var requestedKey: LensTableKey? = null
     private var tablesJob: Job? = null
+
+    /** The slider being dragged and its latest value, stored when the drag ends. */
+    private var draft: Pair<SettingsSlider, Double>? = null
 
     init {
         eventFlow.onEach { event ->
@@ -50,17 +58,19 @@ internal class BlackHoleSettingsViewModel @Inject constructor(
                 is BlackHoleSettingsEvent.OnOpacityFalloffToggle -> save { copy(diskOpacityFalloff = event.enabled) }
                 is BlackHoleSettingsEvent.OnLayerToggle -> save { event.layer.with(this, event.enabled) }
                 is BlackHoleSettingsEvent.OnIdleFpsChange -> save { copy(idleFps = event.fps) }
+                is BlackHoleSettingsEvent.OnSliderChange -> draft = event.slider to event.value
                 is BlackHoleSettingsEvent.OnSliderChangeFinished -> {
-                    // The drag has been folded into the state already; only now does the value reach the store.
-                    val value = event.slider.value(state.value.settings)
-                    save { event.slider.with(this, value) }
+                    draft?.takeIf { (slider) -> slider == event.slider }?.let { (slider, value) ->
+                        save { slider.with(this, value) }
+                    }
+                    draft = null
                 }
                 BlackHoleSettingsEvent.OnShuffleStarsClick -> save { copy(starSeed = newStarSeed(starSeed)) }
                 BlackHoleSettingsEvent.OnResetClick -> save { BlackHoleSettings() }
                 BlackHoleSettingsEvent.OnDebugClick ->
-                    if (state.value.isDebugAvailable) navigator.navigate(BlackHoleDebugDestination)
+                    if (isDebugAvailable) navigator.navigate(BlackHoleDebugDestination)
                 // Every stored change passes here; the tables follow only when their key moves.
-                is BlackHoleSettingsEvent.OnSettingsChanged -> loadTables(state.value.wantedTablesKey)
+                is BlackHoleSettingsEvent.OnSettingsChanged -> loadTables(event.settings.previewTablesKey())
                 else -> Unit
             }
         }.launchIn(viewModelScope)

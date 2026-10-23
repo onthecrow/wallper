@@ -17,7 +17,7 @@ import com.onthecrow.wallper.core.player.createLeanExoPlayer
  * @param durationMs the length of the video from its metadata; 0 if unknown, then the whole video plays.
  */
 @Composable
-fun VideoSurface(
+internal fun VideoSurface(
     videoUri: String,
     durationMs: Long,
     modifier: Modifier = Modifier,
@@ -26,7 +26,7 @@ fun VideoSurface(
 ) {
     val context = LocalContext.current
 
-    // Плеер живёт столько, сколько живёт этот composable
+    // The player lives as long as this composable
     val player = remember(context) { createLeanExoPlayer(context) }
 
     LaunchedEffect(videoUri, durationMs, videoRange, seek) {

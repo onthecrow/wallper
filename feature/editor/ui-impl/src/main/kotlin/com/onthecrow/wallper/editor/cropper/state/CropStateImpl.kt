@@ -16,7 +16,7 @@ import com.onthecrow.wallper.editor.cropper.TouchRegion
 import com.onthecrow.wallper.editor.cropper.model.CropData
 import com.onthecrow.wallper.editor.cropper.settings.CropProperties
 
-val CropState.cropData: CropData
+internal val CropState.cropData: CropData
     get() = CropData(
         overlayRect = overlayRect,
         cropRect = cropRect
@@ -35,7 +35,7 @@ val CropState.cropData: CropData
  * to threshold
  * empty space on sides or edges of parent
  */
-abstract class CropState internal constructor(
+internal abstract class CropState internal constructor(
     imageSize: IntSize,
     containerSize: IntSize,
     drawAreaSize: IntSize,

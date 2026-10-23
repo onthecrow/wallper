@@ -65,12 +65,19 @@ internal class MediaInspector @Inject constructor(
 
     private fun readVideoInfo(path: String): MediaInfo {
         val mmr = MediaMetadataRetriever()
-        mmr.setDataSource(context, Uri.encode(path).toUri())
-        val rotation = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)
-        val width = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)
-        val height = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)
-        val duration = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
-        mmr.release()
+        val rotation: String?
+        val width: String?
+        val height: String?
+        val duration: String?
+        try {
+            mmr.setDataSource(context, Uri.encode(path).toUri())
+            rotation = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)
+            width = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)
+            height = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)
+            duration = mmr.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+        } finally {
+            mmr.release()
+        }
         return MediaInfo(
             width = width?.toInt() ?: 0,
             height = height?.toInt() ?: 0,

@@ -47,6 +47,7 @@ class WallpapersViewModelTest {
     private val navigator = FakeNavigator()
     private val previews = FakeBuiltInPreviews()
     private var mediaSupported = true
+    private var builtInsSupported = true
 
     @BeforeTest
     fun setUp() = Dispatchers.setMain(dispatcher)
@@ -70,6 +71,7 @@ class WallpapersViewModelTest {
         },
         liveWallpaperController = object : LiveWallpaperController {
             override fun createSetWallpaperIntent(): Intent = error("not used in these tests")
+            override fun isSupported(wallpaper: BuiltInWallpaper) = builtInsSupported
         },
         builtInPreviews = previews,
         navigator = navigator,
@@ -128,6 +130,16 @@ class WallpapersViewModelTest {
         val viewModel = createViewModel()
 
         assertEquals(listOf(WallpaperItem(5, null, false, BuiltInWallpaper.BLACK_HOLE)), viewModel.state.value.items)
+    }
+
+    @Test
+    fun `a built-in this device can't draw is hidden`() = runTest(dispatcher) {
+        builtInsSupported = false
+        wallpapers.value = listOf(builtIn(id = 5), wallpaper(id = 1, type = MediaType.VIDEO))
+        val viewModel = createViewModel()
+
+        assertEquals(listOf(WallpaperItem(1, "thumbnail-1", false)), viewModel.state.value.items)
+        assertEquals(emptyList(), previews.requests)
     }
 
     @Test

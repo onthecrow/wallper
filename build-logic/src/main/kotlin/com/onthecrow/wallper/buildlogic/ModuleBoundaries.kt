@@ -29,11 +29,13 @@ private val UI_FREE_MODULES = setOf(
 )
 
 /**
- * Fails the configuration when a module breaks the dependency rules from ARCHITECTURE_MIGRATION.md:
+ * Fails the configuration when a module breaks the dependency rules from CLAUDE.md:
  * - a feature layer has an unknown name;
+ * - a `logic-api` module is an Android module (it is plain Kotlin);
+ * - anything but `:app` depends on an impl module;
  * - a feature depends on another feature's `-impl`;
+ * - a logic layer depends on a UI layer;
  * - `core` depends on `feature`;
- * - an api module depends on an impl module;
  * - a UI-free module depends on Compose or `:core:designsystem`.
  */
 internal fun Project.enforceModuleBoundaries() {
@@ -45,13 +47,19 @@ internal fun Project.enforceModuleBoundaries() {
         throw GradleException("'$path': a feature module must be :feature:<name>:<one of $FEATURE_LAYERS>")
     }
 
-    val isApi = layer == "api" || layer?.endsWith("-api") == true
+    if (layer == "logic-api" && pluginManager.hasPlugin("com.android.library")) {
+        throw GradleException("'$path': a logic-api module is plain Kotlin; apply wallper.jvm.library")
+    }
+
+    val isLogic = group == "feature" && layer?.startsWith("logic-") == true
     val isUiFree = path in UI_FREE_MODULES
 
     afterEvaluate {
         configurations.forEach { configuration ->
             configuration.dependencies.withType(ProjectDependency::class.java).forEach { dependency ->
                 val depPath = dependency.path
+                // Test configurations depend on the module itself.
+                if (depPath == path) return@forEach
                 val depSegments = depPath.segments()
                 val depLayer = depSegments.lastOrNull()
                 fun fail(rule: String): Nothing =
@@ -65,8 +73,11 @@ internal fun Project.enforceModuleBoundaries() {
                 ) {
                     fail("a feature may see another feature only through $CROSS_FEATURE_LAYERS")
                 }
-                if (isApi && (depLayer == "impl" || depLayer?.endsWith("-impl") == true)) {
-                    fail("an api module must not depend on an impl module")
+                if (path != ":app" && (depLayer == "impl" || depLayer?.endsWith("-impl") == true)) {
+                    fail("only :app may depend on an impl module; depend on its api")
+                }
+                if (isLogic && depSegments.firstOrNull() == "feature" && depLayer?.startsWith("ui-") == true) {
+                    fail("a logic layer must not depend on a UI layer")
                 }
                 if (isUiFree && depPath == ":core:designsystem") {
                     fail("UI-free module must not depend on the design system")

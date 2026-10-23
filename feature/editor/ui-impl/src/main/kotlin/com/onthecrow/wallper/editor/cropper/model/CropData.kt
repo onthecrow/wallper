@@ -12,7 +12,7 @@ import androidx.compose.ui.geometry.Rect
  *
  */
 @Immutable
-data class CropData(
+internal data class CropData(
     val overlayRect: Rect,
     val cropRect: Rect
 )

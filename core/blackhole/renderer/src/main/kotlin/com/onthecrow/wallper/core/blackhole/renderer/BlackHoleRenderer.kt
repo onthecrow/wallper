@@ -49,6 +49,12 @@ class BlackHoleRenderer(assets: AssetManager) {
     /** Fade the picture in once the tables arrive; off for still previews. */
     var fadeIn: Boolean = true
 
+    /**
+     * The tables on the GPU died with the context and no CPU copy is kept: send them again with [setTables].
+     * Called on the GL thread.
+     */
+    var onTablesLost: (() -> Unit)? = null
+
     private val shaders = ShaderLibrary(assets)
 
     private var params = BlackHoleParams()
@@ -107,6 +113,7 @@ class BlackHoleRenderer(assets: AssetManager) {
         releaseGpu()
     }
 
+    /** Held until the next frame uploads them, then dropped. */
     fun setTables(tables: LensTables) {
         pendingTables = tables
     }
@@ -126,7 +133,7 @@ class BlackHoleRenderer(assets: AssetManager) {
     /** The context is gone: forget every GPU name without deleting it, they died with the context. */
     fun onContextLost() {
         programs = null
-        lens?.let { pendingTables = pendingTables ?: it.tables }
+        val tablesLost = lens != null && pendingTables == null
         lens = null
         diskDetail = null
         haze = null
@@ -135,15 +142,13 @@ class BlackHoleRenderer(assets: AssetManager) {
         bloom = null
         gpuTimer = null
         caps = null
+        if (tablesLost) onTablesLost?.invoke()
     }
 
-    /** Deletes every GPU object. The tables stay in memory, so a new context picks them up again. */
+    /** Deletes every GPU object, the tables too: [setTables] again before drawing in a new context. */
     fun release() {
         releaseGpu()
-        lens?.let {
-            pendingTables = pendingTables ?: it.tables
-            it.release()
-        }
+        lens?.release()
         lens = null
     }
 
@@ -224,7 +229,7 @@ class BlackHoleRenderer(assets: AssetManager) {
 
     private fun lensPass(program: GlProgram, lens: LensTextures, target: RenderTarget, frame: FrameState) {
         program.use()
-        val key = lens.tables.key
+        val key = lens.key
         val rc = key.cameraDistance
         val pose = frame.pose
         // The tables fix r_c: keep the camera on their sphere even if the params moved on.
@@ -378,7 +383,7 @@ class BlackHoleRenderer(assets: AssetManager) {
         if (debug.lens != LensMode.TABLE) programs.buildDebug()
         pendingTables?.let { tables ->
             pendingTables = null
-            if (lens?.tables !== tables) {
+            if (lens?.key != tables.key) {
                 lens?.release()
                 lens = LensTextures(tables)
             }

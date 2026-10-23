@@ -18,7 +18,7 @@ import com.onthecrow.wallper.editor.cropper.settings.CropProperties
  * values
  */
 @Composable
-fun rememberCropState(
+internal fun rememberCropState(
     imageSize: IntSize,
     containerSize: IntSize,
     drawAreaSize: IntSize,

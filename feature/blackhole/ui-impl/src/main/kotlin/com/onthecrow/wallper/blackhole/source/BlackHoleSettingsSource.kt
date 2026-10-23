@@ -1,6 +1,6 @@
 package com.onthecrow.wallper.blackhole.source
 
-import com.onthecrow.wallper.core.blackhole.renderer.BlackHoleSettings
+import com.onthecrow.wallper.core.blackhole.physics.BlackHoleSettings
 import com.onthecrow.wallper.core.blackhole.renderer.BlackHoleSettingsStore
 import kotlinx.coroutines.flow.StateFlow
 import javax.inject.Inject

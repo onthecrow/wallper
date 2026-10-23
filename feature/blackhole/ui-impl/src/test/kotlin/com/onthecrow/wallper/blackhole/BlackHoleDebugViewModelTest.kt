@@ -5,7 +5,7 @@ import com.onthecrow.wallper.blackhole.model.DebugToggle
 import com.onthecrow.wallper.blackhole.source.BlackHoleSettingsSource
 import com.onthecrow.wallper.core.blackhole.physics.QualityLevel
 import com.onthecrow.wallper.core.blackhole.physics.QualitySetting
-import com.onthecrow.wallper.core.blackhole.renderer.BlackHoleSettings
+import com.onthecrow.wallper.core.blackhole.physics.BlackHoleSettings
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.MutableStateFlow

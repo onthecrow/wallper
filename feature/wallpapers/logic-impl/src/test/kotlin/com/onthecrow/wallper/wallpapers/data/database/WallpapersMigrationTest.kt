@@ -74,6 +74,28 @@ class WallpapersMigrationTest {
     }
 
     @Test
+    fun `migration 2 to 3 leaves one row per built-in`() = runTest {
+        createDatabase(version = 2) { connection ->
+            listOf(1, 2).forEach { id ->
+                connection.execSQL(
+                    """
+                    INSERT INTO wallpapers (id, type, original_path, processed_path, thumbnail_path,
+                        crop_left, crop_top, crop_right, crop_bottom, clip_start_ms, clip_end_ms,
+                        media_width, media_height, media_rotation, media_duration_ms, is_active, built_in)
+                    VALUES ($id, 'IMAGE', '', NULL, '', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, ${if (id == 2) 1 else 0},
+                        '${BuiltInWallpaper.BLACK_HOLE.key}')
+                    """.trimIndent()
+                )
+            }
+        }
+
+        val rows = withDatabase { it.wallpaperDao().observeAll().first() }
+
+        assertBuiltInsSeeded(rows)
+        assertEquals(1, rows.single().id)
+    }
+
+    @Test
     fun `a fresh install gets the built-ins`() = runTest {
         val rows = withDatabase { it.wallpaperDao().observeAll().first() }
 

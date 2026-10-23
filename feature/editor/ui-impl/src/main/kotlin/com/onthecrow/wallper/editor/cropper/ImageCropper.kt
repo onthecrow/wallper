@@ -37,7 +37,7 @@ import com.onthecrow.wallper.editor.cropper.state.rememberCropState
 import kotlinx.coroutines.delay
 
 @Composable
-fun ImageCropper(
+internal fun ImageCropper(
     modifier: Modifier = Modifier,
     videoUri: String,
     videoDurationMs: Long,

@@ -6,7 +6,7 @@ import com.onthecrow.wallper.core.blackhole.physics.LensTableKey
 import com.onthecrow.wallper.core.blackhole.physics.LensTables
 import com.onthecrow.wallper.core.blackhole.physics.QualitySetting
 import com.onthecrow.wallper.core.blackhole.physics.StarMath
-import com.onthecrow.wallper.core.blackhole.renderer.BlackHoleSettings
+import com.onthecrow.wallper.core.blackhole.physics.BlackHoleSettings
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -125,6 +125,30 @@ class BlackHoleSettingsReducerTest {
 
         assertFalse(closed.isPanelExpanded)
         assertTrue(reducer.reduce(closed, BlackHoleSettingsEvent.OnPanelToggle).isPanelExpanded)
+    }
+
+    @Test
+    fun `advanced settings start closed and open on demand`() = runTest {
+        val initial = BlackHoleSettingsState()
+        assertFalse(initial.isAdvancedExpanded)
+
+        val open = reducer.reduce(initial, BlackHoleSettingsEvent.OnAdvancedToggle)
+
+        assertTrue(open.isAdvancedExpanded)
+        assertFalse(reducer.reduce(open, BlackHoleSettingsEvent.OnAdvancedToggle).isAdvancedExpanded)
+    }
+
+    @Test
+    fun `params and the wanted tables follow the settings`() = runTest {
+        val initial = BlackHoleSettingsState()
+
+        val moved = reducer.reduce(initial, BlackHoleSettingsEvent.OnSliderChange(SettingsSlider.DISTANCE, 40.0))
+
+        assertEquals(40.0, moved.params.camera.distance)
+        assertEquals(40.0, moved.wantedTablesKey.cameraDistance)
+        assertEquals(moved.settings.previewTablesKey(), moved.wantedTablesKey)
+        // The store echoing what is shown changes nothing.
+        assertSame(moved, reducer.reduce(moved, BlackHoleSettingsEvent.OnSettingsChanged(moved.settings)))
     }
 
     @Test

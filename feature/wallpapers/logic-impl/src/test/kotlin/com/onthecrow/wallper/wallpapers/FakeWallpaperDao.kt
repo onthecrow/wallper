@@ -11,7 +11,9 @@ internal class FakeWallpaperDao(initial: List<WallpaperEntity> = emptyList()) : 
 
     val rows = MutableStateFlow(initial)
 
-    override fun observeAll(): Flow<List<WallpaperEntity>> = rows
+    // Ordered like the query: built-ins first, then by id.
+    override fun observeAll(): Flow<List<WallpaperEntity>> =
+        rows.map { all -> all.sortedWith(compareBy({ it.builtIn == null }, { it.id })) }
 
     override fun observeActive(): Flow<WallpaperEntity?> = rows.map { list -> list.firstOrNull { it.isActive } }
 

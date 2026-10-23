@@ -1,23 +1,25 @@
 package com.onthecrow.wallper.blackhole.model
 
 import com.onthecrow.wallper.core.blackhole.physics.BlackHoleParams
+import com.onthecrow.wallper.core.blackhole.physics.BlackHoleSettings
 
 /**
  * A slider of the debug screen that edits one of [BlackHoleParams] and needs nothing else: unlike the
- * camera distance, none of them changes the lens tables. Debug edits stay on the debug screen.
+ * camera distance, none of them changes the lens tables. Debug edits stay on the debug screen. A slider
+ * with a user setting behind it has that setting's range.
  */
 internal enum class DebugSlider(val range: ClosedFloatingPointRange<Double>) {
-    FOV(30.0..90.0) {
+    FOV(BlackHoleSettings.FOV_RANGE) {
         override fun value(params: BlackHoleParams) = params.camera.fovYDeg
         override fun set(params: BlackHoleParams, value: Double) =
             params.copy(camera = params.camera.copy(fovYDeg = value))
     },
-    DISK_BRIGHTNESS(0.0..3.0) {
+    DISK_BRIGHTNESS(BlackHoleSettings.DISK_BRIGHTNESS_RANGE) {
         override fun value(params: BlackHoleParams) = params.disk.brightness
         override fun set(params: BlackHoleParams, value: Double) =
             params.copy(disk = params.disk.copy(brightness = value))
     },
-    DISK_OPACITY(0.0..1.0) {
+    DISK_OPACITY(BlackHoleSettings.DISK_OPACITY_RANGE) {
         override fun value(params: BlackHoleParams) = params.disk.opacity
         override fun set(params: BlackHoleParams, value: Double) =
             params.copy(disk = params.disk.copy(opacity = value))
@@ -29,7 +31,7 @@ internal enum class DebugSlider(val range: ClosedFloatingPointRange<Double>) {
         override fun set(params: BlackHoleParams, value: Double) =
             params.copy(disk = params.disk.copy(opacityFalloffPower = value))
     },
-    DISK_ROLL(-45.0..45.0) {
+    DISK_ROLL(BlackHoleSettings.ROLL_RANGE) {
         override fun value(params: BlackHoleParams) = params.camera.rollDeg
         override fun set(params: BlackHoleParams, value: Double) =
             params.copy(camera = params.camera.copy(rollDeg = value))
@@ -41,32 +43,32 @@ internal enum class DebugSlider(val range: ClosedFloatingPointRange<Double>) {
         override fun set(params: BlackHoleParams, value: Double) =
             params.copy(disk = params.disk.copy(rotationPeriodSec = value))
     },
-    BLOOM_INTENSITY(0.0..2.0) {
+    BLOOM_INTENSITY(BlackHoleSettings.BLOOM_INTENSITY_RANGE) {
         override fun value(params: BlackHoleParams) = params.post.bloomIntensity
         override fun set(params: BlackHoleParams, value: Double) =
             params.copy(post = params.post.copy(bloomIntensity = value))
     },
-    EXPOSURE(0.25..4.0) {
+    EXPOSURE(BlackHoleSettings.EXPOSURE_RANGE) {
         override fun value(params: BlackHoleParams) = params.post.exposure
         override fun set(params: BlackHoleParams, value: Double) =
             params.copy(post = params.post.copy(exposure = value))
     },
-    LENS_STRENGTH(0.0..2.0) {
+    LENS_STRENGTH(BlackHoleSettings.LENS_STRENGTH_RANGE) {
         override fun value(params: BlackHoleParams) = params.lens.strength
         override fun set(params: BlackHoleParams, value: Double) =
             params.copy(lens = params.lens.copy(strength = value))
     },
-    STAR_COUNT(0.0..12.0) {
+    STAR_COUNT(BlackHoleSettings.STAR_COUNT_RANGE) {
         override fun value(params: BlackHoleParams) = params.stars.countScale
         override fun set(params: BlackHoleParams, value: Double) =
             params.copy(stars = params.stars.copy(countScale = value))
     },
-    STAR_SIZE(0.2..2.0) {
+    STAR_SIZE(BlackHoleSettings.STAR_SIZE_RANGE) {
         override fun value(params: BlackHoleParams) = params.stars.sizePx
         override fun set(params: BlackHoleParams, value: Double) =
             params.copy(stars = params.stars.copy(sizePx = value))
     },
-    STAR_WIDENING(0.0..0.5) {
+    STAR_WIDENING(BlackHoleSettings.STAR_WIDENING_RANGE) {
         override fun value(params: BlackHoleParams) = params.stars.footprintWidening
         override fun set(params: BlackHoleParams, value: Double) =
             params.copy(stars = params.stars.copy(footprintWidening = value))

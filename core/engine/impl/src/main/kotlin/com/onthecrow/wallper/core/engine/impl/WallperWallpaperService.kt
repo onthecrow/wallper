@@ -1,6 +1,7 @@
 package com.onthecrow.wallper.core.engine.impl
 
 import android.app.WallpaperColors
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Color
 import android.os.Build
@@ -16,6 +17,7 @@ import com.onthecrow.wallper.core.engine.WallpaperSpec
 import com.onthecrow.wallper.core.engine.impl.engine.EngineHost
 import com.onthecrow.wallper.core.engine.impl.engine.WallpaperEngine
 import com.onthecrow.wallper.core.engine.impl.engine.WallpaperEngineFactory
+import com.onthecrow.wallper.core.model.BuiltInWallpaper
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -23,6 +25,7 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
@@ -57,11 +60,32 @@ class WallperWallpaperService : WallpaperService() {
 
     private companion object {
         const val PLACEHOLDER_RETRY_MS = 5 * 60_000L
+
+        /** The width colors are computed at: WallpaperColors scales down anyway. */
+        const val COLORS_SIZE = 112
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O_MR1)
+    private fun colorsOf(bitmap: Bitmap): WallpaperColors = WallpaperColors.fromBitmap(bitmap).also { bitmap.recycle() }
+
+    /** The thumbnail decoded at about [COLORS_SIZE] wide, never at full size. */
+    private fun decodeSmall(path: String): Bitmap? {
+        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(path, bounds)
+        if (bounds.outWidth <= 0) return null
+        var sample = 1
+        while (bounds.outWidth / (sample * 2) >= COLORS_SIZE) sample *= 2
+        return BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample })
+    }
+
+    @RequiresApi(Build.VERSION_CODES.O_MR1)
+    private fun BuiltInWallpaper.colors(): WallpaperColors = when (this) {
+        BuiltInWallpaper.BLACK_HOLE -> blackHoleColors()
     }
 
     /** The black hole: almost black with a warm amber accent, dark theme friendly (§11.4). */
     @RequiresApi(Build.VERSION_CODES.O_MR1)
-    private fun builtInColors(): WallpaperColors {
+    private fun blackHoleColors(): WallpaperColors {
         val primary = Color.valueOf(0.03f, 0.025f, 0.02f)
         val secondary = Color.valueOf(0.85f, 0.55f, 0.2f)
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
@@ -89,13 +113,25 @@ class WallperWallpaperService : WallpaperService() {
 
         /** The user picked a wallpaper: the database emission that follows may retry the failed one. */
         private var retryRequested = false
+
+        /** The database has answered once: until then there is no engine, rather than a flash of the placeholder. */
+        private var loaded = false
         private var wallpaperEngine: WallpaperEngine? = null
         private var computeColorsJob: Job? = null
         private var computedColors: WallpaperColors? = null
         private var surfaceHolder: SurfaceHolder? = null
 
         private val activeWallpaper = activeWallpaperSource.activeWallpaperFlow
+            .catch { error ->
+                Timber.e(error, "No active wallpaper from the database")
+                emit(null)
+            }
             .onEach { wallpaper ->
+                if (!loaded) {
+                    loaded = true
+                    createEngine(wallpaper)
+                    return@onEach
+                }
                 // The database re-emits on any table change. A new engine is for a different wallpaper,
                 // or for the failed one when the user picked it again.
                 val retry = retryRequested && failedWallpaper != null && wallpaper == failedWallpaper
@@ -198,7 +234,7 @@ class WallperWallpaperService : WallpaperService() {
             surfaceHolder: SurfaceHolder? = this.surfaceHolder
         ) {
             Timber.d("createEngine()")
-            if (surfaceHolder == null) return
+            if (surfaceHolder == null || !loaded) return
             wallpaperEngine?.release()
             if (wallpaper != currentWallpaper) {
                 currentWallpaper = wallpaper
@@ -208,33 +244,26 @@ class WallperWallpaperService : WallpaperService() {
             wallpaperEngine = wallpaperEngineFactory
                 .create(baseContext, { surfaceHolder }, shownWallpaper, isPreview, this)
                 .also { if (!isVisible) it.pause() }
-            computeColors()
+            computeColors(shownWallpaper)
         }
 
-        private fun computeColors() {
+        /** From the wallpaper on screen: the placeholder's when it failed. Small bitmaps are enough for colors. */
+        private fun computeColors(wallpaper: WallpaperSpec?) {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1) return
 
             computeColorsJob?.cancel()
             computeColorsJob = engineScope.launch(Dispatchers.IO) {
-                val wallpaper = activeWallpaper.value
-                if (wallpaper is WallpaperSpec.BuiltIn) {
-                    computedColors = builtInColors()
-                    notifyColorsChanged()
-                    return@launch
+                computedColors = when (wallpaper) {
+                    is WallpaperSpec.BuiltIn -> wallpaper.wallpaper.colors()
+                    is WallpaperSpec.Media -> decodeSmall(wallpaper.thumbnailPath)?.let(::colorsOf)
+                    null -> {
+                        val frame = surfaceHolder?.surfaceFrame
+                        val height = if (frame == null || frame.width() <= 0) COLORS_SIZE else COLORS_SIZE * frame.height() / frame.width()
+                        applicationContext.resources.getDrawable(R.drawable.bg_engine_empty, null)
+                            .toBitmap(COLORS_SIZE, height.coerceAtLeast(1))
+                            .let(::colorsOf)
+                    }
                 }
-
-                val bitmap = if (wallpaper is WallpaperSpec.Media) {
-                    BitmapFactory.decodeFile(wallpaper.thumbnailPath)
-                } else {
-                    applicationContext.resources
-                        .getDrawable(R.drawable.bg_engine_empty, null)
-                        .toBitmap(
-                            surfaceHolder?.surfaceFrame?.width() ?: 0,
-                            surfaceHolder?.surfaceFrame?.height() ?: 0,
-                        )
-                }
-
-                computedColors = bitmap?.let { WallpaperColors.fromBitmap(bitmap) }
                 notifyColorsChanged()
             }
         }

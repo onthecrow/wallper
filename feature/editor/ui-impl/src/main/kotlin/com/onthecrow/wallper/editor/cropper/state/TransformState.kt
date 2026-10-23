@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
  * objects' [Animatable.animateTo], [Animatable.snapTo].
  */
 @Stable
-open class TransformState(
+internal open class TransformState(
     internal val imageSize: IntSize,
     val containerSize: IntSize,
     val drawAreaSize: IntSize,

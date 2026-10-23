@@ -27,7 +27,7 @@ import kotlinx.coroutines.launch
 import timber.log.Timber
 
 @Composable
-fun Seeker(
+internal fun Seeker(
     uri: String,
     seedPosition: Float,
 ) {
@@ -51,7 +51,7 @@ fun Seeker(
                         height: Int
                     ) {
                         val surface = Surface(surfaceTexture)
-                        // Инициализируем декодер
+                        // Set up the decoder
                         seeker.setSurface(surface)
                         seeker.prepare()
                         initialized = true
@@ -76,7 +76,7 @@ fun Seeker(
     )
 }
 
-class VideoFrameDecoder(
+internal class VideoFrameDecoder(
     private val context: Context,
     private val uri: Uri,
 ) {
@@ -101,7 +101,7 @@ class VideoFrameDecoder(
     fun prepare() {
         extractor.setDataSource(context, uri, null)
 
-        // Находим видео-дорожку
+        // Find the video track
         for (i in 0 until extractor.trackCount) {
             val format = extractor.getTrackFormat(i)
             val mime = format.getString(MediaFormat.KEY_MIME) ?: continue
@@ -140,11 +140,10 @@ class VideoFrameDecoder(
 
     private var job: Job? = null
     /**
-     * Показать кадр, ближайший к timeUs (с точностью до кадра).
-     * Старый запрос можно пометить как отменённый.
+     * Shows the frame at [timeUs], or the first one after it. A newer call cancels the previous one.
      */
     suspend fun showFrameAt(timeUs: Long) {
-        cancelled = true  // отменяем предыдущий цикл
+        cancelled = true // stops the previous loop
         cancelled = false
 
         job?.cancelAndJoin()
@@ -161,7 +160,7 @@ class VideoFrameDecoder(
     private fun decodeSingleFrame(targetTimeUs: Long, scope: CoroutineScope) {
         val codec = codec ?: return
 
-        // Сбрасываем состояние декодера и extractor для нового seek
+        // Reset the decoder and the extractor for the new seek
         codec.flush()
         extractor.seekTo(targetTimeUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
 
@@ -173,7 +172,7 @@ class VideoFrameDecoder(
         val TIMEOUT_US = 10_000L
 
         while (!outputDone && scope.isActive) {
-            // Кормим входные буферы
+            // Feed the input buffers
             if (!inputDone) {
                 val inIndex = codec.dequeueInputBuffer(TIMEOUT_US)
                 if (inIndex >= 0) {
@@ -202,15 +201,15 @@ class VideoFrameDecoder(
                 }
             }
 
-            // Читаем выходные буферы
+            // Drain the output buffers
             val outIndex = codec.dequeueOutputBuffer(bufferInfo, TIMEOUT_US)
             when {
                 outIndex == MediaCodec.INFO_TRY_AGAIN_LATER -> {
-                    // нет готовых данных, просто продолжаем
+                    // Nothing decoded yet: keep going
                 }
 
                 outIndex == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
-                    // можно игнорировать
+                    // Not needed: the frame goes straight to the surface
                 }
 
                 outIndex >= 0 -> {
@@ -218,11 +217,11 @@ class VideoFrameDecoder(
                         bufferInfo.presentationTimeUs >= targetTimeUs ||
                                 (inputDone && (bufferInfo.flags and MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0)
 
-                    // Рисуем только кадр, который достиг нужного времени
+                    // Render only the frame that reached the target time
                     codec.releaseOutputBuffer(outIndex, isTargetFrame)
 
                     if (isTargetFrame) {
-                        // кадр отправлен на Surface
+                        // The frame is on the surface
                         rendered = true
                         outputDone = true
                     }

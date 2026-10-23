@@ -11,12 +11,13 @@ import java.io.OutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
+/** The tables for [params] at [quality]. */
+fun lensTableKey(params: BlackHoleParams, quality: QualityLevel) =
+    LensTableKey(params.camera.distance, quality.tableAlpha, quality.tablePhi, params.lens.tableK)
+
 /** What the tables depend on; part of the cache file name and header. */
 data class LensTableKey(val cameraDistance: Double, val nAlpha: Int, val nPhi: Int, val k: Double) {
     val alphaC: Double get() = LensMath.alphaC(cameraDistance)
-
-    /** A file name that changes with every input and with the format. */
-    fun fileName(): String = "lens_v${LensTables.FORMAT_VERSION}_rc${cameraDistance}_a${nAlpha}_p${nPhi}_k$k.bin"
 }
 
 /**
