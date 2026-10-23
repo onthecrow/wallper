@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The system splash screen (API 31+) reads the activity theme. -->
+    <style name="Theme.Wallper" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowSplashScreenBackground">@color/ic_launcher_background</item>
+<!--        <item name="android:windowSplashScreenAnimatedIcon">@drawable/...</item>-->
+<!--        <item name="android:windowSplashScreenAnimationDuration">1000</item>-->
+<!--        <item name="android:windowSplashScreenIconBackgroundColor">@color/...</item>-->
+    </style>
+</resources>
