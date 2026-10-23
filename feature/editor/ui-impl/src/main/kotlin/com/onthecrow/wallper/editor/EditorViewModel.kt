@@ -5,6 +5,7 @@ import com.onthecrow.wallper.core.model.CropRect
 import com.onthecrow.wallper.core.mvi.BaseViewModel
 import com.onthecrow.wallper.core.navigation.Navigator
 import com.onthecrow.wallper.editor.domain.CreateWallpaperUseCase
+import com.onthecrow.wallper.editor.domain.DiscardPreparedMediaUseCase
 import com.onthecrow.wallper.editor.domain.PrepareMediaUseCase
 import com.onthecrow.wallper.editor.domain.model.ExportStatus
 import dagger.assisted.Assisted
@@ -23,6 +24,7 @@ internal class EditorViewModel @AssistedInject constructor(
     reducer: EditorReducer,
     private val prepareMediaUseCase: PrepareMediaUseCase,
     private val createWallpaperUseCase: CreateWallpaperUseCase,
+    private val discardPreparedMediaUseCase: DiscardPreparedMediaUseCase,
     private val navigator: Navigator,
 ) : BaseViewModel<EditorEvent, EditorState, EditorReducer>(EditorState(), reducer) {
 
@@ -46,6 +48,11 @@ internal class EditorViewModel @AssistedInject constructor(
         }.launchIn(viewModelScope)
 
         prepareMedia()
+    }
+
+    /** The editor is gone: its copy of the media and what an export made of it go too. */
+    override fun onCleared() {
+        discardPreparedMediaUseCase()
     }
 
     private fun prepareMedia() {

@@ -7,12 +7,15 @@ internal class FakeMediaStorage : MediaStorage {
 
     val deletedPaths = mutableListOf<String>()
 
-    override val tempMediaFile = File("temp/media")
-    override val tempThumbnailFile = File("temp/thumbnail")
+    override val tempMediaFile = File("editor/media")
+    override val tempThumbnailFile = File("editor/thumbnail")
+    override val tempProcessedFile = File("editor/processed.mp4")
 
     override fun copyToTemp(uri: String): String = tempMediaFile.path
     override fun persistTempMedia(): String = "originals/media"
+    override fun persistTempProcessed(): String = "originals/processed.mp4"
     override fun persistTempThumbnail(): String = "thumbnails/thumbnail"
+    override fun clearTemp() = Unit
 
     override fun delete(path: String) {
         deletedPaths += path

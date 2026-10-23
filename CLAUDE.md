@@ -30,7 +30,8 @@ Design docs: [WALLPER_PLAYER_DESIGN.md](WALLPER_PLAYER_DESIGN.md) (video playbac
 
 ## Invariants
 
-- The wallpaper service is `directBootAware`: everything it reads (Room DB, media files, thumbnails) lives in device-protected storage, temp files in its `cacheDir`. `Application.onCreate` and the Hilt graph must not touch credential-encrypted storage.
+- The wallpaper service is `directBootAware`: everything it reads (Room DB, media files, thumbnails) lives in device-protected storage. `Application.onCreate` and the Hilt graph must not touch credential-encrypted storage.
+- The editor's scratch files (`MediaStorage.temp*`: the copy of the picked media, its thumbnail, the export) live in device-protected `files/editor`, not `cacheDir`: the system empties the cache whenever it needs space, also mid-edit. They are cleared when an edit starts (`PrepareMediaUseCase`) and when the editor closes (`DiscardPreparedMediaUseCase`), and copied to permanent storage only once the wallpaper is saved; a failed save deletes its copies. No file outlives a wallpaper that wasn't saved.
 - No cloud backup (`allowBackup="false"`, `data_extraction_rules.xml`): the videos don't fit its quota. A device-to-device transfer still moves everything.
 - GL calls only from the EGL thread (`WallpaperGLThread`). Transformer only from the main looper (`TransformerVideoExporter` uses `flowOn(main)`).
 - After the store release:
