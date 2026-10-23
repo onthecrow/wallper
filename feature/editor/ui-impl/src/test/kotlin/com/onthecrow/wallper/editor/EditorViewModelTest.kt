@@ -23,6 +23,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNull
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class EditorViewModelTest {
@@ -75,6 +76,16 @@ class EditorViewModelTest {
     }
 
     @Test
+    fun `dismissing a preparation error goes back, there is nothing to edit`() = runTest(dispatcher) {
+        prepareResult = Result.failure(IllegalStateException("broken file"))
+        val viewModel = createViewModel()
+
+        viewModel.onEvent(EditorEvent.OnErrorDismiss)
+
+        assertEquals(1, backNavigations)
+    }
+
+    @Test
     fun `save turns the slider range into a clip and goes back on success`() = runTest(dispatcher) {
         val viewModel = createViewModel()
         viewModel.onEvent(EditorEvent.OnTimeLineRangeChange(0.1f..0.5f))
@@ -96,5 +107,12 @@ class EditorViewModelTest {
 
         assertIs<ExportStatus.Error>(viewModel.state.value.exportStatus)
         assertEquals(0, backNavigations)
+
+        viewModel.onEvent(EditorEvent.OnErrorDismiss)
+
+        assertNull(viewModel.state.value.exportStatus)
+        assertEquals(0, backNavigations)
+        viewModel.onEvent(EditorEvent.OnSaveClick(CropRect(0, 0, 100, 200)))
+        assertEquals(2, createCalls.size)
     }
 }

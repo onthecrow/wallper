@@ -51,6 +51,13 @@ class EditorReducerTest {
     }
 
     @Test
+    fun `dismissing the error clears it`() = runTest {
+        val failed = EditorState(exportStatus = ExportStatus.Error(IllegalStateException("encoder")))
+
+        assertNull(reducer.reduce(failed, EditorEvent.OnErrorDismiss).exportStatus)
+    }
+
+    @Test
     fun `save click is a side effect only`() = runTest {
         val initial = EditorState()
 

@@ -12,6 +12,7 @@ internal sealed interface EditorEvent : Event {
     data object OnTimeLineRangeChangeFinished : EditorEvent
     data object OnAdditionalProcessingToggle : EditorEvent
     data object OnAdditionalProcessingInfoClick : EditorEvent
+    data object OnErrorDismiss : EditorEvent
 
     // Internal events
     data class OnMediaPrepared(val media: PreparedMedia) : EditorEvent
