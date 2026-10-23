@@ -7,6 +7,7 @@ import com.onthecrow.wallper.core.blackhole.physics.FrameState
 import com.onthecrow.wallper.core.blackhole.physics.LensMath
 import com.onthecrow.wallper.core.blackhole.physics.LensTables
 import com.onthecrow.wallper.core.blackhole.physics.QualityLevel
+import com.onthecrow.wallper.core.blackhole.physics.StarLayer
 import com.onthecrow.wallper.core.blackhole.physics.StarMath
 import com.onthecrow.wallper.core.blackhole.physics.Tonemapper
 import java.util.Random
@@ -35,7 +36,7 @@ enum class DebugView { IMAGE, TABLE_T, DISK_IMAGE, FOOTPRINT }
  */
 class BlackHoleRenderer(assets: AssetManager) {
 
-    /** GPU time of a whole frame, when the driver can measure it. */
+    /** GPU time of a whole frame, when the driver can measure it. Null stops the measuring. */
     var onGpuTimeMs: ((Double) -> Unit)? = null
 
     /** Once per context when the driver can't measure it: [onGpuTimeMs] will never come. */
@@ -73,6 +74,16 @@ class BlackHoleRenderer(assets: AssetManager) {
 
     private var starRotations = FloatArray(0)
     private var starRotationSeed = Int.MIN_VALUE
+
+    // Uniform data that changes only with the params or the quality: rebuilt then, not on every frame.
+    private var uniformsParams: BlackHoleParams? = null
+    private var uniformsQuality: QualityLevel? = null
+    private val rampPositions = FloatArray(4)
+    private val rampColors = FloatArray(12)
+    private var starLayers: List<StarLayer> = emptyList()
+    private var starLayerData = FloatArray(0)
+    private val starTint = FloatArray(3)
+    private var starAverages = FloatArray(0)
 
     fun setParams(params: BlackHoleParams) {
         val old = this.params
@@ -254,39 +265,25 @@ class BlackHoleRenderer(assets: AssetManager) {
         program.set("uDiskOpacity", disk.opacity)
         program.set("uDiskOpacityFalloff", if (disk.opacityFalloffEnabled) disk.opacityFalloffPower else 0.0)
         program.set("uDiskBrightness", disk.brightness)
-        val ramp = disk.ramp.take(4).let { stops -> if (stops.size == 4) stops else stops + List(4 - stops.size) { stops.last() } }
-        program.set("uRampPos", ramp[0].position, ramp[1].position, ramp[2].position, ramp[3].position)
-        program.set3v("uRampColor", FloatArray(12) { i ->
-            val stop = ramp[i / 3]
-            stop.multiplier * when (i % 3) { 0 -> stop.red; 1 -> stop.green; else -> stop.blue }
-        })
+        refreshUniformData()
+        program.set("uRampPos", rampPositions[0], rampPositions[1], rampPositions[2], rampPositions[3])
+        program.set3v("uRampColor", rampColors)
         program.set("uDopplerStrength", if (params.doppler.enabled) params.doppler.strength else 0.0)
 
         val stars = params.stars
-        val layers = stars.layers.take(quality.starLayers).map { StarMath.effectiveLayer(it, stars.countScale) }
         val sigma = StarMath.sigmaRad(stars.sizePx, frame.tanHalfFovY, target.height)
         program.texture("uHaze", UNIT_HAZE, GLES30.GL_TEXTURE_CUBE_MAP, haze?.texture ?: 0)
         program.set("uHazeEnabled", if (params.haze.enabled) 1f else 0f)
         program.set("uStarsEnabled", if (stars.enabled) 1f else 0f)
         program.setMat3v("uStarRot", starRotations(stars.seed))
-        program.set4v("uStarLayer", FloatArray(4 * quality.starLayers) { i ->
-            val layer = layers.getOrNull(i / 4)
-            when {
-                // A missing layer stays empty; one cell, never zero cells: 1 / cells must not be infinite.
-                layer == null -> if (i % 4 == 0) 1f else 0f
-                i % 4 == 0 -> layer.cells.coerceAtLeast(1).toFloat()
-                i % 4 == 1 -> layer.density.toFloat()
-                i % 4 == 2 -> layer.flux.toFloat()
-                else -> 0f
-            }
-        })
-        val averageTint = floatArrayOf(0.93f, 0.835f, 0.78f).mapIndexed { i, c ->
-            c + (floatArrayOf(1f, 0.96f, 0.86f)[i] - c) * stars.warmth.toFloat()
+        program.set4v("uStarLayer", starLayerData)
+        // The average depends on the star size in pixels, so on the zoom: per frame, into the same array.
+        starAverages.fill(0f)
+        starLayers.forEachIndexed { index, layer ->
+            val radiance = StarMath.averageRadiance(layer, sigma, stars.magPower)
+            for (channel in 0 until 3) starAverages[3 * index + channel] = (radiance * starTint[channel]).toFloat()
         }
-        program.set3v("uStarAvg", FloatArray(3 * quality.starLayers) { i ->
-            val layer = layers.getOrNull(i / 3) ?: return@FloatArray 0f
-            (StarMath.averageRadiance(layer, sigma, stars.magPower) * averageTint[i % 3]).toFloat()
-        })
+        program.set3v("uStarAvg", starAverages)
         program.set("uStarSigma", sigma)
         program.set("uStarWidening", stars.footprintWidening)
         program.set("uStarFade", stars.fadeStart.toFloat(), stars.fadeEnd.toFloat())
@@ -296,6 +293,40 @@ class BlackHoleRenderer(assets: AssetManager) {
         program.setUint("uStarSeed", stars.seed)
         program.set("uFpMax", FP_MAX)
         Gl.drawFullscreen()
+    }
+
+    private fun refreshUniformData() {
+        if (uniformsParams === params && uniformsQuality == quality) return
+        uniformsParams = params
+        uniformsQuality = quality
+
+        val ramp = params.disk.ramp
+        for (i in 0 until 4) {
+            val stop = ramp[minOf(i, ramp.lastIndex)] // fewer stops repeat the last one
+            rampPositions[i] = stop.position
+            rampColors[3 * i] = stop.multiplier * stop.red
+            rampColors[3 * i + 1] = stop.multiplier * stop.green
+            rampColors[3 * i + 2] = stop.multiplier * stop.blue
+        }
+
+        val stars = params.stars
+        starLayers = stars.layers.take(quality.starLayers).map { StarMath.effectiveLayer(it, stars.countScale) }
+        starLayerData = FloatArray(4 * quality.starLayers) { i ->
+            val layer = starLayers.getOrNull(i / 4)
+            when {
+                // A missing layer stays empty; one cell, never zero cells: 1 / cells must not be infinite.
+                layer == null -> if (i % 4 == 0) 1f else 0f
+                i % 4 == 0 -> layer.cells.coerceAtLeast(1).toFloat()
+                i % 4 == 1 -> layer.density.toFloat()
+                i % 4 == 2 -> layer.flux.toFloat()
+                else -> 0f
+            }
+        }
+        for (channel in 0 until 3) {
+            val cool = STAR_TINT_COOL[channel]
+            starTint[channel] = cool + (STAR_TINT_WARM[channel] - cool) * stars.warmth.toFloat()
+        }
+        starAverages = FloatArray(3 * quality.starLayers)
     }
 
     private fun drawComposite(
@@ -358,7 +389,13 @@ class BlackHoleRenderer(assets: AssetManager) {
             )
         }
         if (haze == null) haze = HazeCubemap(programs.haze, quality.hazeFace, caps.hazeFormat, params.haze)
-        if (gpuTimer == null && caps.timerQuery && onGpuTimeMs != null) gpuTimer = GpuTimer()
+        // The timer runs while someone listens: its queries cost a little on every frame.
+        if (onGpuTimeMs == null) {
+            gpuTimer?.release()
+            gpuTimer = null
+        } else if (gpuTimer == null && caps.timerQuery) {
+            gpuTimer = GpuTimer()
+        }
     }
 
     private fun createTargets(caps: GlCaps) {
@@ -493,6 +530,10 @@ class BlackHoleRenderer(assets: AssetManager) {
     private fun glslFloat(value: Double) = String.format(java.util.Locale.US, "%.8f", value)
 
     private companion object {
+        /** The mean colour of the stars at warmth 0 and 1. */
+        val STAR_TINT_COOL = floatArrayOf(0.93f, 0.835f, 0.78f)
+        val STAR_TINT_WARM = floatArrayOf(1f, 0.96f, 0.86f)
+
         const val UNIT_TRAJECTORIES = 0
         const val UNIT_ENDS = 1
         const val UNIT_DISK = 2

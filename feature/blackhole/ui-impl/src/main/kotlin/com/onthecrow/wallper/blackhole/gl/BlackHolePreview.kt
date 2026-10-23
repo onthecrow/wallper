@@ -2,6 +2,7 @@ package com.onthecrow.wallper.blackhole.gl
 
 import android.annotation.SuppressLint
 import android.opengl.GLSurfaceView
+import android.view.Choreographer
 import android.view.MotionEvent
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -12,9 +13,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import com.onthecrow.wallper.core.blackhole.physics.FramePacing
 
 /**
- * An ES 3.0 [GLSurfaceView] drawing [config] continuously. It pauses with the lifecycle, which drops
+ * An ES 3.0 [GLSurfaceView] drawing [config] at most [PREVIEW_FPS] times a second, the wallpaper's rate
+ * while it moves: not at the display's 90–120 Hz, so the stats show what the wallpaper costs and the
+ * settings screen doesn't heat the phone. It pauses with the lifecycle, which drops
  * the EGL context; [PreviewGlRenderer] rebuilds its GPU objects on the next one. A drag on the picture
  * moves the camera as [dragMode] says; with [followsGyroscope] tilting the phone turns it like on the wallpaper.
  *
@@ -43,7 +47,7 @@ internal fun BlackHolePreview(
         GLSurfaceView(context).apply {
             setEGLContextClientVersion(GLES_VERSION)
             setRenderer(renderer)
-            renderMode = GLSurfaceView.RENDERMODE_CONTINUOUSLY
+            renderMode = GLSurfaceView.RENDERMODE_WHEN_DIRTY
             when (dragMode) {
                 DragMode.GYRO -> emulateGyroOnDrag(renderer)
                 DragMode.ORBIT -> orbitOnDrag(renderer)
@@ -53,7 +57,11 @@ internal fun BlackHolePreview(
 
     LifecycleResumeEffect(view) {
         view.onResume()
-        onPauseOrDispose { view.onPause() }
+        val pacer = FramePacer(view).apply { start() }
+        onPauseOrDispose {
+            pacer.stop()
+            view.onPause()
+        }
     }
     LaunchedEffect(view, config) {
         view.queueEvent { renderer.setConfig(config) }
@@ -61,6 +69,33 @@ internal fun BlackHolePreview(
     PreviewGyroscope(view, renderer, enabled = followsGyroscope, input = config.params.input)
 
     AndroidView(factory = { view }, modifier = modifier)
+}
+
+/** Asks [view] for a frame on the vsyncs [FramePacing] picks at [PREVIEW_FPS]. Main thread. */
+private class FramePacer(private val view: GLSurfaceView) : Choreographer.FrameCallback {
+    private val choreographer = Choreographer.getInstance()
+    private var lastFrameNanos = Long.MIN_VALUE
+    private var running = false
+
+    fun start() {
+        running = true
+        choreographer.postFrameCallback(this)
+    }
+
+    fun stop() {
+        running = false
+        choreographer.removeFrameCallback(this)
+    }
+
+    override fun doFrame(frameNanos: Long) {
+        if (!running) return
+        val vsyncNanos = (1e9 / (view.display?.refreshRate?.takeIf { it > 0f } ?: 60f)).toLong()
+        if (FramePacing.isDue(frameNanos, lastFrameNanos, PREVIEW_FPS, vsyncNanos)) {
+            lastFrameNanos = frameNanos
+            view.requestRender()
+        }
+        choreographer.postFrameCallback(this)
+    }
 }
 
 /** Up raises the camera and sideways turns it, like tilting the phone; letting go recentres it. */
@@ -113,5 +148,6 @@ private fun GLSurfaceView.orbitOnDrag(renderer: PreviewGlRenderer) {
 }
 
 private const val GLES_VERSION = 3
+private const val PREVIEW_FPS = 60
 private const val GYRO_DEGREES_PER_100_DP = 3.0
 private const val ORBIT_DEGREES_PER_100_DP = 40.0

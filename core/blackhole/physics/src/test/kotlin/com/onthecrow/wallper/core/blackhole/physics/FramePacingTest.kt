@@ -16,9 +16,24 @@ class FramePacingTest {
         assertEquals(60, FramePacing.targetFps(true, false, ThermalLevel.NORMAL, frames, medium))
         assertEquals(30, FramePacing.targetFps(false, false, ThermalLevel.NORMAL, frames, medium))
         assertEquals(15, FramePacing.targetFps(true, true, ThermalLevel.NORMAL, frames, medium))
+        assertEquals(FramePacing.STILL, FramePacing.targetFps(false, true, ThermalLevel.NORMAL, frames, medium))
         assertEquals(24, FramePacing.targetFps(false, false, ThermalLevel.MODERATE, frames, medium))
         assertEquals(FramePacing.STILL, FramePacing.targetFps(true, false, ThermalLevel.SEVERE, frames, medium))
         assertEquals(30, FramePacing.targetFps(true, false, ThermalLevel.NORMAL, frames, QualityLevel.LOW))
+    }
+
+    @Test
+    fun `the loop sleeps through the vsyncs it would skip`() {
+        val vsync120 = 8_333_333L
+
+        // Just drew at 30 fps on 120 Hz: due at 29.2 ms, so wake at the vsync before it, after 20 ms.
+        assertEquals(20, FramePacing.sleepMs(0, 0, 30, vsync120))
+        // Woke at 25 ms: the frame is due at the next vsync, no sleeping.
+        assertEquals(0, FramePacing.sleepMs(25_000_000, 0, 30, vsync120))
+        // 60 fps on 120 Hz: due at 12.5 ms, a short sleep. A still frame or a first frame never sleeps.
+        assertEquals(4, FramePacing.sleepMs(0, 0, 60, vsync120))
+        assertEquals(0, FramePacing.sleepMs(0, 0, FramePacing.STILL, vsync120))
+        assertEquals(0, FramePacing.sleepMs(0, Long.MIN_VALUE, 30, vsync120))
     }
 
     @Test
@@ -61,6 +76,7 @@ class FramePacingTest {
         repeat(20) { assertNull(controller.onGpuTime(50.0, 30)) } // settled: no second measurement
 
         assertEquals(QualityLevel.HIGH, controller.level)
+        assertFalse(controller.isMeasuring)
     }
 
     @Test
