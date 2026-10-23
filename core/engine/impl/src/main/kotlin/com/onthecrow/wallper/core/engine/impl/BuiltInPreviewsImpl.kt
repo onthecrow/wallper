@@ -2,17 +2,33 @@ package com.onthecrow.wallper.core.engine.impl
 
 import android.content.Context
 import com.onthecrow.wallper.core.blackhole.physics.BlackHoleParams
+import com.onthecrow.wallper.core.blackhole.physics.FrameParams
+import com.onthecrow.wallper.core.blackhole.physics.InputParams
 import com.onthecrow.wallper.core.blackhole.renderer.BlackHolePreviewRenderer
 import com.onthecrow.wallper.core.blackhole.renderer.BlackHoleSettingsStore
 import com.onthecrow.wallper.core.engine.BuiltInPreviews
 import com.onthecrow.wallper.core.model.BuiltInWallpaper
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import timber.log.Timber
 import java.io.File
+import java.util.zip.CRC32
 import javax.inject.Inject
 
-/** Renders built-in previews with the wallpaper's own renderer; one PNG per wallpaper and settings. */
+/**
+ * Renders built-in previews with the wallpaper's own renderer, again whenever the settings change the
+ * picture. Keyed by what the picture shows, so a launch with the same settings reuses the file.
+ */
 internal class BuiltInPreviewsImpl @Inject constructor(
     @param:ApplicationContext private val context: Context,
     private val blackHole: BlackHolePreviewRenderer,
@@ -21,32 +37,48 @@ internal class BuiltInPreviewsImpl @Inject constructor(
 
     private val directory by lazy { File(context.createDeviceProtectedStorageContext().filesDir, "previews") }
 
-    override suspend fun preview(wallpaper: BuiltInWallpaper): String? = try {
-        when (wallpaper) {
-            BuiltInWallpaper.BLACK_HOLE -> blackHolePreview()
+    /** Changes with every install of the app: new shaders or defaults render the pictures once more. */
+    private val installedAt by lazy { context.packageManager.getPackageInfo(context.packageName, 0).lastUpdateTime }
+
+    /** One render at a time: two screens asking for the same picture still write one file. */
+    private val renderLock = Mutex()
+
+    @OptIn(FlowPreview::class, ExperimentalCoroutinesApi::class)
+    override fun previews(wallpaper: BuiltInWallpaper): Flow<String> = when (wallpaper) {
+        BuiltInWallpaper.BLACK_HOLE -> blackHoleSettings.settings
+            // A still frame doesn't show the motion or the frame rate.
+            .map { it.applyTo(BlackHoleParams()).copy(input = InputParams(), frames = FrameParams()) }
+            .distinctUntilChanged()
+            .debounce(SETTINGS_DEBOUNCE_MS)
+            .mapLatest(::blackHolePreview)
+            .filterNotNull()
+    }
+
+    private suspend fun blackHolePreview(params: BlackHoleParams): String? = try {
+        renderLock.withLock {
+            val prefix = BuiltInWallpaper.BLACK_HOLE.key
+            // toString() of the params is the same in every process; hashCode() of their enums is not.
+            val key = CRC32().apply { update("$installedAt $params".toByteArray()) }.value
+            val file = File(directory, "${prefix}_$key.png")
+            val metrics = context.resources.displayMetrics
+            val height = (PREVIEW_WIDTH * metrics.heightPixels.toFloat() / metrics.widthPixels.coerceAtLeast(1)).toInt()
+            if (file.exists() || blackHole.render(params, file, PREVIEW_WIDTH, height)) {
+                // Older pictures go only now: the list keeps showing one until the new one is ready.
+                directory.listFiles { old -> old.name.startsWith(prefix) && old != file }?.forEach(File::delete)
+                file.path
+            } else {
+                null
+            }
         }
     } catch (e: CancellationException) {
         throw e
     } catch (e: Exception) {
-        Timber.e(e, "No preview for $wallpaper")
+        Timber.e(e, "No preview for the black hole")
         null
-    }
-
-    private suspend fun blackHolePreview(): String? {
-        val settings = blackHoleSettings.settings.value
-        // The picture depends on the settings: a new file whenever they change.
-        val name = "${BuiltInWallpaper.BLACK_HOLE.key}_v${PREVIEW_VERSION}_${settings.hashCode().toUInt()}.png"
-        val file = File(directory, name)
-        if (file.exists()) return file.path
-        directory.listFiles { old -> old.name.startsWith(BuiltInWallpaper.BLACK_HOLE.key) }?.forEach(File::delete)
-        val metrics = context.resources.displayMetrics
-        val width = PREVIEW_WIDTH
-        val height = (PREVIEW_WIDTH * metrics.heightPixels.toFloat() / metrics.widthPixels.coerceAtLeast(1)).toInt()
-        return file.path.takeIf { blackHole.render(settings.applyTo(BlackHoleParams()), file, width, height) }
     }
 
     private companion object {
         const val PREVIEW_WIDTH = 540
-        const val PREVIEW_VERSION = 1
+        const val SETTINGS_DEBOUNCE_MS = 300L
     }
 }

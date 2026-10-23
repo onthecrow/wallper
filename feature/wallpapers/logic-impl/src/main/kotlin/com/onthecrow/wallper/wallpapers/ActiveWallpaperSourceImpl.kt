@@ -12,7 +12,10 @@ import javax.inject.Inject
 /** Feeds the wallpaper service from the wallpapers database. An active built-in unknown to this version gives null. */
 internal class ActiveWallpaperSourceImpl @Inject constructor(
     private val wallpapersRepository: WallpapersRepository,
+    activations: WallpaperActivations,
 ) : ActiveWallpaperSource {
     override val activeWallpaperFlow: Flow<WallpaperSpec?> =
         wallpapersRepository.observeActive().map { entity -> entity?.toDomain()?.toSpec() }
+
+    override val activations: Flow<Unit> = activations.flow
 }

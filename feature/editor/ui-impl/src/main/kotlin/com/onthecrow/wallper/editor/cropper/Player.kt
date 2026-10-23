@@ -1,71 +1,39 @@
 package com.onthecrow.wallper.editor.cropper
 
-import android.os.Looper
 import android.view.TextureView
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.net.toUri
 import androidx.media3.common.MediaItem
 import com.onthecrow.wallper.core.player.createLeanExoPlayer
-import timber.log.Timber
 
+/**
+ * Plays the picked part of [videoUri] in a loop.
+ *
+ * @param durationMs the length of the video from its metadata; 0 if unknown, then the whole video plays.
+ */
 @Composable
 fun VideoSurface(
     videoUri: String,
+    durationMs: Long,
     modifier: Modifier = Modifier,
     seek: Float?,
     videoRange: ClosedFloatingPointRange<Float>,
 ) {
     val context = LocalContext.current
-    var initialRange by remember { mutableStateOf(0L) }
 
     // Плеер живёт столько, сколько живёт этот composable
     val player = remember(context) { createLeanExoPlayer(context) }
 
-    LaunchedEffect(videoRange, seek) {
+    LaunchedEffect(videoUri, durationMs, videoRange, seek) {
         if (seek != null) return@LaunchedEffect
-        val startPosition = videoRange.start * initialRange
-        val endPosition = videoRange.endInclusive * initialRange
-
-        Timber.d("startPosition: $startPosition, endPosition: $endPosition")
-
-        val clippingConfiguration = MediaItem.ClippingConfiguration.Builder()
-            .setStartPositionMs(startPosition.toLong())
-            .setEndPositionMs(endPosition.toLong())
-            .build()
-
-        val mediaItem = MediaItem.Builder()
-            .setUri(videoUri.toUri())
-            .setClippingConfiguration(clippingConfiguration)
-            .build()
-
-        player.stop()
-        player.setMediaItem(mediaItem)
+        player.setMediaItem(clippedMediaItem(videoUri, durationMs, videoRange))
         player.prepare()
         player.play()
-    }
-
-    // Отдельно реагируем на смену URI (без пересоздания плеера)
-    LaunchedEffect(videoUri) {
-        val mediaItem = MediaItem.Builder()
-            .setUri(videoUri.toUri())
-            .build()
-
-        player.setMediaItem(mediaItem)
-        player.prepare()
-        player.playWhenReady = true
-        android.os.Handler(Looper.getMainLooper()).postDelayed(
-            {
-                initialRange = player.duration
-            }, 2000L
-        )
     }
 
     AndroidView(
@@ -89,4 +57,20 @@ fun VideoSurface(
             player.release()
         }
     )
+}
+
+/** The picked part of the video; the whole of it while the duration is unknown. */
+private fun clippedMediaItem(videoUri: String, durationMs: Long, range: ClosedFloatingPointRange<Float>): MediaItem {
+    val builder = MediaItem.Builder().setUri(videoUri.toUri())
+    if (durationMs > 0) {
+        val startMs = (range.start.coerceIn(0f, 1f) * durationMs).toLong()
+        val endMs = (range.endInclusive.coerceIn(0f, 1f) * durationMs).toLong().coerceAtLeast(startMs)
+        builder.setClippingConfiguration(
+            MediaItem.ClippingConfiguration.Builder()
+                .setStartPositionMs(startMs)
+                .setEndPositionMs(endMs)
+                .build(),
+        )
+    }
+    return builder.build()
 }

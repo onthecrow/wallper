@@ -45,7 +45,8 @@ The player side and the GL side recover independently; there is no shared abstra
 - **GL (`core:gl`).**
   - `VideoWallpaperRenderer` owns one video texture per EGL context and reports its surface through `onVideoSurfaceCreated`. A lost context's texture is released only after the new one shows a frame.
   - `RenderGuard` inside `WallpaperGLThread` repairs EGL.
-  - `GLWallpaperEngine` recreates a broken or hung GL thread without touching the player, limited by `GlRestartPolicy` (3 per 2 min). It detaches the player (`setVideoSurface(null)`) before the old GL thread exits.
+  - `RestartableGl` (`core:engine:impl`) owns the GL thread of the video and black-hole engines: the heartbeat (armed only while frames are expected; the first frames after a shader compile get 10 s), restarts limited by `GlRestartPolicy` (3 per 2 min), the teardown on the callback thread. It replaces a thread only once it has exited: one stuck in the driver still holds the window, so the engine gives up. The video engine detaches the player (`setVideoSurface(null)`) before the old GL thread exits.
+  - A wallpaper that gave up shows the placeholder until the user picks a wallpaper, that one too (`ActiveWallpaperSource.activations`), or until it is visible again 5 min later.
 - Every ExoPlayer call happens on the player thread (`setLooper`). GL objects are touched only on the GL thread.
 - The supervisor, watchdog, policies and `RenderGuard` are tested on the JVM, with virtual coroutine time or fake clocks and fake engines. Keep Android types behind `ManagedEngine` / `RenderRepairs`.
 

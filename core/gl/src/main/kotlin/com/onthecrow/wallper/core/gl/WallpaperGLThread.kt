@@ -81,6 +81,14 @@ class WallpaperGLThread(
     /** Creating the EGL surface failed; don't retry in a loop, wait for a repair. */
     private var surfaceBroken = false
 
+    /**
+     * Frames swapped to the window so far. The owner's heartbeat gives the first frame after a shader
+     * (re)compilation more time: it counts the frames presented since then.
+     */
+    @Volatile
+    var presentedFrames: Long = 0
+        private set
+
     /** An EGL surface exists on the window; [onSurfaceDestroyed] can wait for it to go. */
     @Volatile
     private var eglSurfaceAlive = false
@@ -267,6 +275,7 @@ class WallpaperGLThread(
                 renderGuard?.onSwapFailed(error)
                 return
             }
+            presentedFrames++
             if (isNewFrame) renderGuard?.onFramePresented()
         } catch (t: Throwable) {
             val guard = renderGuard ?: throw t

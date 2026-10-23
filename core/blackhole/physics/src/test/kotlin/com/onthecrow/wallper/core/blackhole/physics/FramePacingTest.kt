@@ -22,6 +22,17 @@ class FramePacingTest {
     }
 
     @Test
+    fun `a hot or hidden wallpaper expects no frames, on any API level`() {
+        val severe = FramePacing.targetFps(
+            active = true, powerSave = false, thermal = ThermalLevel.SEVERE, frames = frames, quality = QualityLevel.HIGH,
+        )
+
+        assertFalse(FramePacing.expectsFrames(visible = true, targetFps = severe))
+        assertFalse(FramePacing.expectsFrames(visible = false, targetFps = 30))
+        assertTrue(FramePacing.expectsFrames(visible = true, targetFps = 30))
+    }
+
+    @Test
     fun `a 120 Hz display draws every second vsync at 60 fps`() {
         val vsync = 8_333_333L
         var last = Long.MIN_VALUE

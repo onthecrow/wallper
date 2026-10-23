@@ -344,6 +344,7 @@ class BlackHoleRenderer(assets: AssetManager) {
         GLES30.glDisable(GLES30.GL_DITHER)
         if (scene == null) createTargets(caps)
         val programs = programs ?: buildPrograms().also { programs = it }
+        if (debug.lens != LensMode.TABLE) programs.buildDebug()
         pendingTables?.let { tables ->
             pendingTables = null
             if (lens?.tables !== tables) {
@@ -394,13 +395,12 @@ class BlackHoleRenderer(assets: AssetManager) {
         fun program(name: String) = GlProgram(vertex, shaders.source(name, defines), name)
         return Programs(
             lens = program("lens.frag"),
-            reference = program("reference.frag"),
             diskDetail = program("disk_detail.frag"),
             haze = program("haze.frag"),
             bloomDown = program("bloom_down.frag"),
             bloomUp = program("bloom_up.frag"),
             composite = program("composite.frag"),
-            diff = program("diff.frag"),
+            build = ::program,
         )
     }
 
@@ -459,17 +459,33 @@ class BlackHoleRenderer(assets: AssetManager) {
         starRotationSeed = Int.MIN_VALUE
     }
 
+    /**
+     * The wallpaper's programs, plus the debug screen's two built on first use: compiling the RK4 reference
+     * makes the first frame much slower, and the wallpaper never draws it.
+     */
     private class Programs(
         val lens: GlProgram,
-        val reference: GlProgram,
         val diskDetail: GlProgram,
         val haze: GlProgram,
         val bloomDown: GlProgram,
         val bloomUp: GlProgram,
         val composite: GlProgram,
-        val diff: GlProgram,
+        private val build: (String) -> GlProgram,
     ) {
-        fun release() = listOf(lens, reference, diskDetail, haze, bloomDown, bloomUp, composite, diff).forEach(GlProgram::release)
+        private var referenceProgram: GlProgram? = null
+        private var diffProgram: GlProgram? = null
+
+        val reference: GlProgram get() = checkNotNull(referenceProgram) { "buildDebug() first" }
+        val diff: GlProgram get() = checkNotNull(diffProgram) { "buildDebug() first" }
+
+        /** Builds the debug programs if they aren't yet; throws [ShaderException] like the others. */
+        fun buildDebug() {
+            if (referenceProgram == null) referenceProgram = build("reference.frag")
+            if (diffProgram == null) diffProgram = build("diff.frag")
+        }
+
+        fun release() = listOfNotNull(lens, diskDetail, haze, bloomDown, bloomUp, composite, referenceProgram, diffProgram)
+            .forEach(GlProgram::release)
     }
 
     private val Tonemapper.index: Int get() = if (this == Tonemapper.ACES) 0 else 1

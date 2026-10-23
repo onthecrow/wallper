@@ -6,4 +6,10 @@ import kotlinx.coroutines.flow.Flow
 interface ActiveWallpaperSource {
     /** The wallpaper to show, or null for the branded placeholder. */
     val activeWallpaperFlow: Flow<WallpaperSpec?>
+
+    /**
+     * Emits each time the user picks a wallpaper, the active one too, before the pick is stored: a
+     * wallpaper that gave up and shows the placeholder gets another chance.
+     */
+    val activations: Flow<Unit>
 }
