@@ -84,7 +84,11 @@ internal fun EditorScreen(
 
                 if (media != null) {
                     // A picture has nothing to play or trim.
-                    val player = if (media.type == MediaType.VIDEO) rememberEditorPlayer(media.path) else null
+                    val player = if (media.type == MediaType.VIDEO) {
+                        rememberEditorPlayer(media.path, onError = { onEvent(EditorEvent.OnPreviewFailed(it)) })
+                    } else {
+                        null
+                    }
                     // A drag on the trim bar holds playback without touching the user's choice, and so does an
                     // export: it needs the decoders.
                     var isDragging by remember(player) { mutableStateOf(false) }

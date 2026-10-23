@@ -75,6 +75,7 @@ The player side and the GL side recover independently; there is no shared abstra
 
 - `TrimBar` (`core:designsystem`) knows nothing of video: the playhead stays at its centre, it reports scrubs and handle moves (`onSeek`, `onTrimChange`) between `onDragStart` and `onDragEnd`, and reads the position through a lambda while drawing. Its geometry lives in `TrimBarMath.kt` and is tested on the JVM.
 - `EditorPlayer` is one ExoPlayer with the whole video, so a handle can show any frame; it loops `EditorState.trim` itself, starting from its start. It plays while `isPlaying` (the user's choice), no drag is on and no export runs; drags turn on scrubbing mode. Pictures get no player.
+- A player error goes to `Timber.e` and, as `OnPreviewFailed`, to the editor's error dialog; closing it leaves the editor, like media that can't be prepared.
 - The strip's frames are key frames from `MediaMetadataRetriever` on `Dispatchers.IO`, one per tile within a pixel budget (`rememberVideoFrames`), held while an export runs.
 - The player, its position and the frames live in the screen's composition, not in the ViewModel: the position changes every frame, which `runningFold` shouldn't carry, and frames are Bitmaps, which `logic-api` (plain Kotlin) can't. `EditorState` keeps only what the export and the user's choices need: `trim` and `isPlaying`.
 - `ClipRange` with an end not after its start plays to the end of the video (`endMsOrNull`): the editor saves `0..0` when it doesn't know the length.

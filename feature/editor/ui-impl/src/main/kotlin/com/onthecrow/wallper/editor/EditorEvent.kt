@@ -18,4 +18,6 @@ internal sealed interface EditorEvent : Event {
     // Internal events
     data class OnMediaPrepared(val media: PreparedMedia) : EditorEvent
     data class OnExportStatusChanged(val status: ExportStatus) : EditorEvent
+    /** The preview can't play the media: the file may be gone or unreadable. */
+    data class OnPreviewFailed(val error: Throwable) : EditorEvent
 }

@@ -11,6 +11,7 @@ import androidx.compose.runtime.Stable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.platform.LocalContext
@@ -30,16 +31,21 @@ import timber.log.Timber
 /**
  * The editor's preview. It loads the whole video, so the trim bar can show any frame of it, and loops the
  * kept part itself. Main thread only, like the ExoPlayer inside.
+ *
+ * @param onError the player can't go on: the file may be gone or unreadable.
  */
 @Stable
-internal class EditorPlayer(context: Context, path: String) {
+internal class EditorPlayer(context: Context, path: String, onError: (PlaybackException) -> Unit) {
 
     private val player: ExoPlayer = createLeanExoPlayer(context).apply {
         // The loop over the kept part is ours: the player's own would run to the end of the video.
         repeatMode = Player.REPEAT_MODE_OFF
         addListener(object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
-                Timber.e(error, "The editor preview can't play $path")
+                // TODO Report to Sentry or Crashlytics once one is set up: Timber.e reaches Diagnostics.reporter,
+                //  which only writes to logcat for now.
+                Timber.e(error, "The editor preview can't play $path: ${error.errorCodeName}")
+                onError(error)
             }
         })
         setMediaItem(MediaItem.fromUri(path.toUri()))
@@ -105,9 +111,10 @@ internal fun restartsLoop(positionMs: Long, trim: ClipRange, ended: Boolean): Bo
 
 /** A player for the video at [path], released when it leaves the composition. */
 @Composable
-internal fun rememberEditorPlayer(path: String): EditorPlayer {
+internal fun rememberEditorPlayer(path: String, onError: (PlaybackException) -> Unit): EditorPlayer {
     val context = LocalContext.current
-    val player = remember(context, path) { EditorPlayer(context, path) }
+    val currentOnError by rememberUpdatedState(onError)
+    val player = remember(context, path) { EditorPlayer(context, path) { currentOnError(it) } }
     DisposableEffect(player) {
         onDispose(player::release)
     }

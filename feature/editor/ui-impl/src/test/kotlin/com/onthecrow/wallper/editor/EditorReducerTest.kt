@@ -35,6 +35,15 @@ class EditorReducerTest {
     }
 
     @Test
+    fun `a preview that can't play shows its error`() = runTest {
+        val error = IllegalStateException("file gone")
+
+        val state = reducer.reduce(EditorState(), EditorEvent.OnPreviewFailed(error))
+
+        assertEquals(ExportStatus.Error(error), state.exportStatus)
+    }
+
+    @Test
     fun `the preview plays until paused, and plays again`() = runTest {
         val paused = reducer.reduce(EditorState(), EditorEvent.OnPlayPauseClick)
 
