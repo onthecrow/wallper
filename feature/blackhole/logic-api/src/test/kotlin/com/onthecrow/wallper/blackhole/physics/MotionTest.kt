@@ -89,7 +89,7 @@ class MotionTest {
     @Test
     fun `the gyro recentres on a new grip`() {
         val tracker = GyroTracker()
-        val params = InputParams(gyroSmoothing = 0.0)
+        val params = InputParams(gyroGain = 0.5, gyroSmoothing = 0.0)
         val tilted = rotationAboutX(Math.toRadians(4.0))
         tracker.onSample(Quaternion.IDENTITY, 0.02, 0, params)
 
@@ -104,7 +104,7 @@ class MotionTest {
     @Test
     fun `big tilts are soft-clamped`() {
         val tracker = GyroTracker()
-        val params = InputParams(gyroSmoothing = 0.0)
+        val params = InputParams(gyroGain = 0.5, gyroSmoothing = 0.0)
         tracker.onSample(Quaternion.IDENTITY, 0.02, 0, params)
 
         tracker.onSample(rotationAboutX(Math.toRadians(60.0)), 0.02, 0, params)
