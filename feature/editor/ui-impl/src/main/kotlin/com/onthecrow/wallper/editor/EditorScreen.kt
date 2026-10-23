@@ -169,7 +169,10 @@ internal fun EditorScreen(
             }
             when (val status = state.exportStatus) {
                 is ExportStatus.InProgress -> ExportProgressDialog(status)
-                is ExportStatus.Error -> ErrorDialog(error = status.error)
+                is ExportStatus.Error -> ErrorDialog(
+                    error = status.error,
+                    onDismiss = { onEvent(EditorEvent.OnErrorDismiss) },
+                )
                 ExportStatus.Success, null -> Unit
             }
         }

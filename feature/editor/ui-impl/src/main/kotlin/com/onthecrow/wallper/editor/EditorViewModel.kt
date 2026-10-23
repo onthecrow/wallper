@@ -32,10 +32,15 @@ internal class EditorViewModel @AssistedInject constructor(
         fun create(destination: EditorDestination): EditorViewModel
     }
 
+    /** The media couldn't be prepared: there is nothing to edit. Touched only on the main thread. */
+    private var isMediaBroken = false
+
     init {
         eventFlow.onEach { event ->
             when (event) {
                 is EditorEvent.OnSaveClick -> createWallpaper(event.crop)
+                // A failed export can be saved again; a file that can't be read can't.
+                EditorEvent.OnErrorDismiss -> if (isMediaBroken) navigator.navigateBack()
                 else -> Unit
             }
         }.launchIn(viewModelScope)
@@ -47,7 +52,10 @@ internal class EditorViewModel @AssistedInject constructor(
         viewModelScope.launch {
             prepareMediaUseCase(destination.uri).fold(
                 onSuccess = { media -> onEvent(EditorEvent.OnMediaPrepared(media)) },
-                onFailure = { error -> onEvent(EditorEvent.OnExportStatusChanged(ExportStatus.Error(error))) },
+                onFailure = { error ->
+                    isMediaBroken = true
+                    onEvent(EditorEvent.OnExportStatusChanged(ExportStatus.Error(error)))
+                },
             )
         }
     }

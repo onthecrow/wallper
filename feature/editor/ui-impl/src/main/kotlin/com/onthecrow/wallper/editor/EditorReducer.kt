@@ -16,6 +16,7 @@ internal class EditorReducer @Inject constructor() : Reducer<EditorState, Editor
             EditorEvent.OnAdditionalProcessingToggle -> state.copy(isAdditionalProcessing = !state.isAdditionalProcessing)
             is EditorEvent.OnMediaPrepared -> state.copy(media = event.media)
             is EditorEvent.OnExportStatusChanged -> state.copy(exportStatus = event.status)
+            EditorEvent.OnErrorDismiss -> state.copy(exportStatus = null)
             is EditorEvent.OnSaveClick,
             EditorEvent.OnAdditionalProcessingInfoClick -> state
         }
