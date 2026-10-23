@@ -41,6 +41,7 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import com.onthecrow.wallper.core.designsystem.R as DesignR
 import com.onthecrow.wallper.core.designsystem.component.FAB
+import com.onthecrow.wallper.core.model.BuiltInWallpaper
 import com.onthecrow.wallper.wallpapers.model.WallpaperItem
 import com.onthecrow.wallper.wallpapers.ui.R
 import com.onthecrow.wallper.wallpapers.view.WallpaperCard
@@ -123,20 +124,32 @@ internal fun WallpapersScreen(
                         offset = DpOffset(x = 0.dp, y = 8.dp),
                         onDismissRequest = { expanded = false },
                     ) {
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.edit)) },
-                            onClick = {
-                                // TODO Edit mode (ARCHITECTURE_MIGRATION.md, TODO): open the editor for this wallpaper.
-                                expanded = false
-                            },
-                        )
-                        DropdownMenuItem(
-                            text = { Text(stringResource(R.string.delete)) },
-                            onClick = {
-                                expanded = false
-                                onEvent(WallpapersEvent.OnDeleteClick(wallpaper.id))
-                            },
-                        )
+                        val builtIn = wallpaper.builtIn
+                        if (builtIn != null) {
+                            // Built-ins have no media to edit and can't be deleted.
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.settings)) },
+                                onClick = {
+                                    expanded = false
+                                    onEvent(WallpapersEvent.OnBuiltInSettingsClick(builtIn))
+                                },
+                            )
+                        } else {
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.edit)) },
+                                onClick = {
+                                    // TODO Edit mode (ARCHITECTURE_MIGRATION.md, TODO): open the editor for this wallpaper.
+                                    expanded = false
+                                },
+                            )
+                            DropdownMenuItem(
+                                text = { Text(stringResource(R.string.delete)) },
+                                onClick = {
+                                    expanded = false
+                                    onEvent(WallpapersEvent.OnDeleteClick(wallpaper.id))
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -148,7 +161,13 @@ internal fun WallpapersScreen(
 @Composable
 private fun WallpapersScreenPreview() {
     WallpapersScreen(
-        state = WallpapersState(items = listOf(WallpaperItem(1, "", true), WallpaperItem(2, "", false))),
+        state = WallpapersState(
+            items = listOf(
+                WallpaperItem(1, null, false, BuiltInWallpaper.BLACK_HOLE),
+                WallpaperItem(2, "", true),
+                WallpaperItem(3, "", false),
+            ),
+        ),
         eventFlow = emptyFlow(),
         onEvent = {},
     )

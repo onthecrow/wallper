@@ -3,6 +3,7 @@ package com.onthecrow.wallper.wallpapers.data.database
 import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import com.onthecrow.wallper.core.model.BuiltInWallpaper
 import com.onthecrow.wallper.core.model.MediaType
 
 @Entity(tableName = "wallpapers")
@@ -23,4 +24,9 @@ internal data class WallpaperEntity(
     @ColumnInfo(name = "media_rotation") val mediaRotation: Int,
     @ColumnInfo(name = "media_duration_ms") val mediaDurationMs: Long,
     @ColumnInfo(name = "is_active") val isActive: Boolean,
+    /**
+     * [BuiltInWallpaper.key] for rows of built-in wallpapers, null for the user's media.
+     * The media columns of a built-in row hold placeholders, see [SeedBuiltInWallpapersCallback].
+     */
+    @ColumnInfo(name = "built_in") val builtIn: String? = null,
 )

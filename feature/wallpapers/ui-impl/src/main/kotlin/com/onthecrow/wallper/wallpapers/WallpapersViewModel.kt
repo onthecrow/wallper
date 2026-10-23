@@ -1,9 +1,13 @@
 package com.onthecrow.wallper.wallpapers
 
 import androidx.lifecycle.viewModelScope
+import com.onthecrow.wallper.blackhole.BlackHoleSettingsDestination
 import com.onthecrow.wallper.core.coroutines.DispatchersProvider
+import com.onthecrow.wallper.core.engine.BuiltInPreviews
 import com.onthecrow.wallper.core.engine.LiveWallpaperController
+import com.onthecrow.wallper.core.model.BuiltInWallpaper
 import com.onthecrow.wallper.core.mvi.BaseViewModel
+import com.onthecrow.wallper.core.navigation.Destination
 import com.onthecrow.wallper.core.navigation.Navigator
 import com.onthecrow.wallper.editor.EditorDestination
 import com.onthecrow.wallper.editor.domain.IsMediaSupportedUseCase
@@ -28,15 +32,21 @@ internal class WallpapersViewModel @Inject constructor(
     private val deleteWallpaperUseCase: DeleteWallpaperUseCase,
     private val isMediaSupportedUseCase: IsMediaSupportedUseCase,
     private val liveWallpaperController: LiveWallpaperController,
+    private val builtInPreviews: BuiltInPreviews,
     private val navigator: Navigator,
     private val dispatchersProvider: DispatchersProvider,
 ) : BaseViewModel<WallpapersEvent, WallpapersState, WallpapersReducer>(WallpapersState(), reducer) {
+
+    /** Built-ins whose preview has been asked for. Touched only from [eventFlow], on the main thread. */
+    private val requestedPreviews = mutableSetOf<BuiltInWallpaper>()
 
     init {
         eventFlow.onEach { event ->
             when (event) {
                 is WallpapersEvent.OnWallpaperClick -> activateWallpaper(event.id)
                 is WallpapersEvent.OnDeleteClick -> deleteWallpaper(event.id)
+                is WallpapersEvent.OnBuiltInSettingsClick -> navigator.navigate(event.wallpaper.settingsDestination())
+                is WallpapersEvent.OnWallpapersChanged -> event.items.mapNotNull { it.builtIn }.forEach(::loadPreview)
                 is WallpapersEvent.OnMediaPicked -> openEditor(event.uri)
                 WallpapersEvent.OnSettingsClick -> onEvent(
                     WallpapersEvent.OpenLiveWallpaperChooser(liveWallpaperController.createSetWallpaperIntent())
@@ -73,5 +83,19 @@ internal class WallpapersViewModel @Inject constructor(
         viewModelScope.launch(dispatchersProvider.io) {
             deleteWallpaperUseCase(id)
         }
+    }
+
+    /** Once per built-in: the first render may take seconds, the card shows a placeholder until then. */
+    private fun loadPreview(wallpaper: BuiltInWallpaper) {
+        if (!requestedPreviews.add(wallpaper)) return
+        viewModelScope.launch(dispatchersProvider.io) {
+            builtInPreviews.preview(wallpaper)?.let { path ->
+                onEvent(WallpapersEvent.OnBuiltInPreviewLoaded(wallpaper, path))
+            }
+        }
+    }
+
+    private fun BuiltInWallpaper.settingsDestination(): Destination = when (this) {
+        BuiltInWallpaper.BLACK_HOLE -> BlackHoleSettingsDestination
     }
 }

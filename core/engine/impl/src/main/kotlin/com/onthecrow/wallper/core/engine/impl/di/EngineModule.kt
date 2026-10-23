@@ -1,6 +1,8 @@
 package com.onthecrow.wallper.core.engine.impl.di
 
+import com.onthecrow.wallper.core.engine.BuiltInPreviews
 import com.onthecrow.wallper.core.engine.LiveWallpaperController
+import com.onthecrow.wallper.core.engine.impl.BuiltInPreviewsImpl
 import com.onthecrow.wallper.core.engine.impl.LiveWallpaperControllerImpl
 import dagger.Binds
 import dagger.Module
@@ -13,4 +15,7 @@ internal abstract class EngineModule {
 
     @Binds
     abstract fun bindLiveWallpaperController(impl: LiveWallpaperControllerImpl): LiveWallpaperController
+
+    @Binds
+    abstract fun bindBuiltInPreviews(impl: BuiltInPreviewsImpl): BuiltInPreviews
 }

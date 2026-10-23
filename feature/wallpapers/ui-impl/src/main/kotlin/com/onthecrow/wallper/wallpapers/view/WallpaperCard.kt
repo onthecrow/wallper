@@ -1,6 +1,7 @@
 package com.onthecrow.wallper.wallpapers.view
 
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
@@ -35,6 +36,7 @@ internal fun WallpaperCard(
         Box(
             modifier = Modifier
                 .fillMaxSize()
+                .then(if (wallpaper.builtIn != null) Modifier.background(BuiltInPlaceholderColor) else Modifier)
                 .combinedClickable(
                     onClick = {
                         haptics.performHapticFeedback(HapticFeedbackType.Confirm)
@@ -47,14 +49,17 @@ internal fun WallpaperCard(
                     onLongClickLabel = stringResource(R.string.open_context_menu)
                 )
         ) {
-            AsyncImage(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .align(Alignment.Center),
-                model = wallpaper.picturePath,
-                contentScale = ContentScale.Crop,
-                contentDescription = null,
-            )
+            // No picture while a built-in's preview is rendering: the placeholder background shows instead.
+            wallpaper.picturePath?.let { picturePath ->
+                AsyncImage(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .align(Alignment.Center),
+                    model = picturePath,
+                    contentScale = ContentScale.Crop,
+                    contentDescription = null,
+                )
+            }
             if (wallpaper.isActive) {
                 Canvas(
                     modifier = Modifier
@@ -69,6 +74,9 @@ internal fun WallpaperCard(
         }
     }
 }
+
+/** Shown until a built-in's preview is rendered. */
+private val BuiltInPlaceholderColor = Color(0xFF050507)
 
 @Preview(
     widthDp = 200,

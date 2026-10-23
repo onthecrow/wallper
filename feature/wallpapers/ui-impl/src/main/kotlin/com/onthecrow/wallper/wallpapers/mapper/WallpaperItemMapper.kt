@@ -4,8 +4,17 @@ import com.onthecrow.wallper.core.model.MediaType
 import com.onthecrow.wallper.wallpapers.domain.model.Wallpaper
 import com.onthecrow.wallper.wallpapers.model.WallpaperItem
 
-internal fun Wallpaper.toItem() = WallpaperItem(
-    id = id,
-    picturePath = if (type == MediaType.VIDEO) thumbnailPath else originalPath,
-    isActive = isActive,
-)
+internal fun Wallpaper.toItem() = when (this) {
+    is Wallpaper.Media -> WallpaperItem(
+        id = id,
+        picturePath = if (type == MediaType.VIDEO) thumbnailPath else originalPath,
+        isActive = isActive,
+    )
+    // The picture is the preview: it is rendered in the background and added by the reducer.
+    is Wallpaper.BuiltIn -> WallpaperItem(
+        id = id,
+        picturePath = null,
+        isActive = isActive,
+        builtIn = wallpaper,
+    )
+}
