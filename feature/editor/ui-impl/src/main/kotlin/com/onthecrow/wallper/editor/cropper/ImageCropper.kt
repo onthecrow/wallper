@@ -34,17 +34,15 @@ import com.onthecrow.wallper.editor.cropper.settings.CropProperties
 import com.onthecrow.wallper.editor.cropper.settings.CropStyle
 import com.onthecrow.wallper.editor.cropper.state.DynamicCropState
 import com.onthecrow.wallper.editor.cropper.state.rememberCropState
+import com.onthecrow.wallper.editor.preview.EditorPlayer
 import kotlinx.coroutines.delay
 
 @Composable
 internal fun ImageCropper(
     modifier: Modifier = Modifier,
-    videoUri: String,
-    videoDurationMs: Long,
+    /** Null for a picture: there is no video to show under the crop frame. */
+    player: EditorPlayer?,
     videoSize: IntSize,
-    videoRange: ClosedFloatingPointRange<Float>,
-    uiSeek: Float?,
-    videoSeek: Float?,
     cropStyle: CropStyle = CropDefaults.style(),
     cropProperties: CropProperties,
     backgroundColor: Color = Color.Transparent,
@@ -148,11 +146,7 @@ internal fun ImageCropper(
 
         ImageCropper(
             modifier = imageModifier,
-            videoUri = videoUri,
-            videoDurationMs = videoDurationMs,
-            videoRange = videoRange,
-            uiSeek = uiSeek,
-            videoSeek = videoSeek,
+            player = player,
             visible = visible,
             handleSize = cropProperties.handleSize,
             overlayRect = cropState.overlayRect,
@@ -168,11 +162,7 @@ internal fun ImageCropper(
 @Composable
 private fun ImageCropper(
     modifier: Modifier,
-    videoUri: String,
-    videoDurationMs: Long,
-    videoRange: ClosedFloatingPointRange<Float>,
-    uiSeek: Float?,
-    videoSeek: Float?,
+    player: EditorPlayer?,
     visible: Boolean,
     handleSize: Float,
     cropStyle: CropStyle,
@@ -193,20 +183,7 @@ private fun ImageCropper(
         ) {
 
             Box(contentAlignment = Alignment.Center) {
-                // todo draw video
-                VideoSurface(
-                    videoUri,
-                    durationMs = videoDurationMs,
-                    videoRange = videoRange,
-                    seek = uiSeek,
-                )
-
-                if (videoSeek != null) {
-                    Seeker(
-                        videoUri,
-                        videoSeek,
-                    )
-                }
+                if (player != null) VideoSurface(player)
 
                 val drawOverlay = cropStyle.drawOverlay
 

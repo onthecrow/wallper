@@ -16,7 +16,7 @@ import kotlinx.coroutines.flow.stateIn
  *
  * Two differences from those projects:
  * - the event buffer is unbounded instead of 64 + DROP_OLDEST, so bursts from the editor
- *   (range slider, crop gestures) are never dropped;
+ *   (trim bar, crop gestures) are never dropped;
  * - the initial state is a constructor argument instead of an abstract `getInitialState()`,
  *   because a state built from injected arguments is not available yet while the base class
  *   constructor runs.

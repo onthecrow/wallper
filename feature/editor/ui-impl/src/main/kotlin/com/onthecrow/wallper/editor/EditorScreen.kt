@@ -17,17 +17,19 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RangeSlider
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Rect
@@ -35,28 +37,32 @@ import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.window.layout.WindowMetricsCalculator
+import com.onthecrow.wallper.core.designsystem.component.trimbar.TrimBar
+import com.onthecrow.wallper.core.designsystem.component.trimbar.TrimBarDefaults
+import com.onthecrow.wallper.core.model.ClipRange
 import com.onthecrow.wallper.core.model.CropRect
+import com.onthecrow.wallper.core.model.MediaType
 import com.onthecrow.wallper.editor.cropper.ImageCropper
 import com.onthecrow.wallper.editor.cropper.settings.CropDefaults
 import com.onthecrow.wallper.editor.domain.model.ExportStatus
+import com.onthecrow.wallper.editor.preview.EditorPlayer
+import com.onthecrow.wallper.editor.preview.PlaybackEffect
+import com.onthecrow.wallper.editor.preview.rememberEditorPlayer
+import com.onthecrow.wallper.editor.preview.rememberVideoFrames
 import com.onthecrow.wallper.editor.ui.R
 import com.onthecrow.wallper.editor.view.ErrorDialog
 import timber.log.Timber
 
-/**
- * @param playerState the same state sampled less often: seeking the preview player on every
- * slider frame is too expensive.
- */
 @Composable
 internal fun EditorScreen(
     state: EditorState,
-    playerState: EditorState,
     onEvent: (EditorEvent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -77,13 +83,24 @@ internal fun EditorScreen(
                 val media = state.media
 
                 if (media != null) {
+                    // A picture has nothing to play or trim.
+                    val player = if (media.type == MediaType.VIDEO) rememberEditorPlayer(media.path) else null
+                    // A drag on the trim bar holds playback without touching the user's choice, and so does an
+                    // export: it needs the decoders.
+                    var isDragging by remember(player) { mutableStateOf(false) }
+                    val isExporting = state.exportStatus is ExportStatus.InProgress
+                    if (player != null) {
+                        PlaybackEffect(player, state.trim, play = state.isPlaying && !isDragging && !isExporting)
+                    }
+
                     // The preview shows the video rotated upright, so the crop works in those pixels too.
                     val videoSize = IntSize(media.mediaInfo.displayWidth, media.mediaInfo.displayHeight)
+                    val videoAspectRatio = videoSize.width.toFloat() / videoSize.height.toFloat()
                     Box(
                         modifier = Modifier
                             .padding(32.dp)
                             .weight(1f)
-                            .aspectRatio(videoSize.width.toFloat() / videoSize.height.toFloat())
+                            .aspectRatio(videoAspectRatio)
                             .align(Alignment.CenterHorizontally)
                     ) {
 
@@ -104,12 +121,8 @@ internal fun EditorScreen(
                         ImageCropper(
                             modifier = Modifier
                                 .fillMaxSize(),
-                            videoUri = media.path,
-                            videoDurationMs = media.mediaInfo.durationMs,
+                            player = player,
                             videoSize = videoSize,
-                            videoRange = state.timeLineRange,
-                            uiSeek = state.seekPosition,
-                            videoSeek = playerState.seekPosition,
                             cropStyle = cropStyle,
                             cropProperties = cropProperties,
                             cropRect = { cropRect ->
@@ -118,14 +131,41 @@ internal fun EditorScreen(
                             },
                         )
                     }
-                }
 
-                RangeSlider(
-                    modifier = Modifier.padding(horizontal = 32.dp),
-                    value = state.timeLineRange,
-                    onValueChangeFinished = { onEvent(EditorEvent.OnTimeLineRangeChangeFinished) },
-                    onValueChange = { onEvent(EditorEvent.OnTimeLineRangeChange(it)) },
-                )
+                    if (player != null) {
+                        val durationMs = media.mediaInfo.durationMs
+                        PlaybackControls(
+                            player = player,
+                            durationMs = durationMs,
+                            isPlaying = state.isPlaying,
+                            onPlayPauseClick = { onEvent(EditorEvent.OnPlayPauseClick) },
+                        )
+                        // Without a known length there is nothing to trim: the export keeps the whole video.
+                        if (durationMs > 0) {
+                            val frames = rememberVideoFrames(media.path, durationMs, videoAspectRatio, paused = isExporting)
+                            TrimBar(
+                                durationMs = durationMs,
+                                position = { player.positionMs },
+                                startMs = state.trim.startMs,
+                                endMs = state.trim.endMs,
+                                onTrimChange = { startMs, endMs ->
+                                    onEvent(EditorEvent.OnTrimChange(ClipRange(startMs, endMs)))
+                                },
+                                onSeek = player::seekTo,
+                                onDragStart = {
+                                    isDragging = true
+                                    player.setScrubbing(true)
+                                },
+                                onDragEnd = {
+                                    player.setScrubbing(false)
+                                    isDragging = false
+                                },
+                                frames = { frames.value },
+                                modifier = Modifier.padding(bottom = 8.dp),
+                            )
+                        }
+                    }
+                }
 
                 Row(
                     modifier = Modifier.padding(start = 16.dp),
@@ -179,6 +219,37 @@ internal fun EditorScreen(
     }
 }
 
+/** The time of the frame on screen, and the play / pause button in the middle, above the trim bar. */
+@Composable
+private fun PlaybackControls(
+    player: EditorPlayer,
+    durationMs: Long,
+    isPlaying: Boolean,
+    onPlayPauseClick: () -> Unit,
+) {
+    // Recomposes once a second rather than every frame.
+    val second by remember(player) { derivedStateOf { player.positionMs / 1_000 } }
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = "${TrimBarDefaults.formatTime(second * 1_000)} / ${TrimBarDefaults.formatTime(durationMs)}",
+            modifier = Modifier.weight(1f),
+            style = MaterialTheme.typography.bodyMedium,
+        )
+        IconButton(onClick = onPlayPauseClick) {
+            Icon(
+                painter = painterResource(if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play),
+                contentDescription = stringResource(if (isPlaying) R.string.editor_pause else R.string.editor_play),
+            )
+        }
+        Spacer(modifier = Modifier.weight(1f))
+    }
+}
+
 @Composable
 private fun ExportProgressDialog(status: ExportStatus.InProgress) {
     Dialog(
@@ -216,5 +287,5 @@ private fun Rect.toCropRect() = CropRect(left.toInt(), top.toInt(), right.toInt(
 @Preview
 @Composable
 private fun EditorScreenPreview() {
-    EditorScreen(state = EditorState(), playerState = EditorState(), onEvent = {})
+    EditorScreen(state = EditorState(), onEvent = {})
 }

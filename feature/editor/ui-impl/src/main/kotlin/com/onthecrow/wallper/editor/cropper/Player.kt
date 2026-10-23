@@ -2,47 +2,20 @@ package com.onthecrow.wallper.editor.cropper
 
 import android.view.TextureView
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.core.net.toUri
-import androidx.media3.common.MediaItem
-import com.onthecrow.wallper.core.player.createLeanExoPlayer
+import com.onthecrow.wallper.editor.preview.EditorPlayer
 
-/**
- * Plays the picked part of [videoUri] in a loop.
- *
- * @param durationMs the length of the video from its metadata; 0 if unknown, then the whole video plays.
- */
+/** Shows what [player] plays. The player belongs to the caller and outlives this view. */
 @Composable
 internal fun VideoSurface(
-    videoUri: String,
-    durationMs: Long,
+    player: EditorPlayer,
     modifier: Modifier = Modifier,
-    seek: Float?,
-    videoRange: ClosedFloatingPointRange<Float>,
 ) {
-    val context = LocalContext.current
-
-    // The player lives as long as this composable
-    val player = remember(context) { createLeanExoPlayer(context) }
-
-    LaunchedEffect(videoUri, durationMs, videoRange, seek) {
-        if (seek != null) return@LaunchedEffect
-        player.setMediaItem(clippedMediaItem(videoUri, durationMs, videoRange))
-        player.prepare()
-        player.play()
-    }
-
     AndroidView(
         modifier = modifier,
-        factory = { ctx ->
-            TextureView(ctx).apply {
-                player.setVideoTextureView(this)
-            }
-        },
+        factory = ::TextureView,
+        // Runs right after factory too.
         update = { view ->
             player.setVideoTextureView(view)
         },
@@ -53,24 +26,6 @@ internal fun VideoSurface(
         onRelease = { view ->
             player.setVideoTextureView(null)
             view.surfaceTextureListener = null
-            player.stop()
-            player.release()
-        }
+        },
     )
-}
-
-/** The picked part of the video; the whole of it while the duration is unknown. */
-private fun clippedMediaItem(videoUri: String, durationMs: Long, range: ClosedFloatingPointRange<Float>): MediaItem {
-    val builder = MediaItem.Builder().setUri(videoUri.toUri())
-    if (durationMs > 0) {
-        val startMs = (range.start.coerceIn(0f, 1f) * durationMs).toLong()
-        val endMs = (range.endInclusive.coerceIn(0f, 1f) * durationMs).toLong().coerceAtLeast(startMs)
-        builder.setClippingConfiguration(
-            MediaItem.ClippingConfiguration.Builder()
-                .setStartPositionMs(startMs)
-                .setEndPositionMs(endMs)
-                .build(),
-        )
-    }
-    return builder.build()
 }

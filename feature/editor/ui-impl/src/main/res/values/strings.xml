@@ -1,0 +1,4 @@
+<resources>
+    <string name="editor_play">Play</string>
+    <string name="editor_pause">Pause</string>
+</resources>
