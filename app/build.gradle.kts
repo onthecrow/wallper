@@ -5,8 +5,25 @@ plugins {
     id("wallper.hilt")
 }
 
+/** A signing value from ~/.gradle/gradle.properties or the environment; never from the repository. */
+fun signingValue(name: String): String? =
+    providers.gradleProperty(name).orElse(providers.environmentVariable(name)).orNull
+
 android {
     namespace = "com.onthecrow.wallper"
+
+    // The Play upload key. Without these properties the release build stays unsigned, never debug-signed.
+    signingConfigs {
+        val storeFile = signingValue("WALLPER_UPLOAD_STORE_FILE")
+        if (storeFile != null) {
+            create("release") {
+                this.storeFile = file(storeFile)
+                storePassword = signingValue("WALLPER_UPLOAD_STORE_PASSWORD")
+                keyAlias = signingValue("WALLPER_UPLOAD_KEY_ALIAS")
+                keyPassword = signingValue("WALLPER_UPLOAD_KEY_PASSWORD")
+            }
+        }
+    }
 
     defaultConfig {
         applicationId = "com.onthecrow.wallper"
@@ -27,7 +44,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release")
         }
     }
     buildFeatures {
@@ -42,6 +59,7 @@ android {
 
 dependencies {
     implementation(projects.core.coroutines)
+    implementation(projects.core.diagnostics)
     implementation(projects.core.designsystem)
     implementation(projects.core.engine.impl)
     implementation(projects.core.navigation.impl)

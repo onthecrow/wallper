@@ -35,6 +35,7 @@ import com.onthecrow.wallper.core.blackhole.renderer.BlackHoleSettings
 import com.onthecrow.wallper.core.blackhole.renderer.BlackHoleSettingsStore
 import com.onthecrow.wallper.core.blackhole.renderer.LensTablesRepository
 import com.onthecrow.wallper.core.blackhole.renderer.lensTableKey
+import com.onthecrow.wallper.core.diagnostics.Diagnostics
 import com.onthecrow.wallper.core.gl.WallpaperGLThread
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
@@ -70,10 +71,7 @@ internal class BlackHoleWallpaperEngine(
     // the process that draws the wallpaper.
     private val scope = CoroutineScope(
         SupervisorJob() + handler.asCoroutineDispatcher("BlackHoleFrames") +
-            CoroutineExceptionHandler { _, error ->
-                Timber.tag(TAG).e(error, "Black hole failed")
-                host.showPlaceholder()
-            },
+            CoroutineExceptionHandler { _, error -> host.showPlaceholder("The black hole failed", error) },
     )
 
     private val sensorManager = context.getSystemService(SensorManager::class.java)
@@ -143,6 +141,7 @@ internal class BlackHoleWallpaperEngine(
 
     init {
         Timber.tag(TAG).d("created, preview=$isPreview")
+        reportQuality(currentLevel())
         gl.start()
         handler.post {
             ContextCompat.registerReceiver(
@@ -289,11 +288,17 @@ internal class BlackHoleWallpaperEngine(
 
     private fun applyQuality() {
         val level = currentLevel()
+        reportQuality(level)
         val current = gl.current
         // New shader defines: the next frame compiles them.
         gl.expectSlowFrame()
         current.thread.post { current.renderer.setQuality(level) }
         loadTables()
+    }
+
+    /** The level reports come with: the wallpaper's, not the system picker's cheap preview. */
+    private fun reportQuality(level: QualityLevel) {
+        if (!isPreview) Diagnostics.reporter.setKey("black_hole_quality", level.name)
     }
 
     private fun currentLevel(): QualityLevel = if (isPreview) QualityLevel.LOW else quality.level

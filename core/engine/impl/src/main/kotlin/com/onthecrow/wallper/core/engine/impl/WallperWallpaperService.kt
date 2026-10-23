@@ -175,10 +175,11 @@ class WallperWallpaperService : WallpaperService() {
 
         // EngineHost: called from the engines' threads.
 
-        override fun showPlaceholder() {
+        override fun showPlaceholder(reason: String, error: Throwable?) {
             mainHandler.post {
                 if (destroyed) return@post
-                Timber.w("Recovery failed, showing the placeholder for $currentWallpaper")
+                // An error: the reporting tree turns it into a crash report with the GPU and the reason.
+                Timber.e(error, "Placeholder instead of %s: %s", currentWallpaper, reason)
                 failedWallpaper = currentWallpaper
                 failedAtMs = SystemClock.elapsedRealtime()
                 createEngine()

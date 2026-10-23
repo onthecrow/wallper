@@ -2,6 +2,9 @@ package com.onthecrow.wallper.core.engine.impl.engine
 
 /** What a wallpaper engine may ask of the service. Callable from any thread. */
 internal interface EngineHost {
-    /** Give up on the current wallpaper and show the placeholder until another one is selected. */
-    fun showPlaceholder()
+    /**
+     * Give up on the current wallpaper and show the placeholder until the user picks a wallpaper again.
+     * [reason] and [error] go into the crash report.
+     */
+    fun showPlaceholder(reason: String, error: Throwable? = null)
 }

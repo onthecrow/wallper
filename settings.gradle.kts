@@ -32,6 +32,7 @@ dependencyResolutionManagement {
 
 include(":app")
 include(":core:model")
+include(":core:diagnostics")
 include(":core:coroutines")
 include(":core:mvi")
 include(":core:navigation:api")

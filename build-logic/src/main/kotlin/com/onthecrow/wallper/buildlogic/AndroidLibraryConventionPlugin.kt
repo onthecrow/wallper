@@ -23,7 +23,10 @@ class AndroidLibraryConventionPlugin : Plugin<Project> {
                 sourceCompatibility = JAVA_VERSION
                 targetCompatibility = JAVA_VERSION
             }
+            lint { configureLint(target) }
         }
+
+        registerUnitTestTask(testTask = "testDebugUnitTest")
 
         dependencies {
             add("testImplementation", libs.library("kotlin-test"))

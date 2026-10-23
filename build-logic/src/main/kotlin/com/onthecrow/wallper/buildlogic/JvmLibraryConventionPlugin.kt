@@ -23,6 +23,8 @@ class JvmLibraryConventionPlugin : Plugin<Project> {
             }
         }
 
+        registerUnitTestTask(testTask = "test")
+
         dependencies {
             add("testImplementation", libs.library("kotlin-test"))
             add("testImplementation", libs.library("junit"))

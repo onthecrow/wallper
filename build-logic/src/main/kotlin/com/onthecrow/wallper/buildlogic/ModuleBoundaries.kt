@@ -17,6 +17,7 @@ private val CROSS_FEATURE_LAYERS = setOf("logic-api", "ui-api")
  */
 private val UI_FREE_MODULES = setOf(
     ":core:model",
+    ":core:diagnostics",
     ":core:coroutines",
     ":core:storage",
     ":core:gl",

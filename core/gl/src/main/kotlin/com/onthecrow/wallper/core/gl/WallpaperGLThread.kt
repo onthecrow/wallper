@@ -9,6 +9,7 @@ import android.opengl.EGLSurface
 import android.opengl.GLES20
 import android.os.SystemClock
 import android.view.SurfaceHolder
+import com.onthecrow.wallper.core.diagnostics.Diagnostics
 import com.onthecrow.wallper.core.gl.guard.RenderGuard
 import com.onthecrow.wallper.core.gl.guard.RenderRepairs
 import timber.log.Timber
@@ -88,6 +89,8 @@ class WallpaperGLThread(
     @Volatile
     var presentedFrames: Long = 0
         private set
+
+    private var gpuReported = false
 
     /** An EGL surface exists on the window; [onSurfaceDestroyed] can wait for it to go. */
     @Volatile
@@ -370,7 +373,17 @@ class WallpaperGLThread(
         eglSurface = newSurface
         eglSurfaceAlive = true
         pendingSizeChange = true
+        reportGpu()
         return true
+    }
+
+    /** Every report from here on says which GPU and driver it came from. Needs a current context. */
+    private fun reportGpu() {
+        if (gpuReported) return
+        gpuReported = true
+        val renderer = GLES20.glGetString(GLES20.GL_RENDERER)
+        val version = GLES20.glGetString(GLES20.GL_VERSION)
+        Diagnostics.reporter.setKey("gl_renderer", "$renderer, $version")
     }
 
     private fun destroyEglSurface() {

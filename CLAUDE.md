@@ -6,15 +6,18 @@ Architecture, decisions and the migration log live in [ARCHITECTURE_MIGRATION.md
 ## Build and test
 
 ```bash
-./gradlew assembleDebug testDebugUnitTest
+./gradlew assembleDebug unitTest lintDebug
 ```
 
-JVM-only modules (`:core:model`, `*:logic-api`) run with `test`, not `testDebugUnitTest`.
+- `unitTest` (from the convention plugins) runs `test` in plain Kotlin modules and `testDebugUnitTest` in Android ones; plain `testDebugUnitTest` skips the JVM modules.
+- Lint warnings fail the build. Older ones are kept in each module's `lint-baseline.xml`; don't add to it, fix new warnings.
+- CI (`.github/workflows/ci.yml`) runs `unitTest lintDebug assembleRelease validateBlackHoleShaders` on every pull request.
+- Release signing reads the Play upload key from `~/.gradle/gradle.properties` or the environment: `WALLPER_UPLOAD_STORE_FILE`, `WALLPER_UPLOAD_STORE_PASSWORD`, `WALLPER_UPLOAD_KEY_ALIAS`, `WALLPER_UPLOAD_KEY_PASSWORD`. Without them the release build is unsigned; never put them in the repository. Publish with `./gradlew bundleRelease`.
 
 ## Modules
 
 - `:app`: Application, MainActivity, `@StartDestination`. No feature code.
-- `:core:*`: `model` (pure Kotlin), `coroutines`, `mvi`, `navigation:api|impl`, `designsystem`, `resources`, `storage`, `gl`, `player`, `engine:api|impl` (the WallpaperService), `blackhole:physics` (pure Kotlin) and `blackhole:renderer` (GLES 3.0).
+- `:core:*`: `model` (pure Kotlin), `diagnostics` (pure Kotlin), `coroutines`, `mvi`, `navigation:api|impl`, `designsystem`, `resources`, `storage`, `gl`, `player`, `engine:api|impl` (the WallpaperService), `blackhole:physics` (pure Kotlin) and `blackhole:renderer` (GLES 3.0).
 - `:feature:<name>:{logic-api, logic-impl, ui-api, ui-impl}`: `wallpapers` (main screen, owns the wallpaper domain and Room), `editor` (add screen, media prep, Transformer export), `blackhole` (settings and debug screens of the built-in black hole; UI only).
 
 ## Dependency rules (enforced by `build-logic/.../ModuleBoundaries.kt`)
@@ -58,7 +61,14 @@ The player side and the GL side recover independently; there is no shared abstra
 - Lens tables depend only on `(r_c, N_α, N_φ, K)`. `LensTablesRepository` generates them once and caches them in device-protected `cacheDir/blackhole`. Bump `LensTables.FORMAT_VERSION` when the layout or the physics changes.
 - The camera orbits about the disk axis; the gyroscope and the launcher turn it on top in screen axes (`CameraPose.turned`), then the elevation is clamped. Their recoil is a principal-point shift (`FrameState.recoilX/Y`, half screen heights). The settings preview's drag turns the orbit itself (`setOrbitOffset`), with no recoil.
 - `BlackHoleRenderer` (GL thread only) is shared by the wallpaper, the list preview (`BlackHolePreviewRenderer`, EGL pbuffer) and the debug screen. Frames are paced by `Choreographer` on the engine's callback thread; animation phases come from `Long` nanoseconds, never a growing float.
-- Shaders live in `core/blackhole/renderer/src/main/assets/blackhole` (`#include` is resolved by `ShaderLibrary`). After editing them run `scripts/validate_blackhole_shaders.py` (the NDK's glslc); it catches compile errors without a device.
+- Shaders live in `core/blackhole/renderer/src/main/assets/blackhole` (`#include` is resolved by `ShaderLibrary`). After editing them run `./gradlew validateBlackHoleShaders` (also part of `check`): it compiles them for every quality level without a device, as GLSL ES 3.00 with glslangValidator, or as 3.10 with the NDK's glslc when that is all there is.
+
+## Diagnostics (`core:diagnostics`)
+
+- `Timber.w` is a breadcrumb and `Timber.e` a crash report: `ReportingTree` in `:app` forwards both to `Diagnostics.reporter` (`CrashReporter`). Log a failure the app recovers from with `Timber.e`, and the reason in the message.
+- `Diagnostics.reporter` is global on purpose: GL threads and engines aren't built by Hilt, and it must work in direct boot. Context keys: `gl_renderer` (`WallpaperGLThread`), `black_hole_quality`.
+- No crash reporting service yet: release builds log reports to logcat (`adb logcat -s WallperReport`). A service goes behind `CrashReporter`, initialized by hand in `Application.onCreate` without touching credential-encrypted storage.
+- `ExitReasons` reports crashes and ANRs of earlier runs from `ApplicationExitInfo` (API 30+).
 
 ## MVI (`core:mvi`)
 
