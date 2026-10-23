@@ -108,7 +108,7 @@ internal class GLWallpaperEngine(
         gl.thread.onSurfaceCreatedOrChanged(width, height)
     }
 
-    override fun onSurfaceDestroyed() = gl.thread.onSurfaceDestroyed()
+    override fun onSurfaceDestroyed() = gl.thread.onSurfaceDestroyed(waitMs = SURFACE_DESTROY_WAIT_MS)
 
     override fun release() {
         Timber.d("released")
@@ -188,5 +188,6 @@ internal class GLWallpaperEngine(
         const val HEARTBEAT_CHECK_MS = 500L
         const val GL_HEARTBEAT_TIMEOUT_MS = 2_000L
         const val STOP_TIMEOUT_MS = 500L
+        const val SURFACE_DESTROY_WAIT_MS = 1_000L
     }
 }
