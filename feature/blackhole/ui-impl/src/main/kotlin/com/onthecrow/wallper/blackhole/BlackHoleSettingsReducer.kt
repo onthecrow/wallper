@@ -20,6 +20,7 @@ internal class BlackHoleSettingsReducer @Inject constructor() :
             is BlackHoleSettingsEvent.OnZoomOutToggle -> state.edit { copy(zoomOutEnabled = event.enabled) }
             is BlackHoleSettingsEvent.OnDopplerToggle -> state.edit { copy(dopplerEnabled = event.enabled) }
             is BlackHoleSettingsEvent.OnOpacityFalloffToggle -> state.edit { copy(diskOpacityFalloff = event.enabled) }
+            is BlackHoleSettingsEvent.OnOptimizedRenderingToggle -> state.edit { copy(optimizedRendering = event.enabled) }
             is BlackHoleSettingsEvent.OnLayerToggle -> state.edit { event.layer.with(this, event.enabled) }
             is BlackHoleSettingsEvent.OnIdleFpsChange -> state.edit { copy(idleFps = event.fps) }
             is BlackHoleSettingsEvent.OnSliderChange -> state.edit { event.slider.with(this, event.value) }

@@ -17,6 +17,7 @@ internal sealed interface BlackHoleSettingsEvent : Event {
     data class OnZoomOutToggle(val enabled: Boolean) : BlackHoleSettingsEvent
     data class OnDopplerToggle(val enabled: Boolean) : BlackHoleSettingsEvent
     data class OnOpacityFalloffToggle(val enabled: Boolean) : BlackHoleSettingsEvent
+    data class OnOptimizedRenderingToggle(val enabled: Boolean) : BlackHoleSettingsEvent
     data class OnLayerToggle(val layer: PictureLayer, val enabled: Boolean) : BlackHoleSettingsEvent
     data class OnIdleFpsChange(val fps: Int) : BlackHoleSettingsEvent
     data object OnShuffleStarsClick : BlackHoleSettingsEvent

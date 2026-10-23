@@ -66,6 +66,8 @@
     <string name="black_hole_doppler_hint">The side of the disk that moves towards you gets brighter and bluer</string>
     <string name="black_hole_doppler_strength">Doppler strength: %1$.2f</string>
     <string name="black_hole_idle_fps">Idle frame rate</string>
+    <string name="black_hole_optimized">Optimised rendering</string>
+    <string name="black_hole_optimized_hint">The same picture for less GPU work. Turn off only to compare</string>
     <string name="black_hole_fps">%1$d fps</string>
     <string name="black_hole_shuffle_stars">Shuffle stars</string>
     <string name="black_hole_reset">Reset to defaults</string>
@@ -108,6 +110,7 @@
     <string name="black_hole_debug_bloom">Bloom</string>
     <string name="black_hole_debug_doppler">Doppler</string>
     <string name="black_hole_debug_thin_edge">Thin edge</string>
+    <string name="black_hole_debug_optimized">Optimised</string>
     <string name="black_hole_debug_freeze_time">Freeze time</string>
     <string name="black_hole_debug_lens">Lens</string>
     <string name="black_hole_debug_lens_table">Table</string>

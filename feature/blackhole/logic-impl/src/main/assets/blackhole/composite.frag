@@ -7,6 +7,9 @@ precision highp int;
 uniform sampler2D uScene;
 uniform vec2 uSceneSize;
 uniform float uSharpUpscale;     // 1: Catmull-Rom, 0: bilinear
+#if OPTIMIZED
+uniform float uOneToOne;         // 1: the scene is the size of the output, so a texel is a pixel
+#endif
 uniform sampler2D uBloom;
 uniform float uBloomIntensity;   // 0 when bloom is off
 uniform float uExposure;
@@ -46,7 +49,20 @@ vec3 sampleCatmullRom(vec2 uv) {
 }
 
 void main() {
+#if OPTIMIZED
+    // Branches, not a ternary: the compiler must not evaluate all three. At scale 1 Catmull-Rom's
+    // weights are (0, 1, 0, 0): nine reads of the same texel.
+    vec3 c;
+    if (uOneToOne > 0.5) {
+        c = texelFetch(uScene, ivec2(gl_FragCoord.xy), 0).rgb;
+    } else if (uSharpUpscale > 0.5) {
+        c = sampleCatmullRom(vUv);
+    } else {
+        c = texture(uScene, vUv).rgb;
+    }
+#else
     vec3 c = uSharpUpscale > 0.5 ? sampleCatmullRom(vUv) : texture(uScene, vUv).rgb;
+#endif
     c += texture(uBloom, vUv).rgb * uBloomIntensity;
 #if HDR_TARGET
     c = tonemap(c * uExposure, uTonemapper);

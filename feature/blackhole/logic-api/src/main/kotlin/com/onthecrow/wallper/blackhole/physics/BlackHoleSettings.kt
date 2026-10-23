@@ -61,6 +61,8 @@ data class BlackHoleSettings(
     val bloomIntensity: Double = PostParams().bloomIntensity,
     val exposure: Double = PostParams().exposure,
     val idleFps: Int = 30,
+    /** [FrameParams.optimizedShaders]: off only to compare. */
+    val optimizedRendering: Boolean = FrameParams().optimizedShaders,
     val dopplerEnabled: Boolean = false,
     val dopplerStrength: Double = 0.6,
 ) {
@@ -108,7 +110,7 @@ data class BlackHoleSettings(
             recoilStrength = recoilStrength.coerceIn(RECOIL_STRENGTH_RANGE),
             recoilReturnOmega = base.input.recoilReturnOmega * recoilReturnSpeed.coerceIn(RECOIL_RETURN_RANGE),
         ),
-        frames = base.frames.copy(fpsIdle = idleFps, quality = quality),
+        frames = base.frames.copy(fpsIdle = idleFps, quality = quality, optimizedShaders = optimizedRendering),
     )
 
     companion object {

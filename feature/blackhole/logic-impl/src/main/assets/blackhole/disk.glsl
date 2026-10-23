@@ -44,26 +44,42 @@ vec2 clampLength(vec2 v, float maxLength) {
     return l > maxLength ? v * (maxLength / l) : v;
 }
 
-// rgb: emission (HDR), a: opacity. g is the Doppler factor, 1 when it's off.
-// Must be called in uniform control flow: it takes derivatives.
-vec4 diskSample(vec3 hit, float r, float g) {
-    float phiD = atan(hit.z, hit.x);
+// Where a disk point samples the detail texture: two flow phases at (x, rn), and their derivatives.
+struct DiskCoords {
+    vec2 a;
+    vec2 b;
+    vec2 dx;
+    vec2 dy;
+};
+
+// Must be called in uniform control flow: it takes derivatives. [spiral] is (R_IN / r)^1.5: the inner
+// disk turns faster.
+DiskCoords diskCoords(float phiD, float r, float spiral) {
     float rn = clamp((r - uDiskInner) / (uDiskOuter - uDiskInner), 0.0, 1.0);
-    float turns = uSpin * pow(max(r, 1e-3) / uDiskInner, -1.5);
+    float turns = uSpin * spiral;
     float xA = phiD / TAU + uSense * turns * uPhaseA;
     float xB = phiD / TAU + uSense * turns * uPhaseB + 0.37; // decorrelates the layers
 
     // No jump of the φ derivative at the atan seam, otherwise the seam takes the coarsest mip.
-    vec2 dx = vec2(dFdx(xA), dFdx(rn));
-    dx.x -= floor(dx.x + 0.5);
-    vec2 dy = vec2(dFdy(xA), dFdy(rn));
-    dy.x -= floor(dy.x + 0.5);
-    dx = clampLength(dx, GRAD_MAX);
-    dy = clampLength(dy, GRAD_MAX);
+    DiskCoords c;
+    c.a = vec2(xA, rn);
+    c.b = vec2(xB, rn);
+    c.dx = vec2(dFdx(xA), dFdx(rn));
+    c.dx.x -= floor(c.dx.x + 0.5);
+    c.dy = vec2(dFdy(xA), dFdy(rn));
+    c.dy.x -= floor(c.dy.x + 0.5);
+    return c;
+}
 
-    vec2 a = textureGrad(uDiskDetail, vec2(xA, rn), dx, dy).rg;
-    vec2 b = textureGrad(uDiskDetail, vec2(xB, rn), dx, dy).rg;
+// rgb: emission (HDR), a: opacity. g is the Doppler factor, 1 when it's off. Explicit gradients from
+// [diskCoords], so any control flow will do.
+vec4 diskShade(DiskCoords c, float r, float g) {
+    vec2 dx = clampLength(c.dx, GRAD_MAX);
+    vec2 dy = clampLength(c.dy, GRAD_MAX);
+    vec2 a = textureGrad(uDiskDetail, c.a, dx, dy).rg;
+    vec2 b = textureGrad(uDiskDetail, c.b, dx, dy).rg;
     vec2 detail = mix(a, b, uFlowMix);
+    float rn = c.a.y;
 
     float fade = edgeFade(rn);
     // Doppler: a redshifted part looks like the cooler outer disk, and dims as g⁴.
@@ -74,4 +90,9 @@ vec4 diskSample(vec3 hit, float r, float g) {
     float falloff = pow(uDiskInner / max(r, uDiskInner), uDiskOpacityFalloff);
     float opacity = clamp(uDiskOpacity * detail.g * fade * falloff, 0.0, 1.0);
     return vec4(emission, opacity) * uDiskEnabled;
+}
+
+// The disk at [hit], all in one. Must be called in uniform control flow: it takes derivatives.
+vec4 diskSample(vec3 hit, float r, float g) {
+    return diskShade(diskCoords(atan(hit.z, hit.x), r, pow(max(r, 1e-3) / uDiskInner, -1.5)), r, g);
 }

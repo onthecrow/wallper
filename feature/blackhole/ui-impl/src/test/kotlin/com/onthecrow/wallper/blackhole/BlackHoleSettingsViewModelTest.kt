@@ -2,9 +2,9 @@ package com.onthecrow.wallper.blackhole
 
 import com.onthecrow.wallper.blackhole.model.PictureLayer
 import com.onthecrow.wallper.blackhole.model.SettingsSlider
-import com.onthecrow.wallper.blackhole.source.BlackHoleSettingsSource
-import com.onthecrow.wallper.blackhole.physics.QualitySetting
 import com.onthecrow.wallper.blackhole.physics.BlackHoleSettings
+import com.onthecrow.wallper.blackhole.physics.QualitySetting
+import com.onthecrow.wallper.blackhole.source.BlackHoleSettingsSource
 import com.onthecrow.wallper.core.navigation.Destination
 import com.onthecrow.wallper.core.navigation.Navigator
 import kotlinx.coroutines.Dispatchers
@@ -65,8 +65,9 @@ class BlackHoleSettingsViewModelTest {
         viewModel.onEvent(BlackHoleSettingsEvent.OnDopplerToggle(true))
         viewModel.onEvent(BlackHoleSettingsEvent.OnOpacityFalloffToggle(false))
         viewModel.onEvent(BlackHoleSettingsEvent.OnIdleFpsChange(24))
+        viewModel.onEvent(BlackHoleSettingsEvent.OnOptimizedRenderingToggle(false))
 
-        assertEquals(5, source.writes)
+        assertEquals(6, source.writes)
         assertEquals(
             BlackHoleSettings(
                 cameraDistance = 30.0,
@@ -76,6 +77,7 @@ class BlackHoleSettingsViewModelTest {
                 dopplerEnabled = true,
                 diskOpacityFalloff = false,
                 idleFps = 24,
+                optimizedRendering = false,
             ),
             source.settings.value,
         )

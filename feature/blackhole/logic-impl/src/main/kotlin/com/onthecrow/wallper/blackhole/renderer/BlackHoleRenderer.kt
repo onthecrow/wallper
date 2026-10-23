@@ -94,13 +94,35 @@ internal class BlackHoleRenderer(assets: AssetManager) : BlackHoleFrameRenderer 
             haze?.release()
             haze = null
         }
+        if (old.programDefines() != params.programDefines()) {
+            programs?.release()
+            programs = null
+        }
     }
 
-    /** Quality changes the shaders, the render scale and the baked textures; the tables come separately. */
+    /**
+     * Quality changes the shaders, the render scale and the baked textures; the tables come separately.
+     * Only what the new level changes is rebuilt: a heat step between High and Medium, on a hot phone,
+     * keeps the programs and the bakes and only makes new targets.
+     */
     override fun setQuality(level: QualityLevel) {
         if (level == quality) return
+        val old = quality
         quality = level
-        releaseGpu()
+        if (old.diskCrossings != level.diskCrossings || old.starLayers != level.starLayers) {
+            programs?.release()
+            programs = null
+        }
+        if (old.hazeFace != level.hazeFace) {
+            haze?.release()
+            haze = null
+        }
+        if (old.diskDetailWidth != level.diskDetailWidth || old.diskDetailHeight != level.diskDetailHeight) {
+            diskDetail?.release()
+            diskDetail = null
+        }
+        if (old.renderScale != level.renderScale || old.bloomLevels != level.bloomLevels) releaseTargets()
+        starRotationSeed = Int.MIN_VALUE // one rotation per star layer
     }
 
     /** Held until the next frame uploads them, then dropped. */
@@ -185,15 +207,15 @@ internal class BlackHoleRenderer(assets: AssetManager) : BlackHoleFrameRenderer 
     private fun drawLens(programs: Programs, lens: LensTextures, scene: RenderTarget, frame: FrameState) {
         when (debug.lens) {
             LensMode.TABLE -> {
-                scene.bind()
+                scene.bindToOverwrite()
                 lensPass(programs.lens, lens, scene, frame)
             }
             LensMode.REFERENCE -> {
-                scene.bind()
+                scene.bindToOverwrite()
                 lensPass(programs.reference, lens, scene, frame)
             }
             LensMode.SPLIT -> {
-                scene.bind()
+                scene.bindToOverwrite() // both halves together cover it
                 GLES30.glEnable(GLES30.GL_SCISSOR_TEST)
                 GLES30.glScissor(0, 0, scene.width / 2, scene.height)
                 lensPass(programs.lens, lens, scene, frame)
@@ -203,11 +225,11 @@ internal class BlackHoleRenderer(assets: AssetManager) : BlackHoleFrameRenderer 
             }
             LensMode.DIFF -> {
                 val (a, b) = debugTargets ?: createDebugTargets(scene).also { debugTargets = it }
-                a.bind()
+                a.bindToOverwrite()
                 lensPass(programs.lens, lens, a, frame)
-                b.bind()
+                b.bindToOverwrite()
                 lensPass(programs.reference, lens, b, frame)
-                scene.bind()
+                scene.bindToOverwrite()
                 programs.diff.use()
                 programs.diff.texture("uA", 0, GLES30.GL_TEXTURE_2D, a.texture)
                 programs.diff.texture("uB", 1, GLES30.GL_TEXTURE_2D, b.texture)
@@ -333,11 +355,13 @@ internal class BlackHoleRenderer(assets: AssetManager) : BlackHoleFrameRenderer 
     ) {
         GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, outputFramebuffer)
         GLES30.glViewport(0, 0, surfaceWidth, surfaceHeight)
+        Gl.discardColor(defaultFramebuffer = outputFramebuffer == 0)
         val program = programs.composite
         program.use()
         program.texture("uScene", 0, GLES30.GL_TEXTURE_2D, scene.texture)
         program.set("uSceneSize", scene.width.toFloat(), scene.height.toFloat())
         program.set("uSharpUpscale", if (params.post.sharpUpscale) 1f else 0f)
+        program.set("uOneToOne", if (scene.width == surfaceWidth && scene.height == surfaceHeight) 1f else 0f)
         val bloomTexture = bloom?.levels?.firstOrNull()?.texture
         program.texture("uBloom", 1, GLES30.GL_TEXTURE_2D, bloomTexture ?: scene.texture)
         program.set("uBloomIntensity", if (bloomTexture != null) params.post.bloomIntensity else 0.0)
@@ -422,7 +446,7 @@ internal class BlackHoleRenderer(assets: AssetManager) : BlackHoleFrameRenderer 
             "PHI_MAX" to glslFloat(LensMath.PHI_MAX),
             "PHI_END_MAX" to glslFloat(LensMath.PHI_END_MAX),
             "HDR_TARGET" to if (format.isHdr) 1 else 0,
-        )
+        ) + params.programDefines()
         val vertex = shaders.source("fullscreen.vert")
         fun program(name: String) = GlProgram(vertex, shaders.source(name, defines), name)
         return Programs(
@@ -521,6 +545,12 @@ internal class BlackHoleRenderer(assets: AssetManager) : BlackHoleFrameRenderer 
     }
 
     private val Tonemapper.index: Int get() = if (this == Tonemapper.ACES) 0 else 1
+
+    /** The shader defines that come from the params: a change rebuilds the programs. */
+    private fun BlackHoleParams.programDefines(): Map<String, Int> = mapOf(
+        "OPTIMIZED" to if (frames.optimizedShaders) 1 else 0,
+        "MAG_POWER_8" to if (stars.magPower == 8.0) 1 else 0,
+    )
 
     private fun glslFloat(value: Double) = String.format(java.util.Locale.US, "%.8f", value)
 

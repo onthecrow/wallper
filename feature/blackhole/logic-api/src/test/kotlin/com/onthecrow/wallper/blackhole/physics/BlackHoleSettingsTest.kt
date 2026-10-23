@@ -22,6 +22,7 @@ class BlackHoleSettingsTest {
             cameraDistance = 40.0,
             starSeed = 7,
             idleFps = 24,
+            optimizedRendering = false,
         ).applyTo(BlackHoleParams())
 
         assertEquals(QualitySetting.LOW, params.frames.quality)
@@ -31,6 +32,7 @@ class BlackHoleSettingsTest {
         assertEquals(40.0, params.camera.distance)
         assertEquals(7, params.stars.seed)
         assertEquals(24, params.frames.fpsIdle)
+        assertFalse(params.frames.optimizedShaders)
         assertEquals(BlackHoleParams().disk, params.disk)
     }
 

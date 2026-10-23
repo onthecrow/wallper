@@ -48,6 +48,7 @@ import kotlinx.coroutines.android.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import timber.log.Timber
+import kotlin.math.abs
 
 /**
  * The built-in black hole (BLACKHOLE_TZ.md §11): a [BlackHoleRenderer] on its own ES 3.0 GL thread, fed
@@ -106,6 +107,9 @@ internal class BlackHoleWallpaperEngine(
     private var stillDrawn = false
     private var lastSensorNanos = 0L
     private var gyroRegistered = false
+    /** The gyroscope target the last frame drew; a still frame redraws once the target leaves it. */
+    private var drawnGyroPitchDeg = 0.0
+    private var drawnGyroYawDeg = 0.0
     /** Only to skip repeated `Surface.setFrameRate` calls (API 30+); [pacedFps] is what frames follow. */
     private var appliedFrameRate = -1
     @Volatile
@@ -192,14 +196,14 @@ internal class BlackHoleWallpaperEngine(
     override fun onOffsetsChanged(xOffset: Float, xOffsetStep: Float) {
         handler.post {
             scene.setLauncherOffset(xOffset, hasPages = xOffsetStep > 0f)
-            wake()
+            onInputMoved()
         }
     }
 
     override fun onZoomChanged(zoom: Float) {
         handler.post {
             scene.setSystemZoom(zoom)
-            wake()
+            onInputMoved()
         }
     }
 
@@ -245,6 +249,8 @@ internal class BlackHoleWallpaperEngine(
 
     private fun onSettings(next: BlackHoleSettings) {
         val qualityChanged = next.quality != settings.quality
+        // Other shader defines: the next frame compiles them.
+        if (next.optimizedRendering != settings.optimizedRendering) gl.expectSlowFrame()
         settings = next
         params = next.applyTo(BlackHoleParams())
         scene.params = params
@@ -258,7 +264,7 @@ internal class BlackHoleWallpaperEngine(
         val current = gl.current
         val nextParams = params
         current.thread.post { current.renderer.setParams(nextParams) }
-        if (visible && params.input.gyroEnabled) registerGyro() else unregisterGyro()
+        updateGyro()
         loadTables()
         stillDrawn = false
         wake()
@@ -276,6 +282,7 @@ internal class BlackHoleWallpaperEngine(
             Timber.tag(TAG).i("Quality: $level while $thermal")
             applyQuality()
         }
+        updateGyro()
         stillDrawn = false
         updateFramesExpected()
         wake()
@@ -387,10 +394,16 @@ internal class BlackHoleWallpaperEngine(
             if (!stillDrawn) {
                 draw(frameNanos)
                 stillDrawn = true
+                // The frame noticed motion (a tilt, a swipe): the power-save parallax takes over.
+                if (scene.isActive(frameNanos)) scheduleFrame()
             }
             return // nothing more until something changes
         }
-        if (FramePacing.isDue(frameNanos, lastDrawnNanos, target, vsyncNanos())) draw(frameNanos)
+        if (FramePacing.isDue(frameNanos, lastDrawnNanos, target, vsyncNanos())) {
+            draw(frameNanos)
+            // When the motion stops, one more still frame shows where it came to rest.
+            stillDrawn = false
+        }
         // Gyro samples don't wake it early: a tilt shows from the next due frame on.
         scheduleFrame(FramePacing.sleepMs(frameNanos, lastDrawnNanos, target, vsyncNanos()))
     }
@@ -400,6 +413,14 @@ internal class BlackHoleWallpaperEngine(
         current.glRenderer.submit(scene.frame(frameNanos))
         current.thread.requestRender()
         lastDrawnNanos = frameNanos
+        drawnGyroPitchDeg = gyro.targetPitchDeg
+        drawnGyroYawDeg = gyro.targetYawDeg
+    }
+
+    /** A launcher swipe, a zoom or a tilt: a still frame redraws, unless the heat keeps the picture still. */
+    private fun onInputMoved() {
+        if (thermal != ThermalLevel.SEVERE) stillDrawn = false
+        wake()
     }
 
     private fun targetFps(nanos: Long): Int = FramePacing.targetFps(
@@ -424,8 +445,13 @@ internal class BlackHoleWallpaperEngine(
 
     private fun vsyncNanos(): Long = (1e9 / (display?.refreshRate?.takeIf { it > 0f } ?: 60f)).toLong()
 
+    /** Under severe heat the picture stays still whatever the phone does: no samples to wake for. */
+    private fun gyroWanted() = visible && params.input.gyroEnabled && thermal != ThermalLevel.SEVERE
+
+    private fun updateGyro() = if (gyroWanted()) registerGyro() else unregisterGyro()
+
     private fun registerGyro() {
-        if (gyroRegistered || !visible || !params.input.gyroEnabled) return
+        if (gyroRegistered || !gyroWanted()) return
         val sensor = rotationSensor ?: return
         gyroRegistered = sensorManager?.registerListener(sensorListener, sensor, GYRO_PERIOD_US, handler) == true
         lastSensorNanos = 0L
@@ -450,7 +476,14 @@ internal class BlackHoleWallpaperEngine(
         }
         gyro.onSample(Quaternion(q[1].toDouble(), q[2].toDouble(), q[3].toDouble(), q[0].toDouble()), dt, rotation, params.input)
         scene.setGyroTarget(gyro.targetPitchDeg, gyro.targetYawDeg)
-        scheduleFrame()
+        if (pacedFps != FramePacing.STILL) {
+            scheduleFrame()
+        } else if (abs(gyro.targetPitchDeg - drawnGyroPitchDeg) > STILL_WAKE_DEG ||
+            abs(gyro.targetYawDeg - drawnGyroYawDeg) > STILL_WAKE_DEG
+        ) {
+            // A still frame doesn't follow every sample, only a tilt that moves the picture.
+            onInputMoved()
+        }
     }
 
     /** One GL thread with its own renderer: a restart never shares GL state with an abandoned thread. */
@@ -475,6 +508,9 @@ internal class BlackHoleWallpaperEngine(
     private companion object {
         const val TAG = "BlackHole"
         const val GYRO_PERIOD_US = 20_000
+
+        /** About a pixel at the default field of view. */
+        const val STILL_WAKE_DEG = 0.03
         const val STOP_TIMEOUT_MS = 1_500L
         const val SURFACE_DESTROY_WAIT_MS = 1_000L
     }

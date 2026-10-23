@@ -150,7 +150,7 @@ internal class BloomChain(sceneWidth: Int, sceneHeight: Int, levels: Int, format
         down.set("uKnee", knee)
         var source = scene
         levels.forEachIndexed { i, target ->
-            target.bind()
+            target.bindToOverwrite()
             down.texture("uSource", 0, GLES30.GL_TEXTURE_2D, source.texture)
             down.set("uTexel", 1f / source.width, 1f / source.height)
             down.setInt("uPrefilter", if (i == 0) 1 else 0)

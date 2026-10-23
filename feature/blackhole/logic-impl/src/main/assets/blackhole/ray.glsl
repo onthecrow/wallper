@@ -42,6 +42,18 @@ float firstCrossing(Ray ray) {
     return phi0 <= 0.0 ? phi0 + PI : phi0;
 }
 
+// The direction of the first crossing in the disk plane, cos φ0·e1 + sin φ0·e2, without trigonometry:
+// (cos, sin) of atan(−e1.y, e2.y) is (e2.y, −e1.y) / ρ, and firstCrossing adds π when that angle is ≤ 0.
+// Crossing k is at φ0 + kπ, so its point is (−1)^k · r_k times this.
+vec3 firstCrossingDir(Ray ray) {
+    vec2 cs = vec2(ray.e2.y, -ray.e1.y);
+    float rho = length(cs);
+    if (rho < 1e-7) return ray.e1; // the ray plane is the disk plane: no crossings anyway
+    float flip = cs.y < 0.0 || (cs.y == 0.0 && cs.x > 0.0) ? -1.0 : 1.0;
+    cs *= flip / rho;
+    return cs.x * ray.e1 + cs.y * ray.e2;
+}
+
 // The ray plane coincides with the disk plane: no crossings.
 float planeCrosses(Ray ray) {
     return step(1e-6, abs(ray.e1.y) + abs(ray.e2.y));

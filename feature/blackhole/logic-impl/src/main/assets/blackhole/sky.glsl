@@ -48,17 +48,36 @@ vec3 starLayer(vec3 dir, float fp, int i) {
     vec4 h = hash4(uvec4(uvec2(cell), face, uStarSeed + uint(i) * 7919u));
 
     // Density compensation by the cell's solid angle, so faces and corners look the same.
-    vec2 t = tan(((cell + 0.5) / cells * 2.0 - 1.0) * (PI / 4.0));
+    vec2 centre = ((cell + 0.5) / cells * 2.0 - 1.0) * (PI / 4.0);
+#if OPTIMIZED
+    // tan as a Padé approximant: relative error ≤ 2.3e-4 on [−π/4, π/4], and a function of the cell
+    // alone, so whether a cell holds a star is the same across it.
+    vec2 c2 = centre * centre;
+    vec2 t = centre * (15.0 - c2) / (15.0 - 6.0 * c2);
+#else
+    vec2 t = tan(centre);
+#endif
     float uu = t.x * t.x;
     float vv = t.y * t.y;
-    float jacobian = (PI * PI / 16.0) * (1.0 + uu) * (1.0 + vv) / pow(1.0 + uu + vv, 1.5);
+    float w = 1.0 + uu + vv;
+#if OPTIMIZED
+    float jacobian = (PI * PI / 16.0) * (1.0 + uu) * (1.0 + vv) / (w * sqrt(w));
+#else
+    float jacobian = (PI * PI / 16.0) * (1.0 + uu) * (1.0 + vv) / pow(w, 1.5);
+#endif
     float probability = layer.y * jacobian / 0.5235988;
     float cellAngle = sqrt(jacobian) * 2.0 / cells;
 
     // The star keeps inside [0.2, 0.8] of its cell: no neighbours to check.
     vec2 position = 0.2 + 0.6 * h.yz;
     float dist = length(f - position) * cellAngle;
+#if OPTIMIZED && MAG_POWER_8
+    float h2 = h.w * h.w;
+    float h4 = h2 * h2;
+    float magnitude = layer.z * (h4 * h4);
+#else
     float magnitude = layer.z * pow(h.w, uMagPower);
+#endif
     float tint = fract(h.x * 61.7 + h.w * 13.1);
 
     // Flux-preserving widening by the pixel footprint; the layer fades into its mean when cells get sub-pixel.
