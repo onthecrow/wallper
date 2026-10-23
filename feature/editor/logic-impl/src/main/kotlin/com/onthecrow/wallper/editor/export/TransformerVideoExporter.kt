@@ -120,7 +120,7 @@ internal class TransformerVideoExporter @Inject constructor(
                 .setClippingConfiguration(
                     MediaItem.ClippingConfiguration.Builder()
                         .setStartPositionMs(clip.startMs)
-                        .setEndPositionMs(clip.endMs)
+                        .apply { clip.endMsOrNull?.let { setEndPositionMs(it) } }
                         .build()
                 )
                 .build()

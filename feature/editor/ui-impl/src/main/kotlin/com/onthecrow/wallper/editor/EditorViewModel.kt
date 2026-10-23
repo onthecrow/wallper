@@ -1,7 +1,6 @@
 package com.onthecrow.wallper.editor
 
 import androidx.lifecycle.viewModelScope
-import com.onthecrow.wallper.core.model.ClipRange
 import com.onthecrow.wallper.core.model.CropRect
 import com.onthecrow.wallper.core.mvi.BaseViewModel
 import com.onthecrow.wallper.core.navigation.Navigator
@@ -63,12 +62,7 @@ internal class EditorViewModel @AssistedInject constructor(
     private fun createWallpaper(crop: CropRect) {
         val currentState = state.value
         val media = currentState.media ?: return
-        val duration = media.mediaInfo.durationMs
-        val clip = ClipRange(
-            startMs = (currentState.timeLineRange.start * duration).toLong(),
-            endMs = (currentState.timeLineRange.endInclusive * duration).toLong(),
-        )
-        createWallpaperUseCase(media, crop, clip, currentState.isAdditionalProcessing)
+        createWallpaperUseCase(media, crop, currentState.trim, currentState.isAdditionalProcessing)
             .onEach { status ->
                 onEvent(EditorEvent.OnExportStatusChanged(status))
                 if (status is ExportStatus.Success) {

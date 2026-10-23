@@ -71,6 +71,14 @@ The player side and the GL side recover independently; there is no shared abstra
 - Frames are paced by a whole number of vsyncs (`FramePacing.vsyncsPerFrame`). A still frame (power save, heat) wakes only for an input that moves the picture, and the frame that draws it starts the power-save parallax.
 - Shaders live in `feature/blackhole/logic-impl/src/main/assets/blackhole` (`#include` is resolved by `ShaderLibrary`). After editing them run `./gradlew validateBlackHoleShaders` (also part of `check`): it compiles them for every quality level without a device, as GLSL ES 3.00 with glslangValidator, or as 3.10 with the NDK's glslc when that is all there is.
 
+## Editor preview and the trim bar
+
+- `TrimBar` (`core:designsystem`) knows nothing of video: the playhead stays at its centre, it reports scrubs and handle moves (`onSeek`, `onTrimChange`) between `onDragStart` and `onDragEnd`, and reads the position through a lambda while drawing. Its geometry lives in `TrimBarMath.kt` and is tested on the JVM.
+- `EditorPlayer` is one ExoPlayer with the whole video, so a handle can show any frame; it loops `EditorState.trim` itself, starting from its start. It plays while `isPlaying` (the user's choice), no drag is on and no export runs; drags turn on scrubbing mode. Pictures get no player.
+- The strip's frames are key frames from `MediaMetadataRetriever` on `Dispatchers.IO`, one per tile within a pixel budget (`rememberVideoFrames`), held while an export runs.
+- The player, its position and the frames live in the screen's composition, not in the ViewModel: the position changes every frame, which `runningFold` shouldn't carry, and frames are Bitmaps, which `logic-api` (plain Kotlin) can't. `EditorState` keeps only what the export and the user's choices need: `trim` and `isPlaying`.
+- `ClipRange` with an end not after its start plays to the end of the video (`endMsOrNull`): the editor saves `0..0` when it doesn't know the length.
+
 ## Diagnostics (`core:diagnostics`)
 
 - `Timber.w` is a breadcrumb and `Timber.e` a crash report: `ReportingTree` in `:app` forwards both to `Diagnostics.reporter` (`CrashReporter`). Log a failure the app recovers from with `Timber.e`, and the reason in the message.

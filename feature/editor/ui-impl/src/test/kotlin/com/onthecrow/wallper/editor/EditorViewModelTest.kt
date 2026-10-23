@@ -86,9 +86,9 @@ class EditorViewModelTest {
     }
 
     @Test
-    fun `save turns the slider range into a clip and goes back on success`() = runTest(dispatcher) {
+    fun `save exports the trimmed part and goes back on success`() = runTest(dispatcher) {
         val viewModel = createViewModel()
-        viewModel.onEvent(EditorEvent.OnTimeLineRangeChange(0.1f..0.5f))
+        viewModel.onEvent(EditorEvent.OnTrimChange(ClipRange(1_000, 5_000)))
         viewModel.onEvent(EditorEvent.OnAdditionalProcessingToggle)
 
         viewModel.onEvent(EditorEvent.OnSaveClick(CropRect(0, 0, 100, 200)))
@@ -96,6 +96,15 @@ class EditorViewModelTest {
         assertEquals(Triple(CropRect(0, 0, 100, 200), ClipRange(1_000, 5_000), true), createCalls.single())
         assertEquals(ExportStatus.Success, viewModel.state.value.exportStatus)
         assertEquals(1, backNavigations)
+    }
+
+    @Test
+    fun `save without moving the handles exports the whole video`() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+
+        viewModel.onEvent(EditorEvent.OnSaveClick(CropRect(0, 0, 100, 200)))
+
+        assertEquals(ClipRange(0, 10_000), createCalls.single().second)
     }
 
     @Test

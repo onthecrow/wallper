@@ -1,5 +1,6 @@
 package com.onthecrow.wallper.editor
 
+import com.onthecrow.wallper.core.model.ClipRange
 import com.onthecrow.wallper.core.model.CropRect
 import com.onthecrow.wallper.core.model.MediaInfo
 import com.onthecrow.wallper.core.model.MediaType
@@ -8,33 +9,38 @@ import com.onthecrow.wallper.editor.domain.model.PreparedMedia
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertSame
+import kotlin.test.assertTrue
 
 class EditorReducerTest {
 
     private val reducer = EditorReducer()
 
     @Test
-    fun `dragging the start handle previews the start frame`() = runTest {
-        val state = reducer.reduce(EditorState(), EditorEvent.OnTimeLineRangeChange(0.2f..1f))
+    fun `prepared media is kept whole until a handle moves`() = runTest {
+        val media = PreparedMedia("temp", MediaType.VIDEO, MediaInfo(10, 20, 0, 16_000))
 
-        assertEquals(0.2f, state.seekPosition)
-        assertEquals(0.2f..1f, state.timeLineRange)
+        val state = reducer.reduce(EditorState(), EditorEvent.OnMediaPrepared(media))
+
+        assertEquals(ClipRange(0, 16_000), state.trim)
     }
 
     @Test
-    fun `dragging the end handle previews the end frame`() = runTest {
-        val state = reducer.reduce(EditorState(), EditorEvent.OnTimeLineRangeChange(0f..0.7f))
+    fun `moved handles land in the trim`() = runTest {
+        val state = reducer.reduce(EditorState(), EditorEvent.OnTrimChange(ClipRange(2_000, 9_000)))
 
-        assertEquals(0.7f, state.seekPosition)
+        assertEquals(ClipRange(2_000, 9_000), state.trim)
     }
 
     @Test
-    fun `releasing the slider resumes playback`() = runTest {
-        val dragging = EditorState(seekPosition = 0.5f)
+    fun `the preview plays until paused, and plays again`() = runTest {
+        val paused = reducer.reduce(EditorState(), EditorEvent.OnPlayPauseClick)
 
-        assertNull(reducer.reduce(dragging, EditorEvent.OnTimeLineRangeChangeFinished).seekPosition)
+        assertTrue(EditorState().isPlaying)
+        assertFalse(paused.isPlaying)
+        assertTrue(reducer.reduce(paused, EditorEvent.OnPlayPauseClick).isPlaying)
     }
 
     @Test

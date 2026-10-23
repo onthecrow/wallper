@@ -48,7 +48,7 @@ internal class GLWallpaperEngine(
     )
 
     private val player = playerFactory.create(
-        PlayerMedia(wallpaper.sourcePath, wallpaper.clip.startMs, wallpaper.clip.endMs),
+        PlayerMedia(wallpaper.sourcePath, wallpaper.clip.startMs, wallpaper.clip.endMsOrNull),
     )
 
     /** Frame callbacks and this class's coroutines, off the main thread. */
