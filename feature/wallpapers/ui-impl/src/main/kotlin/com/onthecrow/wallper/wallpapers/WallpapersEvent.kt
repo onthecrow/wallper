@@ -1,6 +1,5 @@
 package com.onthecrow.wallper.wallpapers
 
-import android.content.Intent
 import com.onthecrow.wallper.core.model.BuiltInWallpaper
 import com.onthecrow.wallper.core.mvi.Event
 import com.onthecrow.wallper.wallpapers.model.WallpaperItem
@@ -19,6 +18,5 @@ internal sealed interface WallpapersEvent : Event {
     data class OnBuiltInPreviewLoaded(val wallpaper: BuiltInWallpaper, val path: String) : WallpapersEvent
 
     // One-off effects, handled by the screen
-    data class OpenLiveWallpaperChooser(val intent: Intent) : WallpapersEvent
     data object OnUnsupportedMediaPicked : WallpapersEvent
 }

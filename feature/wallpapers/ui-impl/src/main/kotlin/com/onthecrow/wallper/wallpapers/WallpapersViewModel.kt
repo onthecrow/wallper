@@ -11,6 +11,7 @@ import com.onthecrow.wallper.core.navigation.Destination
 import com.onthecrow.wallper.core.navigation.Navigator
 import com.onthecrow.wallper.editor.EditorDestination
 import com.onthecrow.wallper.editor.domain.IsMediaSupportedUseCase
+import com.onthecrow.wallper.settings.SettingsDestination
 import com.onthecrow.wallper.wallpapers.domain.ActivateWallpaperUseCase
 import com.onthecrow.wallper.wallpapers.domain.DeleteWallpaperUseCase
 import com.onthecrow.wallper.wallpapers.domain.ObserveWallpapersUseCase
@@ -48,9 +49,7 @@ internal class WallpapersViewModel @Inject constructor(
                 is WallpapersEvent.OnBuiltInSettingsClick -> navigator.navigate(event.wallpaper.settingsDestination())
                 is WallpapersEvent.OnWallpapersChanged -> event.items.mapNotNull { it.builtIn }.forEach(::followPreview)
                 is WallpapersEvent.OnMediaPicked -> openEditor(event.uri)
-                WallpapersEvent.OnSettingsClick -> onEvent(
-                    WallpapersEvent.OpenLiveWallpaperChooser(liveWallpaperController.createSetWallpaperIntent())
-                )
+                WallpapersEvent.OnSettingsClick -> navigator.navigate(SettingsDestination)
                 else -> Unit
             }
         }.launchIn(viewModelScope)

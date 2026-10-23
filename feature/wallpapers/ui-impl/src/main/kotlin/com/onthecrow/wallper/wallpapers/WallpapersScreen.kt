@@ -7,24 +7,24 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -64,7 +64,6 @@ internal fun WallpapersScreen(
     LaunchedEffect(eventFlow) {
         eventFlow.collect { event ->
             when (event) {
-                is WallpapersEvent.OpenLiveWallpaperChooser -> context.startActivity(event.intent)
                 WallpapersEvent.OnUnsupportedMediaPicked ->
                     Toast.makeText(context, unsupportedFileMessage, Toast.LENGTH_LONG).show()
                 else -> Unit
@@ -75,18 +74,21 @@ internal fun WallpapersScreen(
     Scaffold(
         modifier = modifier,
         topBar = {
-            TopAppBar(
-                title = { Text(text = stringResource(id = DesignR.string.app_name)) },
-                actions = {
+            CenterAlignedTopAppBar(
+                title = {
                     Image(
-                        modifier = Modifier
-                            .clickable { onEvent(WallpapersEvent.OnSettingsClick) }
-                            .padding(9.dp)
-                            .size(30.dp),
-                        painter = painterResource(id = R.drawable.ic_settings),
-                        colorFilter = ColorFilter.tint(color = MaterialTheme.colorScheme.onBackground),
-                        contentDescription = "",
+                        painter = painterResource(id = R.drawable.ic_wallper_title),
+                        colorFilter = ColorFilter.tint(color = LocalContentColor.current),
+                        contentDescription = stringResource(id = DesignR.string.app_name),
                     )
+                },
+                actions = {
+                    IconButton(onClick = { onEvent(WallpapersEvent.OnSettingsClick) }) {
+                        Icon(
+                            painter = painterResource(id = R.drawable.ic_settings),
+                            contentDescription = stringResource(id = R.string.settings),
+                        )
+                    }
                 }
             )
         },
