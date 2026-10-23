@@ -91,7 +91,7 @@ fun Modifier.crop(
         }
 
         this.then(
-            clipToBounds()
+            Modifier.clipToBounds()
                 .then(tapModifier)
                 .then(touchModifier)
         )

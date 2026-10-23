@@ -2,7 +2,9 @@ package com.onthecrow.wallper.core.player
 
 import android.content.Context
 import android.os.Looper
+import androidx.annotation.OptIn
 import androidx.media3.common.C
+import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
@@ -17,6 +19,7 @@ import androidx.media3.exoplayer.upstream.DefaultAllocator
  *
  * @param looper the thread all calls to the player must come from; the calling thread when null.
  */
+@OptIn(UnstableApi::class) // the allocator, load control tuning and decoder fallback
 fun createLeanExoPlayer(context: Context, looper: Looper? = null): ExoPlayer {
     // 64КБ сегменты, тримим при reset’e
     val allocator = DefaultAllocator(/* trimOnReset = */ true,

@@ -30,7 +30,8 @@ internal object EditorUiModule {
         )
         val state by viewModel.state.collectAsStateWithLifecycle()
         val sampledState = remember(viewModel) { viewModel.state.sample(PLAYER_SEEK_SAMPLE_MS) }
-        val playerState by sampledState.collectAsStateWithLifecycle(viewModel.state.value)
+        // Until the first sample arrives, the player starts from the current state.
+        val playerState by sampledState.collectAsStateWithLifecycle(initialValue = state)
         EditorScreen(
             state = state,
             playerState = playerState,
