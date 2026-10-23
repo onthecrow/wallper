@@ -208,9 +208,9 @@ data class FrameParams(
     val fpsActive: Int = 60,
     val fpsIdle: Int = 30,
     val fpsPowerSave: Int = 15,
-    /** In power save mode, show a still frame instead of [fpsPowerSave]. */
-    val powerSaveStill: Boolean = false,
-    val quality: QualitySetting = QualitySetting.HIGH,
+    /** In power save mode, show a still frame while nothing moves; parallax still runs at [fpsPowerSave]. */
+    val powerSaveStill: Boolean = true,
+    val quality: QualitySetting = QualitySetting.AUTO,
 )
 
 /** [startLevel]: Auto starts on High and steps down while the GPU can't keep up ([QualityController]). */

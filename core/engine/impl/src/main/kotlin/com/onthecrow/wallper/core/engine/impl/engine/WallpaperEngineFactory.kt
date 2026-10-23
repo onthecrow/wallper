@@ -14,6 +14,7 @@ internal class WallpaperEngineFactory @Inject constructor(
     private val playerFactory: WallperPlayerFactory,
     private val blackHoleSettings: BlackHoleSettingsStore,
     private val lensTables: LensTablesRepository,
+    private val autoQuality: AutoQualityMemory,
 ) {
     /**
      * @param wallpaper the wallpaper to show, or null for the placeholder.
@@ -29,7 +30,9 @@ internal class WallpaperEngineFactory @Inject constructor(
         null -> PlaceholderWallpaperEngine(baseContext, surfaceHolder)
         is WallpaperSpec.BuiltIn -> when (wallpaper.wallpaper) {
             BuiltInWallpaper.BLACK_HOLE ->
-                BlackHoleWallpaperEngine(baseContext, surfaceHolder, isPreview, host, blackHoleSettings, lensTables)
+                BlackHoleWallpaperEngine(
+                    baseContext, surfaceHolder, isPreview, host, blackHoleSettings, lensTables, autoQuality,
+                )
         }
         is WallpaperSpec.Media -> {
             val processedPath = wallpaper.processedPath

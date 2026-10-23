@@ -60,6 +60,7 @@ internal class BlackHoleWallpaperEngine(
     private val host: EngineHost,
     private val settingsStore: BlackHoleSettingsStore,
     private val tablesRepository: LensTablesRepository,
+    private val autoQuality: AutoQualityMemory,
 ) : WallpaperEngine() {
 
     private val holder = surfaceHolder()
@@ -86,6 +87,8 @@ internal class BlackHoleWallpaperEngine(
     private val scene = BlackHoleScene(params)
     private val gyro = GyroTracker()
     private var quality: QualityController = newQualityController(settings)
+    private val gpuTimeCallback: (Double) -> Unit = { ms -> handler.post { onGpuTime(ms) } }
+    private val rotationQuaternion = FloatArray(4)
     private var tables: LensTables? = null
     private var tablesKey: LensTableKey? = null
     private var tablesJob: Job? = null
@@ -96,6 +99,8 @@ internal class BlackHoleWallpaperEngine(
     /** The rate frames are paced at now, which their GPU time is held against; 0 for a still frame. */
     private var pacedFps = FramePacing.STILL
     private var frameScheduled = false
+    /** The pending frame callback ends a sleep between frames: [wake] may cut it short. */
+    private var frameDelayed = false
     private var stillDrawn = false
     private var lastSensorNanos = 0L
     private var gyroRegistered = false
@@ -117,7 +122,7 @@ internal class BlackHoleWallpaperEngine(
             powerSave = powerManager?.isPowerSaveMode == true
             Timber.tag(TAG).d("Power save: $powerSave")
             stillDrawn = false
-            scheduleFrame()
+            wake()
         }
     }
 
@@ -134,7 +139,7 @@ internal class BlackHoleWallpaperEngine(
         onGiveUp = host::showPlaceholder,
         afterRestart = {
             stillDrawn = false
-            scheduleFrame()
+            wake()
         },
         newSession = { Gl(currentLevel()) },
     )
@@ -171,7 +176,7 @@ internal class BlackHoleWallpaperEngine(
         gl.onSurfaceChanged(width, height)
         handler.post {
             stillDrawn = false
-            scheduleFrame()
+            wake()
         }
     }
 
@@ -183,14 +188,14 @@ internal class BlackHoleWallpaperEngine(
     override fun onOffsetsChanged(xOffset: Float, xOffsetStep: Float) {
         handler.post {
             scene.setLauncherOffset(xOffset, hasPages = xOffsetStep > 0f)
-            scheduleFrame()
+            wake()
         }
     }
 
     override fun onZoomChanged(zoom: Float) {
         handler.post {
             scene.setSystemZoom(zoom)
-            scheduleFrame()
+            wake()
         }
     }
 
@@ -240,8 +245,11 @@ internal class BlackHoleWallpaperEngine(
         params = next.applyTo(BlackHoleParams())
         scene.params = params
         if (qualityChanged) {
+            // Picking Auto again is the way to measure from High once more.
+            if (next.quality == QualitySetting.AUTO && !isPreview) autoQuality.clear()
             quality = newQualityController(next).apply { onThermal(thermal) }
             applyQuality()
+            updateGpuTiming()
         }
         val current = gl.current
         val nextParams = params
@@ -249,7 +257,7 @@ internal class BlackHoleWallpaperEngine(
         if (visible && params.input.gyroEnabled) registerGyro() else unregisterGyro()
         loadTables()
         stillDrawn = false
-        scheduleFrame()
+        wake()
     }
 
     private fun onThermalStatus(status: Int) {
@@ -266,16 +274,29 @@ internal class BlackHoleWallpaperEngine(
         }
         stillDrawn = false
         updateFramesExpected()
-        scheduleFrame()
+        wake()
     }
 
     // GPU times arrive a few frames late; a change of pace in between barely moves the median.
     private fun onGpuTime(ms: Double) {
-        if (isPreview || settings.quality != QualitySetting.AUTO) return
+        if (!isMeasuringGpu()) return
         quality.onGpuTime(ms, pacedFps)?.let { level ->
             Timber.tag(TAG).i("Quality: $level, the GPU didn't keep up")
             applyQuality()
         }
+        if (!quality.isMeasuring) {
+            autoQuality.save(quality.level)
+            updateGpuTiming()
+        }
+    }
+
+    private fun isMeasuringGpu(): Boolean = !isPreview && settings.quality == QualitySetting.AUTO && quality.isMeasuring
+
+    /** The GPU timer runs only while Auto measures: its queries cost a little on every frame. */
+    private fun updateGpuTiming() {
+        val timing = isMeasuringGpu()
+        val current = gl.current
+        current.thread.post { current.renderer.onGpuTimeMs = if (timing) gpuTimeCallback else null }
     }
 
     private fun onNoGpuTimer() {
@@ -303,7 +324,11 @@ internal class BlackHoleWallpaperEngine(
 
     private fun currentLevel(): QualityLevel = if (isPreview) QualityLevel.LOW else quality.level
 
-    private fun newQualityController(settings: BlackHoleSettings) = QualityController(settings.quality.startLevel)
+    /** Auto starts where it settled last time on this device, and still steps down if it has to. */
+    private fun newQualityController(settings: BlackHoleSettings): QualityController {
+        val remembered = if (settings.quality == QualitySetting.AUTO && !isPreview) autoQuality.load() else null
+        return QualityController(remembered ?: settings.quality.startLevel)
+    }
 
     private fun loadTables() {
         val key = lensTableKey(params, currentLevel())
@@ -316,14 +341,29 @@ internal class BlackHoleWallpaperEngine(
             val current = gl.current
             current.thread.post { current.renderer.setTables(loaded) }
             stillDrawn = false
-            scheduleFrame()
+            wake()
         }
     }
 
-    private fun scheduleFrame() {
+    /** A frame callback after [delayMs], or the next vsync; nothing if one is already coming. */
+    private fun scheduleFrame(delayMs: Long = 0) {
         if (!visible || frameScheduled || released) return
         frameScheduled = true
-        choreographer.postFrameCallback(frameCallback)
+        frameDelayed = delayMs > 0
+        if (frameDelayed) {
+            choreographer.postFrameCallbackDelayed(frameCallback, delayMs)
+        } else {
+            choreographer.postFrameCallback(frameCallback)
+        }
+    }
+
+    /** Something on screen changed: draw at the next vsync rather than when the sleep between frames ends. */
+    private fun wake() {
+        if (frameScheduled && frameDelayed) {
+            choreographer.removeFrameCallback(frameCallback)
+            frameScheduled = false
+        }
+        scheduleFrame()
     }
 
     private fun onVsync(frameNanos: Long) {
@@ -343,7 +383,8 @@ internal class BlackHoleWallpaperEngine(
             return // nothing more until something changes
         }
         if (FramePacing.isDue(frameNanos, lastDrawnNanos, target, vsyncNanos())) draw(frameNanos)
-        scheduleFrame()
+        // Gyro samples don't wake it early: a tilt shows from the next due frame on.
+        scheduleFrame(FramePacing.sleepMs(frameNanos, lastDrawnNanos, target, vsyncNanos()))
     }
 
     private fun draw(frameNanos: Long) {
@@ -389,7 +430,7 @@ internal class BlackHoleWallpaperEngine(
     }
 
     private fun onRotation(event: SensorEvent) {
-        val q = FloatArray(4)
+        val q = rotationQuaternion
         SensorManager.getQuaternionFromVector(q, event.values) // w, x, y, z
         val dt = if (lastSensorNanos == 0L) 0.0 else (event.timestamp - lastSensorNanos) / 1e9
         lastSensorNanos = event.timestamp
@@ -410,7 +451,7 @@ internal class BlackHoleWallpaperEngine(
             setQuality(level)
             setParams(params)
             tables?.let(::setTables)
-            onGpuTimeMs = { ms -> handler.post { onGpuTime(ms) } }
+            onGpuTimeMs = if (isMeasuringGpu()) gpuTimeCallback else null
             onNoGpuTimer = { handler.post { onNoGpuTimer() } }
         }
         val glRenderer = BlackHoleGlRenderer(renderer) { error -> gl.fail(this@Gl, error) }

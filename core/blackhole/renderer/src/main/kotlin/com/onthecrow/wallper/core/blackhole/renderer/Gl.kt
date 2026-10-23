@@ -186,6 +186,7 @@ internal class GpuTimer {
     private val queries = IntArray(RING)
     private val pending = BooleanArray(RING)
     private var index = 0
+    private val scratch = IntArray(1) // polled every frame: no new arrays
 
     init {
         GLES30.glGenQueries(RING, queries, 0)
@@ -207,16 +208,14 @@ internal class GpuTimer {
     fun poll(): Double? {
         val oldest = index // the next slot to reuse is the oldest pending one
         if (!pending[oldest]) return null
-        val available = IntArray(1)
-        GLES30.glGetQueryObjectuiv(queries[oldest], GLES30.GL_QUERY_RESULT_AVAILABLE, available, 0)
-        if (available[0] == 0) return null
-        val result = IntArray(1)
-        GLES30.glGetQueryObjectuiv(queries[oldest], GLES30.GL_QUERY_RESULT, result, 0)
+        GLES30.glGetQueryObjectuiv(queries[oldest], GLES30.GL_QUERY_RESULT_AVAILABLE, scratch, 0)
+        if (scratch[0] == 0) return null
+        GLES30.glGetQueryObjectuiv(queries[oldest], GLES30.GL_QUERY_RESULT, scratch, 0)
+        val nanos = scratch[0].toLong() and 0xFFFFFFFFL
         pending[oldest] = false
-        val disjoint = IntArray(1)
-        GLES30.glGetIntegerv(GL_GPU_DISJOINT_EXT, disjoint, 0)
-        if (disjoint[0] != 0) return null
-        return (result[0].toLong() and 0xFFFFFFFFL) / 1e6
+        GLES30.glGetIntegerv(GL_GPU_DISJOINT_EXT, scratch, 0)
+        if (scratch[0] != 0) return null
+        return nanos / 1e6
     }
 
     fun release() = GLES30.glDeleteQueries(RING, queries, 0)

@@ -53,7 +53,10 @@ class BlackHoleScene(params: BlackHoleParams = BlackHoleParams()) {
     private var orbitElevationTarget = 0.0
     private var orbitAzimuthTarget = 0.0
     private var systemZoom = 0.0
-    private var previousTargets: DoubleArray? = null
+    // Input targets of this frame and the last one, reused: the activity check runs every frame.
+    private val targets = DoubleArray(INPUT_COUNT)
+    private val previousTargets = DoubleArray(INPUT_COUNT)
+    private var hasPreviousTargets = false
     private var lastNanos = Long.MIN_VALUE
     private var activeUntilNanos = Long.MIN_VALUE
 
@@ -92,7 +95,7 @@ class BlackHoleScene(params: BlackHoleParams = BlackHoleParams()) {
         launcher.reset(launcherTarget)
         recoilX.reset()
         recoilY.reset()
-        previousTargets = null
+        hasPreviousTargets = false
         lastNanos = Long.MIN_VALUE
     }
 
@@ -164,6 +167,7 @@ class BlackHoleScene(params: BlackHoleParams = BlackHoleParams()) {
 
     private companion object {
         const val ZOOM_ACTIVITY_SCALE = 10.0
+        const val INPUT_COUNT = 6
 
         /** Half screen heights of recoil per °/s of turn at strength 1: 15 °/s, a quick page flick, gives 0.06. */
         const val RECOIL_PER_DEG_PER_SEC = 0.004
@@ -179,16 +183,22 @@ class BlackHoleScene(params: BlackHoleParams = BlackHoleParams()) {
     }
 
     private fun trackActivity(nanos: Long, dt: Double) {
+        targets[0] = gyroPitchTarget
+        targets[1] = gyroYawTarget
+        targets[2] = launcherTarget
+        targets[3] = orbitElevationTarget
+        targets[4] = orbitAzimuthTarget
         // The zoom in degrees-per-second terms: a full zoom over a second is clearly motion.
-        val targets = doubleArrayOf(
-            gyroPitchTarget, gyroYawTarget, launcherTarget, orbitElevationTarget, orbitAzimuthTarget,
-            systemZoom * ZOOM_ACTIVITY_SCALE,
-        )
-        val previous = previousTargets
-        previousTargets = targets
+        targets[5] = systemZoom * ZOOM_ACTIVITY_SCALE
         val input = params.input
-        val fastTarget = previous != null && dt > 0 &&
-            targets.indices.any { abs(targets[it] - previous[it]) / dt > input.activityDegPerSec }
+        var fastTarget = false
+        if (hasPreviousTargets && dt > 0) {
+            for (i in 0 until INPUT_COUNT) {
+                if (abs(targets[i] - previousTargets[i]) / dt > input.activityDegPerSec) fastTarget = true
+            }
+        }
+        targets.copyInto(previousTargets)
+        hasPreviousTargets = true
         val settling = !gyroPitch.isSettled(gyroPitchTarget) ||
             !gyroYaw.isSettled(gyroYawTarget) ||
             !launcher.isSettled(launcherTarget) ||

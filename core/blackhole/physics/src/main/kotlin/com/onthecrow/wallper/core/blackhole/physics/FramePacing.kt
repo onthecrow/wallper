@@ -17,7 +17,8 @@ object FramePacing {
         quality: QualityLevel,
     ): Int = when {
         thermal == ThermalLevel.SEVERE -> STILL
-        powerSave -> if (frames.powerSaveStill) STILL else frames.fpsPowerSave
+        powerSave && frames.powerSaveStill && !active -> STILL
+        powerSave -> frames.fpsPowerSave
         active -> minOf(frames.fpsActive, quality.maxFpsActive, MAX_FPS)
         thermal == ThermalLevel.MODERATE -> minOf(frames.fpsIdle, quality.maxFpsIdle, MODERATE_IDLE_FPS)
         else -> minOf(frames.fpsIdle, quality.maxFpsIdle, MAX_FPS)
@@ -35,6 +36,17 @@ object FramePacing {
         if (lastDrawnNanos == Long.MIN_VALUE) return true
         val interval = 1_000_000_000L / targetFps
         return frameNanos - lastDrawnNanos >= max(0L, interval - vsyncNanos / 2)
+    }
+
+    /**
+     * How long the frame loop may sleep after the vsync at [frameNanos] before the next frame at
+     * [targetFps] is due: it wakes a vsync early and [isDue] decides. At 30 fps on a 120 Hz display
+     * that is two wake-ups per frame instead of four.
+     */
+    fun sleepMs(frameNanos: Long, lastDrawnNanos: Long, targetFps: Int, vsyncNanos: Long): Long {
+        if (targetFps <= 0 || lastDrawnNanos == Long.MIN_VALUE) return 0
+        val dueNanos = lastDrawnNanos + 1_000_000_000L / targetFps - vsyncNanos / 2
+        return max(0L, (dueNanos - frameNanos - vsyncNanos) / 1_000_000)
     }
 
     private const val MAX_FPS = 60
@@ -70,6 +82,9 @@ class QualityController(
     private val loads = ArrayList<Double>(sampleCount)
     private var skipped = 0
     private var settled = false
+
+    /** Still measuring: the GPU timer is needed. Not once the level has settled. */
+    val isMeasuring: Boolean get() = !settled
 
     /** Feeds the GPU time of a frame drawn at [fps]; returns the new level when it changes. */
     fun onGpuTime(ms: Double, fps: Int): QualityLevel? {
