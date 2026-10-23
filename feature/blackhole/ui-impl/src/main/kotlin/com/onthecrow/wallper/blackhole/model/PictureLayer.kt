@@ -1,6 +1,6 @@
 package com.onthecrow.wallper.blackhole.model
 
-import com.onthecrow.wallper.core.blackhole.physics.BlackHoleSettings
+import com.onthecrow.wallper.blackhole.physics.BlackHoleSettings
 
 /** A layer of the picture the user can switch off; stored like any setting. */
 internal enum class PictureLayer {

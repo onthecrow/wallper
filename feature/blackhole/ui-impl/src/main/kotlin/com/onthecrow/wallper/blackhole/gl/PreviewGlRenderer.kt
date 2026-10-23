@@ -1,17 +1,16 @@
 package com.onthecrow.wallper.blackhole.gl
 
-import android.content.res.AssetManager
 import android.opengl.GLSurfaceView
 import android.os.SystemClock
-import com.onthecrow.wallper.core.blackhole.physics.BlackHoleScene
-import com.onthecrow.wallper.core.blackhole.physics.LensTables
-import com.onthecrow.wallper.core.blackhole.renderer.BlackHoleRenderer
+import com.onthecrow.wallper.blackhole.physics.BlackHoleScene
+import com.onthecrow.wallper.blackhole.physics.LensTables
+import com.onthecrow.wallper.blackhole.renderer.BlackHoleFrameRenderer
 import javax.microedition.khronos.egl.EGLConfig
 import javax.microedition.khronos.opengles.GL10
 import kotlin.math.tanh
 
 /**
- * [BlackHoleRenderer] and [BlackHoleScene] behind a [GLSurfaceView.Renderer].
+ * The black hole [renderer] and a [BlackHoleScene] behind a [GLSurfaceView.Renderer].
  *
  * Every member runs on the GL thread: the renderer callbacks by contract, [setConfig], [setGyroTarget]
  * and [orbitBy] through [GLSurfaceView.queueEvent]. Queued events also run while the view is paused
@@ -22,13 +21,12 @@ import kotlin.math.tanh
  * @param onFailure once, when the shaders don't build.
  */
 internal class PreviewGlRenderer(
-    assets: AssetManager,
+    private val renderer: BlackHoleFrameRenderer,
     private val onStats: (fps: Double, gpuMs: Double?) -> Unit,
     private val onFailure: (String) -> Unit,
 ) : GLSurfaceView.Renderer {
 
     private val scene = BlackHoleScene()
-    private val renderer = BlackHoleRenderer(assets)
 
     private var config: PreviewConfig? = null
     private var isConfigDirty = false

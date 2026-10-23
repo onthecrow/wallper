@@ -5,6 +5,7 @@ import android.graphics.Bitmap
 import android.view.SurfaceHolder
 import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.graphics.drawable.toBitmap
+import com.onthecrow.wallper.core.engine.WallpaperEngine
 import com.onthecrow.wallper.core.engine.impl.R
 import com.onthecrow.wallper.core.gl.BitmapWallpaperRenderer
 import com.onthecrow.wallper.core.gl.WallpaperGLThread

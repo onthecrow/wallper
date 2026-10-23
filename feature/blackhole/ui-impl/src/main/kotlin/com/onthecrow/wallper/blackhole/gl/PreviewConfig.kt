@@ -1,9 +1,9 @@
 package com.onthecrow.wallper.blackhole.gl
 
-import com.onthecrow.wallper.core.blackhole.physics.BlackHoleParams
-import com.onthecrow.wallper.core.blackhole.physics.LensTables
-import com.onthecrow.wallper.core.blackhole.physics.QualityLevel
-import com.onthecrow.wallper.core.blackhole.renderer.DebugOptions
+import com.onthecrow.wallper.blackhole.physics.BlackHoleParams
+import com.onthecrow.wallper.blackhole.physics.LensTables
+import com.onthecrow.wallper.blackhole.physics.QualityLevel
+import com.onthecrow.wallper.blackhole.renderer.DebugOptions
 
 /** What a live preview draws; the screens build it from their state. Stats stay out, so they don't re-push it. */
 internal data class PreviewConfig(

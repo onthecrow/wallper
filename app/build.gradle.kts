@@ -70,6 +70,7 @@ dependencies {
     implementation(projects.feature.wallpapers.uiImpl)
     implementation(projects.feature.editor.logicImpl)
     implementation(projects.feature.editor.uiImpl)
+    implementation(projects.feature.blackhole.logicImpl)
     implementation(projects.feature.blackhole.uiImpl)
 
     implementation(libs.androidx.core.ktx)

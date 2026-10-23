@@ -4,7 +4,10 @@ import android.os.Handler
 import android.os.HandlerThread
 import android.view.Surface
 import android.view.SurfaceHolder
+import com.onthecrow.wallper.core.engine.EngineHost
+import com.onthecrow.wallper.core.engine.WallpaperEngine
 import com.onthecrow.wallper.core.engine.WallpaperSpec
+import com.onthecrow.wallper.core.gl.RestartableGl
 import com.onthecrow.wallper.core.gl.VideoRenderParams
 import com.onthecrow.wallper.core.gl.VideoWallpaperRenderer
 import com.onthecrow.wallper.core.gl.WallpaperGLThread

@@ -1,7 +1,7 @@
 package com.onthecrow.wallper.blackhole
 
-import com.onthecrow.wallper.core.blackhole.physics.BlackHoleSettings
-import com.onthecrow.wallper.core.blackhole.physics.lensTableKey
+import com.onthecrow.wallper.blackhole.physics.BlackHoleSettings
+import com.onthecrow.wallper.blackhole.physics.lensTableKey
 import com.onthecrow.wallper.core.mvi.Reducer
 import javax.inject.Inject
 

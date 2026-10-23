@@ -43,8 +43,8 @@ import com.onthecrow.wallper.blackhole.view.SHEET_HEIGHT_FRACTION
 import com.onthecrow.wallper.blackhole.view.SectionTitle
 import com.onthecrow.wallper.blackhole.view.SliderRow
 import com.onthecrow.wallper.blackhole.view.SwitchRow
-import com.onthecrow.wallper.core.blackhole.physics.BlackHoleSettings
-import com.onthecrow.wallper.core.blackhole.physics.QualitySetting
+import com.onthecrow.wallper.blackhole.physics.BlackHoleSettings
+import com.onthecrow.wallper.blackhole.physics.QualitySetting
 import kotlin.math.roundToInt
 
 /**

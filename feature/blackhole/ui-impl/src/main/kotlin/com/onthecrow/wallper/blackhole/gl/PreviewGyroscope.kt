@@ -12,9 +12,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.lifecycle.compose.LifecycleResumeEffect
-import com.onthecrow.wallper.core.blackhole.physics.GyroTracker
-import com.onthecrow.wallper.core.blackhole.physics.InputParams
-import com.onthecrow.wallper.core.blackhole.physics.Quaternion
+import com.onthecrow.wallper.blackhole.physics.GyroTracker
+import com.onthecrow.wallper.blackhole.physics.InputParams
+import com.onthecrow.wallper.blackhole.physics.Quaternion
 
 /**
  * Feeds the phone's tilt into [renderer] while [enabled] and the screen is resumed, through the same
