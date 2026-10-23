@@ -1,7 +1,7 @@
 package com.onthecrow.wallper.blackhole.model
 
-import com.onthecrow.wallper.blackhole.physics.StarMath
 import com.onthecrow.wallper.blackhole.physics.BlackHoleSettings
+import com.onthecrow.wallper.blackhole.physics.StarMath
 
 /** A slider of the settings screen and the setting it edits. */
 internal enum class SettingsSlider(val range: ClosedFloatingPointRange<Double>) {
@@ -48,6 +48,18 @@ internal enum class SettingsSlider(val range: ClosedFloatingPointRange<Double>) 
     LENS_STRENGTH(BlackHoleSettings.LENS_STRENGTH_RANGE) {
         override fun value(settings: BlackHoleSettings) = settings.lensStrength
         override fun set(settings: BlackHoleSettings, value: Double) = settings.copy(lensStrength = value)
+    },
+    LENS_FADE_START(BlackHoleSettings.LENS_FADE_RANGE) {
+        override fun value(settings: BlackHoleSettings) = settings.lensFadeStart
+        override fun set(settings: BlackHoleSettings, value: Double) = settings.copy(lensFadeStart = value)
+    },
+    LENS_FADE_END(BlackHoleSettings.LENS_FADE_RANGE) {
+        override fun value(settings: BlackHoleSettings) = settings.lensFadeEnd
+        override fun set(settings: BlackHoleSettings, value: Double) = settings.copy(lensFadeEnd = value)
+    },
+    RENDER_SCALE(BlackHoleSettings.RENDER_SCALE_RANGE) {
+        override fun value(settings: BlackHoleSettings) = settings.renderScale
+        override fun set(settings: BlackHoleSettings, value: Double) = settings.copy(renderScale = value)
     },
     DISK_BRIGHTNESS(BlackHoleSettings.DISK_BRIGHTNESS_RANGE) {
         override fun value(settings: BlackHoleSettings) = settings.diskBrightness

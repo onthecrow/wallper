@@ -57,6 +57,7 @@ internal class BlackHoleSettingsViewModel @Inject constructor(
                 is BlackHoleSettingsEvent.OnDopplerToggle -> save { copy(dopplerEnabled = event.enabled) }
                 is BlackHoleSettingsEvent.OnOpacityFalloffToggle -> save { copy(diskOpacityFalloff = event.enabled) }
                 is BlackHoleSettingsEvent.OnOptimizedRenderingToggle -> save { copy(optimizedRendering = event.enabled) }
+                is BlackHoleSettingsEvent.OnLensCustomToggle -> save { copy(lensCustom = event.enabled) }
                 is BlackHoleSettingsEvent.OnLayerToggle -> save { event.layer.with(this, event.enabled) }
                 is BlackHoleSettingsEvent.OnIdleFpsChange -> save { copy(idleFps = event.fps) }
                 is BlackHoleSettingsEvent.OnSliderChange -> draft = event.slider to event.value

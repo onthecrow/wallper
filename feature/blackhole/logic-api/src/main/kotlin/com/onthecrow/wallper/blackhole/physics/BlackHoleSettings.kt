@@ -3,6 +3,7 @@ package com.onthecrow.wallper.blackhole.physics
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
+import kotlin.math.roundToInt
 
 /**
  * What the user may change about the black hole; everything else lives in [BlackHoleParams].
@@ -22,7 +23,7 @@ data class BlackHoleSettings(
     val starSeed: Int = 1337,
     /** Multiplies the number of stars of the spec; 0 leaves only the Milky Way. */
     val starCount: Double = StarParams().countScale,
-    /** σ of a star in render pixels; the screen's sharpness slider sets it together with [starWidening]. */
+    /** σ of a star in screen pixels; the screen's sharpness slider sets it together with [starWidening]. */
     val starSizePx: Double = StarMath.sizePx(StarMath.DEFAULT_SHARPNESS),
     /** How much stars widen with the pixel footprint to avoid shimmering; lower is crisper. */
     val starWidening: Double = StarMath.footprintWidening(StarMath.DEFAULT_SHARPNESS),
@@ -32,8 +33,14 @@ data class BlackHoleSettings(
     val diskSpeed: Double = 1.0,
     /** Tilts the disk on screen, about the hole. How edge-on it looks is [elevationDeg]. */
     val diskRollDeg: Double = CameraParams().rollDeg,
+    /** Off keeps the default lens; on applies [lensStrength], [lensFadeStart] and [lensFadeEnd]. */
+    val lensCustom: Boolean = false,
     /** Strength of the gravitational lens on the sky: 1 is physical, lower brings the lens ring closer to the shadow. */
     val lensStrength: Double = LensParams().strength,
+    /** [LensParams.fadeStart], in shadow radii. */
+    val lensFadeStart: Double = LensParams().fadeStart,
+    /** [LensParams.fadeEnd], in shadow radii; the end of [LENS_FADE_RANGE] means no fade, the physical reach. */
+    val lensFadeEnd: Double = LENS_FADE_RANGE.endInclusive,
     /** The view widens when the system zooms the wallpaper out, e.g. while unlocking. */
     val zoomOutEnabled: Boolean = true,
     /** Degrees the camera turns per degree the phone tilts. */
@@ -63,6 +70,8 @@ data class BlackHoleSettings(
     val idleFps: Int = 30,
     /** [FrameParams.optimizedShaders]: off only to compare. */
     val optimizedRendering: Boolean = FrameParams().optimizedShaders,
+    /** [FrameParams.maxRenderScale], in steps of 5%. */
+    val renderScale: Double = FrameParams().maxRenderScale,
     val dopplerEnabled: Boolean = false,
     val dopplerStrength: Double = 0.6,
 ) {
@@ -84,7 +93,7 @@ data class BlackHoleSettings(
                 if (speed > 0) base.disk.rotationPeriodSec / speed else 0.0
             },
         ),
-        lens = base.lens.copy(strength = lensStrength.coerceIn(LENS_STRENGTH_RANGE)),
+        lens = if (lensCustom) customLens(base.lens) else base.lens,
         haze = base.haze.copy(enabled = hazeEnabled),
         post = base.post.copy(
             bloomEnabled = bloomEnabled,
@@ -110,8 +119,23 @@ data class BlackHoleSettings(
             recoilStrength = recoilStrength.coerceIn(RECOIL_STRENGTH_RANGE),
             recoilReturnOmega = base.input.recoilReturnOmega * recoilReturnSpeed.coerceIn(RECOIL_RETURN_RANGE),
         ),
-        frames = base.frames.copy(fpsIdle = idleFps, quality = quality, optimizedShaders = optimizedRendering),
+        frames = base.frames.copy(
+            fpsIdle = idleFps,
+            quality = quality,
+            optimizedShaders = optimizedRendering,
+            maxRenderScale = (renderScale.coerceIn(RENDER_SCALE_RANGE) * 20).roundToInt() / 20.0,
+        ),
     )
+
+    private fun customLens(base: LensParams): LensParams {
+        val start = lensFadeStart.coerceIn(LENS_FADE_RANGE)
+        val end = when {
+            lensFadeEnd >= LENS_FADE_RANGE.endInclusive -> Double.POSITIVE_INFINITY
+            // A fade narrower than this squeezes the stars at its edge into a visible ring.
+            else -> maxOf(lensFadeEnd, start + MIN_LENS_FADE)
+        }
+        return base.copy(strength = lensStrength.coerceIn(LENS_STRENGTH_RANGE), fadeStart = start, fadeEnd = end)
+    }
 
     companion object {
         /** r_c ≥ R_OUT + 5 keeps the camera outside the disk (§4). */
@@ -119,6 +143,9 @@ data class BlackHoleSettings(
         val ELEVATION_RANGE = 1.0..60.0
         val ROLL_RANGE = -45.0..45.0
         val LENS_STRENGTH_RANGE = 0.0..2.0
+        val LENS_FADE_RANGE = 1.0..15.0
+        const val MIN_LENS_FADE = 0.5
+        val RENDER_SCALE_RANGE = 0.5..1.0
         val DISK_BRIGHTNESS_RANGE = 0.0..3.0
         val DISK_OPACITY_RANGE = 0.0..1.0
         val BLOOM_INTENSITY_RANGE = 0.0..2.0

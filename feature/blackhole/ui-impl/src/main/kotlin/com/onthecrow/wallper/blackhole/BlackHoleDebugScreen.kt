@@ -26,6 +26,7 @@ import com.onthecrow.wallper.blackhole.model.DebugSlider
 import com.onthecrow.wallper.blackhole.model.DebugToggle
 import com.onthecrow.wallper.blackhole.physics.BlackHoleSettings
 import com.onthecrow.wallper.blackhole.physics.QualityLevel
+import com.onthecrow.wallper.blackhole.physics.effectiveRenderScale
 import com.onthecrow.wallper.blackhole.renderer.DebugView
 import com.onthecrow.wallper.blackhole.renderer.LensMode
 import com.onthecrow.wallper.blackhole.ui.R
@@ -57,6 +58,7 @@ internal fun BlackHoleDebugScreen(
             fps = state.fps,
             gpuMs = state.gpuMs,
             quality = state.quality,
+            renderScale = state.quality.effectiveRenderScale(state.params.frames),
             isTablesLoading = state.isTablesLoading,
             tablesError = state.tablesError,
             renderFailure = state.renderFailure,

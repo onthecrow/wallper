@@ -52,6 +52,13 @@ data class LensParams(
      * An artistic knob: the disk and the shadow stay physical.
      */
     val strength: Double = 0.19,
+    /**
+     * Where the lens on the sky fades out, in shadow radii from the centre of the hole: full [strength] up
+     * to [fadeStart], none from [fadeEnd]. An infinite [fadeEnd] keeps the physical reach: the bending only
+     * falls as 1/b, so stars far from the hole move too. The sky alone, like [strength].
+     */
+    val fadeStart: Double = 2.0,
+    val fadeEnd: Double = Double.POSITIVE_INFINITY,
 )
 
 data class DiskParams(
@@ -217,7 +224,12 @@ data class FrameParams(
      * draws the original shader paths, to compare.
      */
     val optimizedShaders: Boolean = true,
+    /** The most the lens pass renders at, as a share of the screen: it caps the quality level's scale. */
+    val maxRenderScale: Double = 1.0,
 )
+
+/** The scale the lens pass runs at: this level's, capped by [FrameParams.maxRenderScale]. */
+fun QualityLevel.effectiveRenderScale(frames: FrameParams): Float = minOf(renderScale, frames.maxRenderScale.toFloat())
 
 /** [startLevel]: Auto starts on High and steps down while the GPU can't keep up ([QualityController]). */
 enum class QualitySetting(val startLevel: QualityLevel) {

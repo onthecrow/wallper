@@ -1,9 +1,9 @@
 package com.onthecrow.wallper.blackhole
 
 import androidx.lifecycle.viewModelScope
+import com.onthecrow.wallper.blackhole.physics.LensTableKey
 import com.onthecrow.wallper.blackhole.source.BlackHoleSettingsSource
 import com.onthecrow.wallper.blackhole.source.LensTablesSource
-import com.onthecrow.wallper.blackhole.physics.LensTableKey
 import com.onthecrow.wallper.core.mvi.BaseViewModel
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException

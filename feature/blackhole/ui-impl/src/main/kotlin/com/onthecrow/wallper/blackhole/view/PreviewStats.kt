@@ -13,8 +13,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.onthecrow.wallper.blackhole.ui.R
 import com.onthecrow.wallper.blackhole.physics.QualityLevel
+import com.onthecrow.wallper.blackhole.ui.R
 
 /** FPS, GPU time, the quality level and any loading or shader problem, over a live preview. */
 @Composable
@@ -22,6 +22,8 @@ internal fun PreviewStats(
     fps: Double?,
     gpuMs: Double?,
     quality: QualityLevel,
+    /** The level's scale capped by the render resolution setting. */
+    renderScale: Float,
     isTablesLoading: Boolean,
     tablesError: String?,
     renderFailure: String?,
@@ -38,7 +40,7 @@ internal fun PreviewStats(
         val gpuText = gpuMs?.let { stringResource(R.string.black_hole_debug_gpu, it) }
         Text(text = listOfNotNull(fpsText, gpuText).joinToString(" · "), style = style, color = Color.White)
         Text(
-            text = stringResource(R.string.black_hole_debug_level, quality.label(), quality.renderScale),
+            text = stringResource(R.string.black_hole_debug_level, quality.label(), renderScale),
             style = style,
             color = Color.White,
         )

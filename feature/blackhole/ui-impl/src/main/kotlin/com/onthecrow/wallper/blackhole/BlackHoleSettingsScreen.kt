@@ -37,6 +37,7 @@ import com.onthecrow.wallper.blackhole.model.PictureLayer
 import com.onthecrow.wallper.blackhole.model.SettingsSlider
 import com.onthecrow.wallper.blackhole.physics.BlackHoleSettings
 import com.onthecrow.wallper.blackhole.physics.QualitySetting
+import com.onthecrow.wallper.blackhole.physics.effectiveRenderScale
 import com.onthecrow.wallper.blackhole.ui.R
 import com.onthecrow.wallper.blackhole.view.ChoiceRow
 import com.onthecrow.wallper.blackhole.view.ControlsSheet
@@ -78,6 +79,7 @@ internal fun BlackHoleSettingsScreen(
                     fps = state.fps,
                     gpuMs = state.gpuMs,
                     quality = state.quality,
+                    renderScale = state.quality.effectiveRenderScale(state.params.frames),
                     isTablesLoading = state.isTablesLoading,
                     tablesError = state.tablesError,
                     renderFailure = state.renderFailure,
@@ -169,6 +171,13 @@ private fun BasicSettings(settings: BlackHoleSettings, onEvent: (BlackHoleSettin
         label = { it.label() },
         onSelect = { onEvent(BlackHoleSettingsEvent.OnQualityChange(it)) },
     )
+    SettingsSliderRow(
+        slider = SettingsSlider.RENDER_SCALE,
+        label = stringResource(R.string.black_hole_render_scale, (settings.renderScale * 100).roundToInt()),
+        supportingText = stringResource(R.string.black_hole_render_scale_hint),
+        settings = settings,
+        onEvent = onEvent,
+    )
     SwitchRow(
         text = stringResource(R.string.black_hole_optimized),
         supportingText = stringResource(R.string.black_hole_optimized_hint),
@@ -231,7 +240,7 @@ private fun BasicSettings(settings: BlackHoleSettings, onEvent: (BlackHoleSettin
 }
 
 @Composable
-private fun AdvancedSettings(
+private fun ColumnScope.AdvancedSettings(
     settings: BlackHoleSettings,
     isTimeFrozen: Boolean,
     onEvent: (BlackHoleSettingsEvent) -> Unit,
@@ -280,13 +289,7 @@ private fun AdvancedSettings(
     )
 
     SectionTitle(stringResource(R.string.black_hole_picture))
-    SettingsSliderRow(
-        slider = SettingsSlider.LENS_STRENGTH,
-        label = stringResource(R.string.black_hole_lens_strength, settings.lensStrength),
-        supportingText = stringResource(R.string.black_hole_lens_strength_hint),
-        settings = settings,
-        onEvent = onEvent,
-    )
+    LensRows(settings, onEvent)
     SettingsSliderRow(
         slider = SettingsSlider.DISK_BRIGHTNESS,
         label = stringResource(R.string.black_hole_disk_brightness, settings.diskBrightness),
@@ -390,6 +393,47 @@ private fun SettingsSliderRow(
         onValueChange = { onEvent(BlackHoleSettingsEvent.OnSliderChange(slider, it)) },
         onValueChangeFinished = { onEvent(BlackHoleSettingsEvent.OnSliderChangeFinished(slider)) },
     )
+}
+
+/** The lens on the sky: physical while the switch is off, shaped by the three sliders under it when on. */
+@Composable
+private fun ColumnScope.LensRows(settings: BlackHoleSettings, onEvent: (BlackHoleSettingsEvent) -> Unit) {
+    SwitchRow(
+        text = stringResource(R.string.black_hole_lens_custom),
+        supportingText = stringResource(R.string.black_hole_lens_custom_hint),
+        checked = settings.lensCustom,
+        onCheckedChange = { onEvent(BlackHoleSettingsEvent.OnLensCustomToggle(it)) },
+    )
+    AnimatedVisibility(visible = settings.lensCustom) {
+        Column {
+            SettingsSliderRow(
+                slider = SettingsSlider.LENS_STRENGTH,
+                label = stringResource(R.string.black_hole_lens_strength, settings.lensStrength),
+                supportingText = stringResource(R.string.black_hole_lens_strength_hint),
+                settings = settings,
+                onEvent = onEvent,
+            )
+            SettingsSliderRow(
+                slider = SettingsSlider.LENS_FADE_START,
+                label = stringResource(R.string.black_hole_lens_fade_start, settings.lensFadeStart),
+                supportingText = stringResource(R.string.black_hole_lens_fade_start_hint),
+                settings = settings,
+                onEvent = onEvent,
+            )
+            val endsNowhere = settings.lensFadeEnd >= BlackHoleSettings.LENS_FADE_RANGE.endInclusive
+            SettingsSliderRow(
+                slider = SettingsSlider.LENS_FADE_END,
+                label = if (endsNowhere) {
+                    stringResource(R.string.black_hole_lens_fade_end_none)
+                } else {
+                    stringResource(R.string.black_hole_lens_fade_end, settings.lensFadeEnd)
+                },
+                supportingText = stringResource(R.string.black_hole_lens_fade_end_hint),
+                settings = settings,
+                onEvent = onEvent,
+            )
+        }
+    }
 }
 
 /** How the camera answers the gyroscope and the launcher, and the recoil of the hole; the strength is basic. */
