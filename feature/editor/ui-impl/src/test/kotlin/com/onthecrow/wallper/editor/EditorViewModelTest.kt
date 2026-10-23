@@ -1,5 +1,8 @@
 package com.onthecrow.wallper.editor
 
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.ViewModelStore
 import com.onthecrow.wallper.core.model.ClipRange
 import com.onthecrow.wallper.core.model.CropRect
 import com.onthecrow.wallper.core.model.MediaInfo
@@ -34,6 +37,7 @@ class EditorViewModelTest {
     private var exportStatuses: List<ExportStatus> = listOf(ExportStatus.InProgress(10), ExportStatus.Success)
     private val createCalls = mutableListOf<Triple<CropRect, ClipRange, Boolean>>()
     private var backNavigations = 0
+    private var discards = 0
 
     @BeforeTest
     fun setUp() = Dispatchers.setMain(dispatcher)
@@ -53,6 +57,7 @@ class EditorViewModelTest {
                 return flowOf(*exportStatuses.toTypedArray())
             }
         },
+        discardPreparedMediaUseCase = { discards++ },
         navigator = object : Navigator {
             override fun navigate(destination: Destination) = Unit
             override fun navigateBack() { backNavigations++ }
@@ -97,6 +102,21 @@ class EditorViewModelTest {
         viewModel.onEvent(EditorEvent.OnErrorDismiss)
 
         assertEquals(1, backNavigations)
+    }
+
+    @Test
+    fun `closing the editor discards its copy of the media`() = runTest(dispatcher) {
+        val store = ViewModelStore()
+        val factory = object : ViewModelProvider.Factory {
+            @Suppress("UNCHECKED_CAST")
+            override fun <T : ViewModel> create(modelClass: Class<T>): T = createViewModel() as T
+        }
+        ViewModelProvider(store, factory)[EditorViewModel::class.java]
+
+        assertEquals(0, discards)
+        store.clear()
+
+        assertEquals(1, discards)
     }
 
     @Test

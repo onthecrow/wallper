@@ -32,38 +32,50 @@ internal class CreateWallpaperUseCaseImpl @Inject constructor(
         clip: ClipRange,
         preCrop: Boolean,
     ): Flow<ExportStatus> = flow {
-        val isVideo = media.type == MediaType.VIDEO
-        val originalPath = mediaStorage.persistTempMedia()
-        val thumbnailPath = if (isVideo) mediaStorage.persistTempThumbnail() else null
-        val processedPath = (originalPath + SUFFIX_CROPPED_FILE).takeIf { isVideo && preCrop }
-
-        val export = if (processedPath != null) {
-            mediaStorage.delete(processedPath)
-            videoExporter.export(originalPath, processedPath, crop, clip)
+        // The export works in scratch storage too: a failed or abandoned one leaves nothing elsewhere.
+        val processed = mediaStorage.tempProcessedFile.takeIf { media.type == MediaType.VIDEO && preCrop }
+        val export = if (processed != null) {
+            mediaStorage.delete(processed.path)
+            videoExporter.export(media.path, processed.path, crop, clip)
         } else {
             flowOf(ExportStatus.Success)
         }
 
         emitAll(
             export.onEach { status ->
-                if (status is ExportStatus.Success) {
-                    saveWallpaperUseCase(
-                        NewWallpaper(
-                            type = media.type,
-                            originalPath = originalPath,
-                            processedPath = processedPath,
-                            thumbnailPath = thumbnailPath.orEmpty(),
-                            crop = crop,
-                            clip = clip,
-                            mediaInfo = media.mediaInfo,
-                        )
-                    )
-                }
+                if (status is ExportStatus.Success) save(media, crop, clip, isProcessed = processed != null)
             }
         )
     }.flowOn(dispatchersProvider.io)
 
-    companion object {
-        private const val SUFFIX_CROPPED_FILE = "_cropped.mp4"
+    /**
+     * Copies the scratch files to permanent storage, only now that the wallpaper is ready, and saves it. If
+     * that fails halfway, the copies go again: no file outlives a wallpaper that wasn't saved.
+     */
+    private suspend fun save(media: PreparedMedia, crop: CropRect, clip: ClipRange, isProcessed: Boolean) {
+        val persisted = mutableListOf<String>()
+        try {
+            val originalPath = mediaStorage.persistTempMedia().also(persisted::add)
+            val processedPath = if (isProcessed) mediaStorage.persistTempProcessed().also(persisted::add) else null
+            val thumbnailPath = if (media.type == MediaType.VIDEO) {
+                mediaStorage.persistTempThumbnail()?.also(persisted::add)
+            } else {
+                null
+            }
+            saveWallpaperUseCase(
+                NewWallpaper(
+                    type = media.type,
+                    originalPath = originalPath,
+                    processedPath = processedPath,
+                    thumbnailPath = thumbnailPath.orEmpty(),
+                    crop = crop,
+                    clip = clip,
+                    mediaInfo = media.mediaInfo,
+                )
+            )
+        } catch (error: Throwable) {
+            persisted.forEach(mediaStorage::delete)
+            throw error
+        }
     }
 }

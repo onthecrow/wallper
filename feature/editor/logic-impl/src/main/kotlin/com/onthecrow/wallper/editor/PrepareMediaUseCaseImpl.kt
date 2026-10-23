@@ -18,6 +18,8 @@ internal class PrepareMediaUseCaseImpl @Inject constructor(
 
     override suspend fun invoke(uri: String): Result<PreparedMedia> = withContext(dispatchersProvider.io) {
         runCatching {
+            // An edit killed with the process may have left its scratch files behind.
+            mediaStorage.clearTemp()
             val type = if (mediaInspector.isVideo(uri)) MediaType.VIDEO else MediaType.IMAGE
             if (type == MediaType.VIDEO) {
                 mediaInspector.writeVideoThumbnail(uri, mediaStorage.tempThumbnailFile)

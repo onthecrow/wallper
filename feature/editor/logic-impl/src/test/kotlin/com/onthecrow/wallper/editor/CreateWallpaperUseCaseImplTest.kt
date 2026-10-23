@@ -20,6 +20,7 @@ import kotlinx.coroutines.test.runTest
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFailsWith
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
@@ -28,26 +29,37 @@ class CreateWallpaperUseCaseImplTest {
 
     private val dispatcher = UnconfinedTestDispatcher()
     private val saved = mutableListOf<NewWallpaper>()
-    private val exports = mutableListOf<String>()
+    private val exports = mutableListOf<Pair<String, String>>()
+    private val persisted = mutableListOf<String>()
+    private val deleted = mutableListOf<String>()
     private var exportResult: List<ExportStatus> = listOf(ExportStatus.InProgress(50), ExportStatus.Success)
+    private var saveError: Exception? = null
 
     private val useCase = CreateWallpaperUseCaseImpl(
         mediaStorage = object : MediaStorage {
-            override val tempMediaFile = File("temp/media")
-            override val tempThumbnailFile = File("temp/thumbnail")
+            override val tempMediaFile = File("editor/media")
+            override val tempThumbnailFile = File("editor/thumbnail")
+            override val tempProcessedFile = File("editor/processed.mp4")
             override fun copyToTemp(uri: String) = tempMediaFile.path
-            override fun persistTempMedia() = "originals/a"
-            override fun persistTempThumbnail() = "thumbnails/a"
-            override fun delete(path: String) = Unit
+            override fun persistTempMedia() = "originals/a".also(persisted::add)
+            override fun persistTempProcessed() = "originals/b.mp4".also(persisted::add)
+            override fun persistTempThumbnail() = "thumbnails/a".also(persisted::add)
+            override fun clearTemp() = Unit
+            override fun delete(path: String) {
+                deleted += path
+            }
         },
         videoExporter = object : VideoExporter {
             override fun export(inputPath: String, outputPath: String, crop: CropRect, clip: ClipRange): Flow<ExportStatus> {
-                exports += outputPath
+                exports += inputPath to outputPath
                 return flowOf(*exportResult.toTypedArray())
             }
         },
         saveWallpaperUseCase = object : SaveWallpaperUseCase {
-            override suspend fun invoke(wallpaper: NewWallpaper) { saved += wallpaper }
+            override suspend fun invoke(wallpaper: NewWallpaper) {
+                saveError?.let { throw it }
+                saved += wallpaper
+            }
         },
         dispatchersProvider = object : DispatchersProvider {
             override val main = dispatcher
@@ -56,7 +68,7 @@ class CreateWallpaperUseCaseImplTest {
         },
     )
 
-    private val video = PreparedMedia("temp/media", MediaType.VIDEO, MediaInfo(1920, 1080, 90, 10_000))
+    private val video = PreparedMedia("editor/media", MediaType.VIDEO, MediaInfo(1920, 1080, 90, 10_000))
     private val crop = CropRect(0, 0, 100, 200)
     private val clip = ClipRange(1_000, 5_000)
 
@@ -66,32 +78,44 @@ class CreateWallpaperUseCaseImplTest {
 
         assertEquals(listOf<ExportStatus>(ExportStatus.Success), statuses)
         assertTrue(exports.isEmpty())
+        assertEquals("originals/a", saved.single().originalPath)
         assertNull(saved.single().processedPath)
         assertEquals("thumbnails/a", saved.single().thumbnailPath)
         assertEquals(video.mediaInfo, saved.single().mediaInfo)
     }
 
     @Test
-    fun `pre-cropped video is saved only after the export succeeds`() = runTest(dispatcher) {
+    fun `pre-cropped video is exported in scratch and saved only after the export succeeds`() = runTest(dispatcher) {
         val statuses = useCase(video, crop, clip, preCrop = true).toList()
 
         assertEquals(listOf(ExportStatus.InProgress(50), ExportStatus.Success), statuses)
-        assertEquals(listOf("originals/a_cropped.mp4"), exports)
-        assertEquals("originals/a_cropped.mp4", saved.single().processedPath)
+        assertEquals(listOf("editor/media" to "editor/processed.mp4"), exports)
+        assertEquals("originals/b.mp4", saved.single().processedPath)
     }
 
     @Test
-    fun `failed export saves nothing`() = runTest(dispatcher) {
+    fun `failed export saves nothing and leaves nothing in permanent storage`() = runTest(dispatcher) {
         exportResult = listOf(ExportStatus.Error(IllegalStateException("encoder")))
 
         useCase(video, crop, clip, preCrop = true).toList()
 
         assertTrue(saved.isEmpty())
+        assertTrue(persisted.isEmpty())
+    }
+
+    @Test
+    fun `a wallpaper that can't be saved takes its copies with it`() = runTest(dispatcher) {
+        saveError = IllegalStateException("database")
+
+        assertFailsWith<IllegalStateException> { useCase(video, crop, clip, preCrop = true).toList() }
+
+        assertEquals(listOf("originals/a", "originals/b.mp4", "thumbnails/a"), persisted)
+        assertEquals(persisted, deleted.filterNot { it == "editor/processed.mp4" })
     }
 
     @Test
     fun `image never gets a processed copy or a video thumbnail`() = runTest(dispatcher) {
-        val image = PreparedMedia("temp/media", MediaType.IMAGE, MediaInfo(800, 600, 0, 0))
+        val image = PreparedMedia("editor/media", MediaType.IMAGE, MediaInfo(800, 600, 0, 0))
 
         useCase(image, crop, clip, preCrop = true).toList()
 

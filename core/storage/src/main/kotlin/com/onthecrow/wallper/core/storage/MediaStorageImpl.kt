@@ -17,12 +17,13 @@ internal class MediaStorageImpl @Inject constructor(
     // All device-protected, like the database: the wallpaper reads the media and the thumbnail (its
     // colours) before the first unlock. External storage isn't there yet then, and may be missing at all.
     private val deviceProtectedContext = context.createDeviceProtectedStorageContext()
-    private val tempDir = File(deviceProtectedContext.cacheDir, "temp")
+    private val tempDir = File(deviceProtectedContext.filesDir, "editor")
     private val thumbnailsDir = File(deviceProtectedContext.filesDir, "thumbnails")
     private val originalsDir = deviceProtectedContext.filesDir
 
-    override val tempMediaFile = File(tempDir, "tempFile")
-    override val tempThumbnailFile = File(tempDir, "tempThumbnail")
+    override val tempMediaFile = File(tempDir, "media")
+    override val tempThumbnailFile = File(tempDir, "thumbnail")
+    override val tempProcessedFile = File(tempDir, "processed.mp4")
 
     override fun copyToTemp(uri: String): String? = runCatching {
         tempDir.mkdirs()
@@ -36,10 +37,17 @@ internal class MediaStorageImpl @Inject constructor(
         tempMediaFile.copyTo(File(originalsDir, randomName()), overwrite = true).absolutePath
             .also { Timber.d("Tmp file saved: $it") }
 
+    override fun persistTempProcessed(): String =
+        tempProcessedFile.copyTo(File(originalsDir, "${randomName()}.mp4"), overwrite = true).absolutePath
+
     override fun persistTempThumbnail(): String? = runCatching {
         thumbnailsDir.mkdirs()
         tempThumbnailFile.copyTo(File(thumbnailsDir, randomName()), overwrite = true).absolutePath
     }.onFailure(Timber::e).getOrNull()
+
+    override fun clearTemp() {
+        if (!tempDir.deleteRecursively()) Timber.e("Can't delete all of $tempDir")
+    }
 
     override fun delete(path: String) {
         runCatching {
