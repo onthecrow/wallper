@@ -24,6 +24,10 @@ import com.onthecrow.wallper.blackhole.gl.BlackHolePreview
 import com.onthecrow.wallper.blackhole.gl.DragMode
 import com.onthecrow.wallper.blackhole.model.DebugSlider
 import com.onthecrow.wallper.blackhole.model.DebugToggle
+import com.onthecrow.wallper.blackhole.physics.BlackHoleSettings
+import com.onthecrow.wallper.blackhole.physics.QualityLevel
+import com.onthecrow.wallper.blackhole.renderer.DebugView
+import com.onthecrow.wallper.blackhole.renderer.LensMode
 import com.onthecrow.wallper.blackhole.ui.R
 import com.onthecrow.wallper.blackhole.view.ChoiceRow
 import com.onthecrow.wallper.blackhole.view.ControlsSheet
@@ -33,10 +37,6 @@ import com.onthecrow.wallper.blackhole.view.SectionTitle
 import com.onthecrow.wallper.blackhole.view.SliderRow
 import com.onthecrow.wallper.blackhole.view.SwitchRow
 import com.onthecrow.wallper.blackhole.view.label
-import com.onthecrow.wallper.blackhole.physics.QualityLevel
-import com.onthecrow.wallper.blackhole.physics.BlackHoleSettings
-import com.onthecrow.wallper.blackhole.renderer.DebugView
-import com.onthecrow.wallper.blackhole.renderer.LensMode
 
 /** The live renderer under a stats overlay, with the tuning controls in a collapsible bottom panel. */
 @Composable
@@ -195,6 +195,7 @@ private fun DebugToggle.label(): String = stringResource(
         DebugToggle.BLOOM -> R.string.black_hole_debug_bloom
         DebugToggle.DOPPLER -> R.string.black_hole_debug_doppler
         DebugToggle.OPACITY_FALLOFF -> R.string.black_hole_debug_thin_edge
+        DebugToggle.OPTIMIZED -> R.string.black_hole_debug_optimized
     },
 )
 

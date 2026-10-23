@@ -61,6 +61,32 @@ class FramePacingTest {
     }
 
     @Test
+    fun `a rate that doesn't divide the display's keeps an even gap, whatever the timestamp jitter`() {
+        fun gaps(targetFps: Int, hz: Double): Set<Int> {
+            val vsync = (1e9 / hz).toLong()
+            val random = java.util.Random(1)
+            var last = Long.MIN_VALUE
+            var lastIndex = 0
+            val gaps = mutableSetOf<Int>()
+            for (i in 0 until 600) {
+                val t = (i * 1e9 / hz).toLong() + random.nextInt(100_001) - 50_000 // ±50 µs
+                if (FramePacing.isDue(t, last, targetFps, vsync)) {
+                    if (last != Long.MIN_VALUE) gaps += i - lastIndex
+                    last = t
+                    lastIndex = i
+                }
+            }
+            return gaps
+        }
+
+        assertEquals(setOf(2), gaps(60, 90.0)) // 45 fps, never above the target
+        assertEquals(setOf(3), gaps(24, 60.0)) // 20 fps
+        assertEquals(setOf(2), gaps(30, 60.0))
+        assertEquals(setOf(4), gaps(30, 120.0))
+        assertEquals(setOf(1), gaps(60, 60.0))
+    }
+
+    @Test
     fun `a 60 Hz display draws every second vsync at 30 fps`() {
         val vsync = 16_666_667L
         assertTrue(FramePacing.isDue(2 * vsync, 0, 30, vsync))

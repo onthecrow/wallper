@@ -108,6 +108,11 @@ internal enum class DebugToggle {
         override fun isOn(params: BlackHoleParams) = params.disk.opacityFalloffEnabled
         override fun with(params: BlackHoleParams, on: Boolean) =
             params.copy(disk = params.disk.copy(opacityFalloffEnabled = on))
+    },
+    OPTIMIZED {
+        override fun isOn(params: BlackHoleParams) = params.frames.optimizedShaders
+        override fun with(params: BlackHoleParams, on: Boolean) =
+            params.copy(frames = params.frames.copy(optimizedShaders = on))
     };
 
     abstract fun isOn(params: BlackHoleParams): Boolean

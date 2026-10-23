@@ -211,6 +211,12 @@ data class FrameParams(
     /** In power save mode, show a still frame while nothing moves; parallax still runs at [fpsPowerSave]. */
     val powerSaveStill: Boolean = true,
     val quality: QualitySetting = QualitySetting.AUTO,
+    /**
+     * The same picture for less GPU work (OPTIMIZATION_REVIEW.md, phase 1): the disk shaded only where a
+     * ray crosses it, a texel-for-texel composite, no trigonometry per crossing, cheaper star maths. Off
+     * draws the original shader paths, to compare.
+     */
+    val optimizedShaders: Boolean = true,
 )
 
 /** [startLevel]: Auto starts on High and steps down while the GPU can't keep up ([QualityController]). */

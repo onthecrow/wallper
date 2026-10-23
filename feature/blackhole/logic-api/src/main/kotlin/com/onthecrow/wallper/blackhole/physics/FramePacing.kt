@@ -1,5 +1,6 @@
 package com.onthecrow.wallper.blackhole.physics
 
+import kotlin.math.ceil
 import kotlin.math.max
 
 enum class ThermalLevel { NORMAL, MODERATE, SEVERE }
@@ -30,11 +31,19 @@ object FramePacing {
      */
     fun expectsFrames(visible: Boolean, targetFps: Int): Boolean = visible && targetFps != STILL
 
+    /**
+     * Vsyncs from one frame to the next: the same every frame, and never faster than [targetFps]. 60 fps on
+     * 90 Hz is every second vsync (45 fps), 24 on 60 Hz every third (20 fps): a rate that doesn't divide the
+     * display's would alternate gaps, and timestamp jitter would pick which.
+     */
+    fun vsyncsPerFrame(targetFps: Int, vsyncNanos: Long): Int =
+        max(1, ceil(1e9 / targetFps / vsyncNanos - VSYNC_SLACK).toInt())
+
     /** Whether the vsync at [frameNanos] should be drawn; skips vsyncs on 90 and 120 Hz displays. */
     fun isDue(frameNanos: Long, lastDrawnNanos: Long, targetFps: Int, vsyncNanos: Long): Boolean {
         if (targetFps <= 0) return false
         if (lastDrawnNanos == Long.MIN_VALUE) return true
-        val interval = 1_000_000_000L / targetFps
+        val interval = vsyncsPerFrame(targetFps, vsyncNanos) * vsyncNanos
         return frameNanos - lastDrawnNanos >= max(0L, interval - vsyncNanos / 2)
     }
 
@@ -45,12 +54,15 @@ object FramePacing {
      */
     fun sleepMs(frameNanos: Long, lastDrawnNanos: Long, targetFps: Int, vsyncNanos: Long): Long {
         if (targetFps <= 0 || lastDrawnNanos == Long.MIN_VALUE) return 0
-        val dueNanos = lastDrawnNanos + 1_000_000_000L / targetFps - vsyncNanos / 2
+        val dueNanos = lastDrawnNanos + vsyncsPerFrame(targetFps, vsyncNanos) * vsyncNanos - vsyncNanos / 2
         return max(0L, (dueNanos - frameNanos - vsyncNanos) / 1_000_000)
     }
 
     private const val MAX_FPS = 60
     private const val MODERATE_IDLE_FPS = 24
+
+    /** A display rate is a float: 30 fps on "60 Hz" must stay two vsyncs, not three. */
+    private const val VSYNC_SLACK = 0.05
 }
 
 /**

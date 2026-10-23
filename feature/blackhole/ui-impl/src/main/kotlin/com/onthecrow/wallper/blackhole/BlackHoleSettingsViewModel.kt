@@ -2,11 +2,11 @@ package com.onthecrow.wallper.blackhole
 
 import androidx.lifecycle.viewModelScope
 import com.onthecrow.wallper.blackhole.model.SettingsSlider
+import com.onthecrow.wallper.blackhole.physics.BlackHoleSettings
+import com.onthecrow.wallper.blackhole.physics.LensTableKey
 import com.onthecrow.wallper.blackhole.source.BlackHoleSettingsSource
 import com.onthecrow.wallper.blackhole.source.DebuggableBuild
 import com.onthecrow.wallper.blackhole.source.LensTablesSource
-import com.onthecrow.wallper.blackhole.physics.BlackHoleSettings
-import com.onthecrow.wallper.blackhole.physics.LensTableKey
 import com.onthecrow.wallper.core.mvi.BaseViewModel
 import com.onthecrow.wallper.core.navigation.Navigator
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -56,6 +56,7 @@ internal class BlackHoleSettingsViewModel @Inject constructor(
                 is BlackHoleSettingsEvent.OnZoomOutToggle -> save { copy(zoomOutEnabled = event.enabled) }
                 is BlackHoleSettingsEvent.OnDopplerToggle -> save { copy(dopplerEnabled = event.enabled) }
                 is BlackHoleSettingsEvent.OnOpacityFalloffToggle -> save { copy(diskOpacityFalloff = event.enabled) }
+                is BlackHoleSettingsEvent.OnOptimizedRenderingToggle -> save { copy(optimizedRendering = event.enabled) }
                 is BlackHoleSettingsEvent.OnLayerToggle -> save { event.layer.with(this, event.enabled) }
                 is BlackHoleSettingsEvent.OnIdleFpsChange -> save { copy(idleFps = event.fps) }
                 is BlackHoleSettingsEvent.OnSliderChange -> draft = event.slider to event.value

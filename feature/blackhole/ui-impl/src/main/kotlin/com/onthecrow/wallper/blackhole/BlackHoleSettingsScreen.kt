@@ -35,6 +35,8 @@ import com.onthecrow.wallper.blackhole.gl.BlackHolePreview
 import com.onthecrow.wallper.blackhole.gl.DragMode
 import com.onthecrow.wallper.blackhole.model.PictureLayer
 import com.onthecrow.wallper.blackhole.model.SettingsSlider
+import com.onthecrow.wallper.blackhole.physics.BlackHoleSettings
+import com.onthecrow.wallper.blackhole.physics.QualitySetting
 import com.onthecrow.wallper.blackhole.ui.R
 import com.onthecrow.wallper.blackhole.view.ChoiceRow
 import com.onthecrow.wallper.blackhole.view.ControlsSheet
@@ -43,8 +45,6 @@ import com.onthecrow.wallper.blackhole.view.SHEET_HEIGHT_FRACTION
 import com.onthecrow.wallper.blackhole.view.SectionTitle
 import com.onthecrow.wallper.blackhole.view.SliderRow
 import com.onthecrow.wallper.blackhole.view.SwitchRow
-import com.onthecrow.wallper.blackhole.physics.BlackHoleSettings
-import com.onthecrow.wallper.blackhole.physics.QualitySetting
 import kotlin.math.roundToInt
 
 /**
@@ -168,6 +168,12 @@ private fun BasicSettings(settings: BlackHoleSettings, onEvent: (BlackHoleSettin
         selected = settings.quality,
         label = { it.label() },
         onSelect = { onEvent(BlackHoleSettingsEvent.OnQualityChange(it)) },
+    )
+    SwitchRow(
+        text = stringResource(R.string.black_hole_optimized),
+        supportingText = stringResource(R.string.black_hole_optimized_hint),
+        checked = settings.optimizedRendering,
+        onCheckedChange = { onEvent(BlackHoleSettingsEvent.OnOptimizedRenderingToggle(it)) },
     )
 
     SectionTitle(stringResource(R.string.black_hole_motion))

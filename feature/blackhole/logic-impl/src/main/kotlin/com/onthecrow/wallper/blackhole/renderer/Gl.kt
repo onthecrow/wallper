@@ -132,6 +132,12 @@ internal class RenderTarget private constructor(val width: Int, val height: Int,
         GLES30.glViewport(0, 0, width, height)
     }
 
+    /** [bind] for a pass that overwrites every pixel: the old contents are discarded, not loaded. */
+    fun bindToOverwrite() {
+        bind()
+        Gl.discardColor(defaultFramebuffer = false)
+    }
+
     fun release() {
         GLES30.glDeleteFramebuffers(1, intArrayOf(framebuffer), 0)
         GLES30.glDeleteTextures(1, intArrayOf(texture), 0)
@@ -174,6 +180,16 @@ internal object Gl {
         GLES30.glTexParameteri(target, GLES30.GL_TEXTURE_WRAP_S, GLES30.GL_CLAMP_TO_EDGE)
         GLES30.glTexParameteri(target, GLES30.GL_TEXTURE_WRAP_T, GLES30.GL_CLAMP_TO_EDGE)
     }
+
+    /**
+     * The bound framebuffer's colour is about to be overwritten whole. Without this a tile-based GPU loads
+     * the old contents into tile memory first (a fullscreen triangle doesn't tell the driver otherwise).
+     */
+    fun discardColor(defaultFramebuffer: Boolean) =
+        GLES30.glInvalidateFramebuffer(GLES30.GL_FRAMEBUFFER, 1, if (defaultFramebuffer) WINDOW_COLOR else ATTACHED_COLOR, 0)
+
+    private val WINDOW_COLOR = intArrayOf(GLES30.GL_COLOR)
+    private val ATTACHED_COLOR = intArrayOf(GLES30.GL_COLOR_ATTACHMENT0)
 
     /** Draws the fullscreen triangle of `fullscreen.vert`. */
     fun drawFullscreen() = GLES30.glDrawArrays(GLES30.GL_TRIANGLES, 0, 3)

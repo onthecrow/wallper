@@ -6,7 +6,8 @@ checked as `#version 300 es`, exactly as devices compile them. Without it the ND
 only targets SPIR-V, so it checks `#version 310 es` (a superset of 300 es) and can miss a 3.10-only feature.
 Either way this catches syntax, type and undeclared-name errors, not driver quirks.
 
-The quality defines (K_MAX, STAR_LAYERS) are read from QualityLevel in BlackHoleParams.kt.
+The quality defines (K_MAX, STAR_LAYERS) are read from QualityLevel in BlackHoleParams.kt. Both shader
+paths are checked: OPTIMIZED 1 (the default) and 0 (the original, kept to compare).
 
 Usage: scripts/validate_blackhole_shaders.py   (exit code 1 on errors)
 With no compiler found it skips with exit code 0, unless WALLPER_REQUIRE_SHADER_COMPILER is set (CI).
@@ -95,8 +96,9 @@ def main():
         if stage is None:
             continue
         for k_max, star_layers in quality_defines():
-            for hdr in (1, 0):
-                defines = {'K_MAX': k_max, 'STAR_LAYERS': star_layers, **LENS_DEFINES, 'HDR_TARGET': hdr}
+            for hdr, optimized in ((1, 1), (0, 1), (1, 0), (0, 0)):
+                defines = {'K_MAX': k_max, 'STAR_LAYERS': star_layers, **LENS_DEFINES, 'HDR_TARGET': hdr,
+                           'OPTIMIZED': optimized, 'MAG_POWER_8': 1}
                 source = version + '\n' + ''.join(f'#define {k} {v}\n' for k, v in defines.items()) + resolve(name, set())
                 with tempfile.NamedTemporaryFile('w', suffix='.' + stage, delete=False) as out:
                     out.write(source)
@@ -105,7 +107,7 @@ def main():
                 output = (result.stdout + result.stderr).strip()
                 if result.returncode != 0 or 'ERROR' in output or 'error' in result.stderr:
                     failed = True
-                    print(f'{name} (K_MAX={k_max}, STAR_LAYERS={star_layers}, HDR_TARGET={hdr}):\n{output}')
+                    print(f'{name} (K_MAX={k_max}, STAR_LAYERS={star_layers}, HDR_TARGET={hdr}, OPTIMIZED={optimized}):\n{output}')
     print('shaders: FAILED' if failed else 'shaders: OK')
     sys.exit(1 if failed else 0)
 
