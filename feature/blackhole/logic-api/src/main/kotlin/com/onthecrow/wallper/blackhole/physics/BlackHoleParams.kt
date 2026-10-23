@@ -24,8 +24,8 @@ data class CameraParams(
     /** Where the hole sits on screen, as an NDC offset of the projection centre (off-axis projection). */
     val principalX: Double = 0.0,
     val principalY: Double = 0.10,
-    /** θ0: height above the disk plane. */
-    val elevationDeg: Double = 5.6,
+    /** θ0: height above the disk plane. At [elevationMinDeg] by default: the disk almost edge-on. */
+    val elevationDeg: Double = 1.0,
     val elevationSwingDeg: Double = 3.0,
     val elevationPeriodSec: Double = 120.0,
     val elevationMinDeg: Double = 1.0,
@@ -51,7 +51,7 @@ data class LensParams(
      * (Einstein ring) sits: at r_c = 32 it is 3.4× the shadow radius at 1, 1.4× at 0.1, 4.7× at 2.
      * An artistic knob: the disk and the shadow stay physical.
      */
-    val strength: Double = 0.25,
+    val strength: Double = 0.19,
 )
 
 data class DiskParams(
@@ -65,7 +65,7 @@ data class DiskParams(
     /** P in (R_IN / r)^P. */
     val falloffPower: Double = 2.5,
     /** One turn of the inner edge; 0 stops the disk. */
-    val rotationPeriodSec: Double = 10.0,
+    val rotationPeriodSec: Double = 4.0,
     /**
      * Length of one crossfade cycle of the two texture phases (§8.3). The pattern shift over a cycle,
      * `turns(R_IN) − turns(R_OUT)`, has to stay ≲ 1, otherwise the pattern doubles mid-crossfade; the
@@ -178,13 +178,13 @@ data class DopplerParams(
 
 data class InputParams(
     val gyroEnabled: Boolean = true,
-    val gyroGain: Double = 0.5,
+    val gyroGain: Double = 0.12,
     val gyroMaxAngleDeg: Double = 6.0,
     val gyroRecenterSec: Double = 2.5,
     val gyroInvertPitch: Boolean = false,
     val gyroInvertYaw: Boolean = false,
     /** 0..1: the 1€ filter on the gyroscope ([GyroTracker]). More takes out more hand tremor; 0 is off. */
-    val gyroSmoothing: Double = 0.3,
+    val gyroSmoothing: Double = 0.27,
     /** ω_n of the springs that smooth every input: higher follows faster. */
     val springOmega: Double = 10.0,
     /** ζ of those springs: 1 is the fastest approach without overshoot, lower swings past and back, higher creeps in. */
