@@ -17,3 +17,12 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.timber)
 }
+
+// Compiles the shaders for every quality level without a device (scripts/validate_blackhole_shaders.py).
+val validateShaders = tasks.register<Exec>("validateBlackHoleShaders") {
+    group = "verification"
+    description = "Compiles the black hole shaders as GLSL ES 3.00 for every quality level."
+    workingDir = rootDir
+    commandLine("python3", "scripts/validate_blackhole_shaders.py")
+}
+tasks.named("check") { dependsOn(validateShaders) }

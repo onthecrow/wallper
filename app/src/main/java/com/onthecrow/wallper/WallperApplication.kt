@@ -2,6 +2,10 @@ package com.onthecrow.wallper
 
 import android.app.Application
 import android.os.Build
+import com.onthecrow.wallper.core.diagnostics.Diagnostics
+import com.onthecrow.wallper.diagnostics.ExitReasons
+import com.onthecrow.wallper.diagnostics.LogcatCrashReporter
+import com.onthecrow.wallper.diagnostics.ReportingTree
 import dagger.hilt.android.HiltAndroidApp
 import timber.log.Timber
 import timber.log.Timber.DebugTree
@@ -10,6 +14,7 @@ import timber.log.Timber.Tree
 import java.text.SimpleDateFormat
 import java.util.Locale
 import java.util.regex.Pattern
+import kotlin.concurrent.thread
 
 
 @HiltAndroidApp
@@ -21,6 +26,12 @@ class WallperApplication : Application() {
         if (BuildConfig.DEBUG) {
             plant(DebugTree())
             plant(FileTree())
+        } else {
+            Diagnostics.reporter = LogcatCrashReporter()
+        }
+        plant(ReportingTree())
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            thread(name = "ExitReasons") { ExitReasons.reportNew(this) }
         }
     }
 

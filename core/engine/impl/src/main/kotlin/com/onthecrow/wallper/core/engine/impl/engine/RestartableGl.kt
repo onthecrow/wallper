@@ -24,7 +24,7 @@ import java.util.concurrent.TimeUnit
  * from any thread, and their latest values also reach a thread started later.
  *
  * A thread is replaced only after it has really exited. One stuck in the driver keeps its EGL surface on
- * the window, and a second one there fails; the engine gives up instead ([onGiveUp]).
+ * the window, and a second one there fails; the engine gives up instead ([onGiveUp], with the reason).
  *
  * @param beforeRestart runs on [handler] before the old thread is stopped, e.g. to detach a video decoder.
  * @param afterRestart runs on [handler] once the new thread is started.
@@ -33,7 +33,7 @@ import java.util.concurrent.TimeUnit
 internal class RestartableGl<S : RestartableGl.Session>(
     holder: SurfaceHolder,
     private val handler: Handler,
-    private val onGiveUp: () -> Unit,
+    private val onGiveUp: (reason: String, error: Throwable?) -> Unit,
     private val beforeRestart: () -> Unit = {},
     private val afterRestart: () -> Unit = {},
     private val newSession: () -> S,
@@ -123,9 +123,7 @@ internal class RestartableGl<S : RestartableGl.Session>(
     /** [candidate] can never draw here (no ES 3, shaders don't build): give up, if it is still the current one. */
     fun fail(candidate: S, error: Throwable) {
         handler.post {
-            if (!isCurrent(candidate) || released) return@post
-            Timber.e(error, "GL can't render here")
-            onGiveUp()
+            if (isCurrent(candidate) && !released) onGiveUp("GL can't render here", error)
         }
     }
 
@@ -174,10 +172,7 @@ internal class RestartableGl<S : RestartableGl.Session>(
         afterRestart()
     }
 
-    private fun giveUp(reason: String) {
-        Timber.w(reason)
-        onGiveUp()
-    }
+    private fun giveUp(reason: String) = onGiveUp(reason, null)
 
     private fun startSession(next: S) {
         session = next

@@ -75,7 +75,7 @@ internal class GLWallpaperEngine(
         gl.start()
         scope.launch {
             player.state.first { it is WallperPlayerState.Failed }
-            host.showPlaceholder()
+            host.showPlaceholder("The video player failed")
         }
         scope.launch { framesExpected.collect(gl::setFramesExpected) }
         player.play()

@@ -11,3 +11,10 @@ updates:
       interval: "weekly"
     commit-message:
       prefix: deps(upgrade)
+    groups:
+      # The migration test runs Room on the bundled SQLite build of the same androidx.sqlite version
+      # Room depends on: they move together.
+      room:
+        patterns:
+          - "androidx.room*"
+          - "androidx.sqlite*"

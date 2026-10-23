@@ -27,7 +27,7 @@ internal class VideoWallpaperEngine(
         Timber.d("created")
         scope.launch {
             player.state.first { it is WallperPlayerState.Failed }
-            host.showPlaceholder()
+            host.showPlaceholder("The video player failed")
         }
         player.setVideoSurface(surfaceHolder().surface)
         player.play()
