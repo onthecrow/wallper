@@ -11,17 +11,29 @@ sealed interface Wallpaper {
     val id: Int
     val isActive: Boolean
 
-    /** Made by the user from their media in the editor. */
+    /**
+     * The user's media as it was picked: cropped and trimmed while it plays. The original is kept, so it can
+     * be edited again.
+     */
     data class Media(
         override val id: Int,
         val type: MediaType,
         val originalPath: String,
-        /** Video pre-cropped by the editor ("additional processing"), null when cropping happens in GL. */
-        val processedPath: String?,
         val thumbnailPath: String,
         val crop: CropRect,
         val clip: ClipRange,
         val mediaInfo: MediaInfo,
+        override val isActive: Boolean,
+    ) : Wallpaper
+
+    /**
+     * A video the editor exported already cropped and trimmed ("additional processing"): it plays as is.
+     * Nothing else is kept, so it can't be edited, only deleted.
+     */
+    data class ProcessedVideo(
+        override val id: Int,
+        val path: String,
+        val thumbnailPath: String,
         override val isActive: Boolean,
     ) : Wallpaper
 

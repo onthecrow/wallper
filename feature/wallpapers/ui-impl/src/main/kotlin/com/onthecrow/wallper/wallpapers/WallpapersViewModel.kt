@@ -45,6 +45,7 @@ internal class WallpapersViewModel @Inject constructor(
         eventFlow.onEach { event ->
             when (event) {
                 is WallpapersEvent.OnWallpaperClick -> activateWallpaper(event.id)
+                is WallpapersEvent.OnEditClick -> navigator.navigate(EditorDestination.Edit(event.id))
                 is WallpapersEvent.OnDeleteClick -> deleteWallpaper(event.id)
                 is WallpapersEvent.OnBuiltInSettingsClick -> navigator.navigate(event.wallpaper.settingsDestination())
                 is WallpapersEvent.OnWallpapersChanged -> event.items.mapNotNull { it.builtIn }.forEach(::followPreview)
@@ -67,7 +68,7 @@ internal class WallpapersViewModel @Inject constructor(
     private fun openEditor(uri: String) {
         viewModelScope.launch(dispatchersProvider.io) {
             if (isMediaSupportedUseCase(uri)) {
-                navigator.navigate(EditorDestination(uri))
+                navigator.navigate(EditorDestination.New(uri))
             } else {
                 onEvent(WallpapersEvent.OnUnsupportedMediaPicked)
             }

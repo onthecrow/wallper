@@ -19,6 +19,7 @@ import kotlin.math.roundToInt
  * @param handleSize size of the handle to control, move or scale dynamic overlay
  * @param imageSize size of the **Bitmap**
  * @param containerSize size of the Composable that draws **Bitmap**
+ * @param initialCropRect the crop to start from, in **Bitmap** pixels; null centres the largest one
  * @param fling when set to true dragging pointer builds up velocity. When last
  * pointer leaves Composable a movement invoked against friction till velocity drops below
  * to threshold
@@ -31,6 +32,7 @@ internal class DynamicCropState internal constructor(
     imageSize: IntSize,
     containerSize: IntSize,
     drawAreaSize: IntSize,
+    initialCropRect: Rect?,
     aspectRatio: Float,
     overlayRatio: Float,
     fling: Boolean,
@@ -40,6 +42,7 @@ internal class DynamicCropState internal constructor(
     imageSize = imageSize,
     containerSize = containerSize,
     drawAreaSize = drawAreaSize,
+    initialCropRect = initialCropRect,
     aspectRatio = aspectRatio,
     fling = fling,
     overlayRatio = overlayRatio,

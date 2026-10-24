@@ -9,4 +9,6 @@ internal data class WallpaperItem(
     val isActive: Boolean,
     /** Set for the wallpapers that ship with the app: their menu has settings instead of delete. */
     val builtIn: BuiltInWallpaper? = null,
+    /** The user's media whose original is kept; a processed video can only be deleted. */
+    val isEditable: Boolean = false,
 )

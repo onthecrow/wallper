@@ -137,13 +137,16 @@ internal fun WallpapersScreen(
                                 },
                             )
                         } else {
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.edit)) },
-                                onClick = {
-                                    // TODO Edit mode: open the editor for this wallpaper.
-                                    expanded = false
-                                },
-                            )
+                            // A processed video keeps no original to edit.
+                            if (wallpaper.isEditable) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.edit)) },
+                                    onClick = {
+                                        expanded = false
+                                        onEvent(WallpapersEvent.OnEditClick(wallpaper.id))
+                                    },
+                                )
+                            }
                             DropdownMenuItem(
                                 text = { Text(stringResource(R.string.delete)) },
                                 onClick = {
@@ -166,7 +169,7 @@ private fun WallpapersScreenPreview() {
         state = WallpapersState(
             items = listOf(
                 WallpaperItem(1, null, false, BuiltInWallpaper.BLACK_HOLE),
-                WallpaperItem(2, "", true),
+                WallpaperItem(2, "", true, isEditable = true),
                 WallpaperItem(3, "", false),
             ),
         ),

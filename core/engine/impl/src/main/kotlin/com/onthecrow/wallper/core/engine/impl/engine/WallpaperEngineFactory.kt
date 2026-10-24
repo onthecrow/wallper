@@ -29,16 +29,11 @@ internal class WallpaperEngineFactory @Inject constructor(
         is WallpaperSpec.BuiltIn -> builtIns[wallpaper.wallpaper]
             ?.createEngine(baseContext, surfaceHolder, isPreview, host)
             ?: PlaceholderWallpaperEngine(baseContext, surfaceHolder)
-        is WallpaperSpec.Media -> {
-            val processedPath = wallpaper.processedPath
-            when {
-                wallpaper.type == MediaType.VIDEO && processedPath != null ->
-                    VideoWallpaperEngine(surfaceHolder, processedPath, playerFactory, host)
-                wallpaper.type == MediaType.VIDEO ->
-                    GLWallpaperEngine(surfaceHolder, wallpaper, playerFactory, host)
-                // TODO Images are not rendered yet and fall back to the placeholder.
-                else -> PlaceholderWallpaperEngine(baseContext, surfaceHolder)
-            }
+        is WallpaperSpec.ProcessedVideo -> VideoWallpaperEngine(surfaceHolder, wallpaper.path, playerFactory, host)
+        is WallpaperSpec.Media -> when (wallpaper.type) {
+            MediaType.VIDEO -> GLWallpaperEngine(surfaceHolder, wallpaper, playerFactory, host)
+            // TODO Images are not rendered yet and fall back to the placeholder.
+            MediaType.IMAGE -> PlaceholderWallpaperEngine(baseContext, surfaceHolder)
         }
     }
 }

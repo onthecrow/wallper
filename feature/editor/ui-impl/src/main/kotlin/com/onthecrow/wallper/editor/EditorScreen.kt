@@ -2,6 +2,13 @@
 
 package com.onthecrow.wallper.editor
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,14 +22,16 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilledIconButton
+import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
+import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
@@ -32,6 +41,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.LocalContext
@@ -45,7 +55,6 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.window.layout.WindowMetricsCalculator
 import com.onthecrow.wallper.core.designsystem.component.trimbar.TrimBar
-import com.onthecrow.wallper.core.designsystem.component.trimbar.TrimBarDefaults
 import com.onthecrow.wallper.core.model.ClipRange
 import com.onthecrow.wallper.core.model.CropRect
 import com.onthecrow.wallper.core.model.MediaType
@@ -58,6 +67,8 @@ import com.onthecrow.wallper.editor.preview.rememberEditorPlayer
 import com.onthecrow.wallper.editor.preview.rememberVideoFrames
 import com.onthecrow.wallper.editor.ui.R
 import com.onthecrow.wallper.editor.view.ErrorDialog
+import com.onthecrow.wallper.editor.view.OptimisedToggle
+import com.onthecrow.wallper.editor.view.ProcessingInfoDialog
 import timber.log.Timber
 
 @Composable
@@ -94,7 +105,12 @@ internal fun EditorScreen(
                     var isDragging by remember(player) { mutableStateOf(false) }
                     val isExporting = state.exportStatus is ExportStatus.InProgress
                     if (player != null) {
-                        PlaybackEffect(player, state.trim, play = state.isPlaying && !isDragging && !isExporting)
+                        PlaybackEffect(
+                            player = player,
+                            trim = state.trim,
+                            play = state.isPlaying && !isDragging && !isExporting,
+                            onEnd = { onEvent(EditorEvent.OnPlaybackEnded) },
+                        )
                     }
 
                     // The preview shows the video rotated upright, so the crop works in those pixels too.
@@ -127,6 +143,7 @@ internal fun EditorScreen(
                                 .fillMaxSize(),
                             player = player,
                             videoSize = videoSize,
+                            initialCropRect = media.edited?.crop?.toRect(),
                             cropStyle = cropStyle,
                             cropProperties = cropProperties,
                             cropRect = { cropRect ->
@@ -140,9 +157,13 @@ internal fun EditorScreen(
                         val durationMs = media.mediaInfo.durationMs
                         PlaybackControls(
                             player = player,
-                            durationMs = durationMs,
+                            // Without a known length there is nothing to trim.
+                            trim = state.trim.takeIf { durationMs > 0 },
                             isPlaying = state.isPlaying,
                             onPlayPauseClick = { onEvent(EditorEvent.OnPlayPauseClick) },
+                            onSetTrimStartClick = { onEvent(EditorEvent.OnSetTrimStartClick(player.positionMs)) },
+                            onSetTrimEndClick = { onEvent(EditorEvent.OnSetTrimEndClick(player.positionMs)) },
+                            modifier = Modifier.padding(bottom = 12.dp),
                         )
                         // Without a known length there is nothing to trim: the export keeps the whole video.
                         if (durationMs > 0) {
@@ -172,32 +193,21 @@ internal fun EditorScreen(
                 }
 
                 Row(
-                    modifier = Modifier.padding(start = 16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Switch(
-                        checked = state.isAdditionalProcessing,
-                        onCheckedChange = { onEvent(EditorEvent.OnAdditionalProcessingToggle) }
-                    )
-                    Spacer(modifier = Modifier.size(8.dp))
-                    Text(text = "Additional processing")
-                    IconButton(onClick = { onEvent(EditorEvent.OnAdditionalProcessingInfoClick) }) {
-                        Image(
-                            painter = painterResource(id = R.drawable.ic_question_mark),
-                            contentDescription = "",
-                            colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.primary)
-                        )
-                    }
-                }
-                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(end = 16.dp, bottom = 16.dp, top = 8.dp)
+                        .padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Button(
-                        modifier = Modifier.align(Alignment.CenterEnd),
-                        onClick = { onEvent(EditorEvent.OnSaveClick(rect.value.toCropRect())) }
-                    ) {
+                    // Only a video is ever optimised: a picture is always kept as it is.
+                    if (media?.type == MediaType.VIDEO) {
+                        OptimisedToggle(
+                            isOptimised = state.isOptimised,
+                            onToggle = { onEvent(EditorEvent.OnOptimisedToggle) },
+                            onInfoClick = { onEvent(EditorEvent.OnProcessingInfoClick) },
+                        )
+                    }
+                    Button(onClick = { onEvent(EditorEvent.OnSaveClick(rect.value.toCropRect())) }) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Image(
                                 painter = painterResource(id = R.drawable.ic_save_outline),
@@ -211,6 +221,12 @@ internal fun EditorScreen(
                 }
 
             }
+            if (state.processingInfo != null) {
+                ProcessingInfoDialog(
+                    onConfirm = { onEvent(EditorEvent.OnProcessingInfoConfirm) },
+                    onDismiss = { onEvent(EditorEvent.OnProcessingInfoDismiss) },
+                )
+            }
             when (val status = state.exportStatus) {
                 is ExportStatus.InProgress -> ExportProgressDialog(status)
                 is ExportStatus.Error -> ErrorDialog(
@@ -223,34 +239,101 @@ internal fun EditorScreen(
     }
 }
 
-/** The time of the frame on screen, and the play / pause button in the middle, above the trim bar. */
+/**
+ * Play / pause between the buttons that put the start and the end of [trim] at the playhead, above the trim
+ * bar. A button is off while it would leave the kept part too short. Without a [trim] there are no such
+ * buttons.
+ */
 @Composable
 private fun PlaybackControls(
     player: EditorPlayer,
-    durationMs: Long,
+    trim: ClipRange?,
     isPlaying: Boolean,
     onPlayPauseClick: () -> Unit,
+    onSetTrimStartClick: () -> Unit,
+    onSetTrimEndClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
-    // Recomposes once a second rather than every frame.
-    val second by remember(player) { derivedStateOf { player.positionMs / 1_000 } }
+    // Recomposes when a button turns on or off rather than every frame.
+    val canSetStart by remember(player, trim) { derivedStateOf { trim?.withStartAt(player.positionMs) != null } }
+    val canSetEnd by remember(player, trim) { derivedStateOf { trim?.withEndAt(player.positionMs) != null } }
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp),
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text(
-            text = "${TrimBarDefaults.formatTime(second * 1_000)} / ${TrimBarDefaults.formatTime(durationMs)}",
-            modifier = Modifier.weight(1f),
-            style = MaterialTheme.typography.bodyMedium,
-        )
-        IconButton(onClick = onPlayPauseClick) {
-            Icon(
-                painter = painterResource(if (isPlaying) R.drawable.ic_pause else R.drawable.ic_play),
-                contentDescription = stringResource(if (isPlaying) R.string.editor_pause else R.string.editor_play),
+        if (trim != null) {
+            SetTrimBoundaryButton(
+                onClick = onSetTrimStartClick,
+                enabled = canSetStart,
+                contentDescription = stringResource(R.string.editor_set_trim_start),
             )
         }
-        Spacer(modifier = Modifier.weight(1f))
+        FilledIconButton(
+            onClick = onPlayPauseClick,
+            modifier = Modifier.size(48.dp),
+            shape = CircleShape,
+        ) {
+            AnimatedContent(
+                targetState = isPlaying,
+                transitionSpec = {
+                    (fadeIn() + scaleIn(initialScale = 0.5f)) togetherWith (fadeOut() + scaleOut(targetScale = 0.5f))
+                },
+                label = "play / pause",
+            ) { playing ->
+                Icon(
+                    painter = painterResource(if (playing) R.drawable.ic_pause else R.drawable.ic_play),
+                    contentDescription = stringResource(if (playing) R.string.editor_pause else R.string.editor_play),
+                    modifier = Modifier.size(28.dp),
+                )
+            }
+        }
+        if (trim != null) {
+            // The same arrow turned around: the bar on the right, pointing back into the kept part.
+            SetTrimBoundaryButton(
+                onClick = onSetTrimEndClick,
+                enabled = canSetEnd,
+                contentDescription = stringResource(R.string.editor_set_trim_end),
+                modifier = Modifier.rotate(180f),
+            )
+        }
+    }
+}
+
+/** Fades between its enabled and disabled colours instead of switching. */
+@Composable
+private fun SetTrimBoundaryButton(
+    onClick: () -> Unit,
+    enabled: Boolean,
+    contentDescription: String,
+    modifier: Modifier = Modifier,
+) {
+    val colors = IconButtonDefaults.filledTonalIconButtonColors()
+    val containerColor by animateColorAsState(
+        targetValue = if (enabled) colors.containerColor else colors.disabledContainerColor,
+        label = "trim button container",
+    )
+    val contentColor by animateColorAsState(
+        targetValue = if (enabled) colors.contentColor else colors.disabledContentColor,
+        label = "trim button content",
+    )
+    FilledTonalIconButton(
+        onClick = onClick,
+        modifier = modifier.size(36.dp),
+        enabled = enabled,
+        shape = CircleShape,
+        colors = IconButtonDefaults.filledTonalIconButtonColors(
+            containerColor = containerColor,
+            contentColor = contentColor,
+            disabledContainerColor = containerColor,
+            disabledContentColor = contentColor,
+        ),
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.ic_trim_start),
+            contentDescription = contentDescription,
+            modifier = Modifier.size(20.dp),
+        )
     }
 }
 
@@ -287,6 +370,8 @@ private fun rememberScreenAspectRatio(): Float {
 }
 
 private fun Rect.toCropRect() = CropRect(left.toInt(), top.toInt(), right.toInt(), bottom.toInt())
+
+private fun CropRect.toRect() = Rect(left.toFloat(), top.toFloat(), right.toFloat(), bottom.toFloat())
 
 @Preview
 @Composable

@@ -17,10 +17,14 @@ internal class FakeWallpaperDao(initial: List<WallpaperEntity> = emptyList()) : 
 
     override fun observeActive(): Flow<WallpaperEntity?> = rows.map { list -> list.firstOrNull { it.isActive } }
 
-    override suspend fun get(id: Int): WallpaperEntity = rows.value.first { it.id == id }
+    override suspend fun get(id: Int): WallpaperEntity? = rows.value.firstOrNull { it.id == id }
 
     override suspend fun insert(wallpaper: WallpaperEntity) {
         rows.update { list -> list + wallpaper.copy(id = (list.maxOfOrNull { it.id } ?: 0) + 1) }
+    }
+
+    override suspend fun update(wallpaper: WallpaperEntity) {
+        rows.update { list -> list.map { if (it.id == wallpaper.id) wallpaper else it } }
     }
 
     override suspend fun delete(wallpaper: WallpaperEntity) {

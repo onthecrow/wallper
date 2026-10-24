@@ -29,6 +29,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.io.File
 import javax.inject.Inject
 
 /** Media3 Transformer export. Transformer must be driven from the main looper, hence `flowOn(main)`. */
@@ -44,8 +45,12 @@ internal class TransformerVideoExporter @Inject constructor(
         crop: CropRect,
         clip: ClipRange,
     ): Flow<ExportStatus> = callbackFlow {
-        // Reading the metadata is disk work: off the main thread, which only drives the Transformer.
-        val item = withContext(dispatchersProvider.io) { getEditedMediaItemForVideo(inputPath, crop, clip) }
+        // Disk work: off the main thread, which only drives the Transformer.
+        val item = withContext(dispatchersProvider.io) {
+            // An edit of a saved wallpaper copies nothing into scratch storage, so its directory may be missing.
+            File(outputPath).parentFile?.mkdirs()
+            getEditedMediaItemForVideo(inputPath, crop, clip)
+        }
         val transformer = getTransformer(
             onCompleted = {
                 trySend(ExportStatus.Success)

@@ -5,11 +5,12 @@ import com.onthecrow.wallper.core.model.ClipRange
 import com.onthecrow.wallper.core.model.CropRect
 import com.onthecrow.wallper.core.model.MediaType
 import com.onthecrow.wallper.core.storage.MediaStorage
-import com.onthecrow.wallper.editor.domain.CreateWallpaperUseCase
+import com.onthecrow.wallper.editor.domain.SaveWallpaperUseCase
 import com.onthecrow.wallper.editor.domain.model.ExportStatus
 import com.onthecrow.wallper.editor.domain.model.PreparedMedia
 import com.onthecrow.wallper.editor.export.VideoExporter
-import com.onthecrow.wallper.wallpapers.domain.SaveWallpaperUseCase
+import com.onthecrow.wallper.wallpapers.domain.AddWallpaperUseCase
+import com.onthecrow.wallper.wallpapers.domain.UpdateWallpaperUseCase
 import com.onthecrow.wallper.wallpapers.domain.model.NewWallpaper
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
@@ -19,21 +20,22 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.onEach
 import javax.inject.Inject
 
-internal class CreateWallpaperUseCaseImpl @Inject constructor(
+internal class SaveWallpaperUseCaseImpl @Inject constructor(
     private val mediaStorage: MediaStorage,
     private val videoExporter: VideoExporter,
-    private val saveWallpaperUseCase: SaveWallpaperUseCase,
+    private val addWallpaperUseCase: AddWallpaperUseCase,
+    private val updateWallpaperUseCase: UpdateWallpaperUseCase,
     private val dispatchersProvider: DispatchersProvider,
-) : CreateWallpaperUseCase {
+) : SaveWallpaperUseCase {
 
     override fun invoke(
         media: PreparedMedia,
         crop: CropRect,
         clip: ClipRange,
-        preCrop: Boolean,
+        process: Boolean,
     ): Flow<ExportStatus> = flow {
         // The export works in scratch storage too: a failed or abandoned one leaves nothing elsewhere.
-        val processed = mediaStorage.tempProcessedFile.takeIf { media.type == MediaType.VIDEO && preCrop }
+        val processed = mediaStorage.tempProcessedFile.takeIf { media.type == MediaType.VIDEO && process }
         val export = if (processed != null) {
             mediaStorage.delete(processed.path)
             videoExporter.export(media.path, processed.path, crop, clip)
@@ -49,33 +51,30 @@ internal class CreateWallpaperUseCaseImpl @Inject constructor(
     }.flowOn(dispatchersProvider.io)
 
     /**
-     * Copies the scratch files to permanent storage, only now that the wallpaper is ready, and saves it. If
+     * Copies the files the wallpaper keeps to permanent storage, only now that it is ready, and saves it. If
      * that fails halfway, the copies go again: no file outlives a wallpaper that wasn't saved.
      */
     private suspend fun save(media: PreparedMedia, crop: CropRect, clip: ClipRange, isProcessed: Boolean) {
+        val edited = media.edited
         val persisted = mutableListOf<String>()
         try {
-            val originalPath = mediaStorage.persistTempMedia().also(persisted::add)
-            val processedPath = if (isProcessed) mediaStorage.persistTempProcessed().also(persisted::add) else null
-            val thumbnailPath = if (media.type == MediaType.VIDEO) {
-                mediaStorage.persistTempThumbnail()?.also(persisted::add)
+            // An edited wallpaper keeps its thumbnail: it is the first frame, whatever the crop and trim.
+            val thumbnailPath = edited?.thumbnailPath ?: persistThumbnail(media.type)?.also(persisted::add).orEmpty()
+            val wallpaper = if (isProcessed) {
+                // The export is all a processed video needs: it can't be edited again, so the original goes.
+                NewWallpaper.ProcessedVideo(mediaStorage.persistTempProcessed().also(persisted::add), thumbnailPath)
             } else {
-                null
+                // An edited wallpaper's original is in permanent storage already.
+                val originalPath = if (edited != null) media.path else mediaStorage.persistTempMedia().also(persisted::add)
+                NewWallpaper.Media(media.type, originalPath, thumbnailPath, crop, clip, media.mediaInfo)
             }
-            saveWallpaperUseCase(
-                NewWallpaper(
-                    type = media.type,
-                    originalPath = originalPath,
-                    processedPath = processedPath,
-                    thumbnailPath = thumbnailPath.orEmpty(),
-                    crop = crop,
-                    clip = clip,
-                    mediaInfo = media.mediaInfo,
-                )
-            )
+            if (edited != null) updateWallpaperUseCase(edited.id, wallpaper) else addWallpaperUseCase(wallpaper)
         } catch (error: Throwable) {
             persisted.forEach(mediaStorage::delete)
             throw error
         }
     }
+
+    private fun persistThumbnail(type: MediaType): String? =
+        if (type == MediaType.VIDEO) mediaStorage.persistTempThumbnail() else null
 }
