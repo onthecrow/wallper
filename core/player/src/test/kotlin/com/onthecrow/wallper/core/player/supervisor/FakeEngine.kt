@@ -8,8 +8,9 @@ import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 
 /**
- * An engine whose decoder makes one frame of progress per snapshot while [healthy] and playing.
- * Lifecycle calls also go to [journal], shared by every engine of one factory, to check their order.
+ * An engine whose decoder makes one frame of progress per snapshot while [healthy] and playing. Unless it
+ * [loops] it stops at [durationMs], ended. Lifecycle calls also go to [journal], shared by every engine
+ * of one factory, to check their order.
  */
 internal class FakeEngine(
     override val id: Int,
@@ -24,6 +25,8 @@ internal class FakeEngine(
     var healthy = true
     var state = EngineSnapshot.State.READY
     var durationMs = 10_000L
+    var loops = true
+        private set
     var released = false
     val actions = mutableListOf<String>()
 
@@ -34,6 +37,7 @@ internal class FakeEngine(
     override val error = MutableStateFlow<Int?>(null)
     override val frameRate = MutableStateFlow(30f)
     override val loopBoundaries = MutableSharedFlow<Unit>(extraBufferCapacity = 1)
+    override val isEnded = MutableStateFlow(false)
 
     override fun setSurface(surface: Surface?) {
         this.surface = surface
@@ -41,9 +45,14 @@ internal class FakeEngine(
     }
 
     override fun snapshot(): EngineSnapshot {
-        if (healthy && playing && !released) {
+        if (healthy && playing && !released && !isEnded.value) {
             frames++
             positionMs += 250
+            if (!loops && positionMs >= durationMs) {
+                positionMs = durationMs
+                state = EngineSnapshot.State.ENDED
+                isEnded.value = true
+            }
         }
         return EngineSnapshot(state, positionMs, durationMs, frames)
     }
@@ -61,7 +70,13 @@ internal class FakeEngine(
 
     override fun seekTo(positionMs: Long) {
         this.positionMs = positionMs
+        isEnded.value = false
+        if (state == EngineSnapshot.State.ENDED) state = EngineSnapshot.State.READY
         journal += "#$id seekTo $positionMs"
+    }
+
+    override fun setLooping(looping: Boolean) {
+        loops = looping
     }
 
     override fun release() {

@@ -56,6 +56,16 @@ internal class DefaultWallperPlayer(
         playWhenReady.value = false
     }
 
+    // Posted, not awaited: they reach the supervisor before a play() that follows them, which goes through
+    // the same handler.
+    override fun setLooping(looping: Boolean) {
+        handler.post { supervisor.setLooping(looping) }
+    }
+
+    override fun seekToStart() {
+        handler.post { supervisor.seekToStart() }
+    }
+
     override fun release() {
         onPlayerThread(RELEASE_TIMEOUT_MS) {
             scope.cancel()

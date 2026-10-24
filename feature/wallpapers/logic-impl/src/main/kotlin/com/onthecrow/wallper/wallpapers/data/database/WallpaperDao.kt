@@ -20,8 +20,9 @@ internal interface WallpaperDao {
     @Query("SELECT * FROM wallpapers WHERE id = :id")
     suspend fun get(id: Int): WallpaperEntity?
 
+    /** Returns the new row's id. */
     @Insert
-    suspend fun insert(wallpaper: WallpaperEntity)
+    suspend fun insert(wallpaper: WallpaperEntity): Long
 
     @Update
     suspend fun update(wallpaper: WallpaperEntity)

@@ -15,6 +15,8 @@ import com.onthecrow.wallper.core.navigation.Navigator
 import com.onthecrow.wallper.editor.EditorDestination
 import com.onthecrow.wallper.editor.domain.IsMediaSupportedUseCase
 import com.onthecrow.wallper.settings.SettingsDestination
+import com.onthecrow.wallper.settings.domain.AppSettings
+import com.onthecrow.wallper.settings.domain.AppSettingsSource
 import com.onthecrow.wallper.wallpapers.domain.ActivateWallpaperUseCase
 import com.onthecrow.wallper.wallpapers.domain.DeleteWallpaperUseCase
 import com.onthecrow.wallper.wallpapers.domain.ObserveWallpapersUseCase
@@ -27,6 +29,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -49,6 +52,7 @@ class WallpapersViewModelTest {
     private val previews = FakeBuiltInPreviews()
     private var mediaSupported = true
     private var builtInsSupported = true
+    private val appSettings = MutableStateFlow(AppSettings())
 
     @BeforeTest
     fun setUp() = Dispatchers.setMain(dispatcher)
@@ -77,6 +81,10 @@ class WallpapersViewModelTest {
             override fun wallpaperChanges(): Flow<Unit> = error("not used in these tests")
         },
         builtInPreviews = previews,
+        appSettings = object : AppSettingsSource {
+            override val settings = appSettings
+            override fun update(transform: (AppSettings) -> AppSettings) = appSettings.update(transform)
+        },
         navigator = navigator,
         dispatchersProvider = TestDispatchers(dispatcher),
     )
@@ -186,6 +194,18 @@ class WallpapersViewModelTest {
 
         assertEquals(listOf(WallpaperItem(1, "thumbnail-1", false)), viewModel.state.value.items)
         assertEquals(emptyList(), previews.requests)
+    }
+
+    @Test
+    fun `hidden built-ins leave the list, unless one is the active wallpaper`() = runTest(dispatcher) {
+        wallpapers.value = listOf(builtIn(id = 5), wallpaper(id = 1, type = MediaType.VIDEO))
+        val viewModel = createViewModel()
+
+        appSettings.value = AppSettings(showBuiltInWallpapers = false)
+        assertEquals(listOf(1), viewModel.state.value.items.map { it.id })
+
+        wallpapers.value = listOf(builtIn(id = 5, isActive = true), wallpaper(id = 1, type = MediaType.VIDEO))
+        assertEquals(listOf(5, 1), viewModel.state.value.items.map { it.id })
     }
 
     @Test

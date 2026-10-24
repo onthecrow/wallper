@@ -5,6 +5,7 @@ import android.os.HandlerThread
 import android.view.Surface
 import android.view.SurfaceHolder
 import com.onthecrow.wallper.core.engine.EngineHost
+import com.onthecrow.wallper.core.engine.VideoWallpaperSettings
 import com.onthecrow.wallper.core.engine.WallpaperEngine
 import com.onthecrow.wallper.core.engine.WallpaperSpec
 import com.onthecrow.wallper.core.gl.RestartableGl
@@ -18,9 +19,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.android.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -31,12 +34,16 @@ import timber.log.Timber
  *
  * Only binds the two sides together: the renderer's video surface goes to the player. Each side recovers
  * on its own. The player replaces its decoder behind that surface; the GL side repairs EGL inside the GL
- * thread, and a broken or hung GL thread is recreated here without touching the player.
+ * thread, and a broken or hung GL thread is recreated here without touching the player. When the user
+ * wants it, the crop pans with the launcher's pages ([VideoWallpaperRenderer.pageOffset]).
  */
 internal class GLWallpaperEngine(
     surfaceHolder: () -> SurfaceHolder,
     wallpaper: WallpaperSpec.Media,
     playerFactory: WallperPlayerFactory,
+    settings: Flow<VideoWallpaperSettings>,
+    savingPower: Flow<Boolean>,
+    screenOffs: Flow<Unit>,
     private val host: EngineHost,
 ) : WallpaperEngine() {
 
@@ -61,6 +68,15 @@ internal class GLWallpaperEngine(
         isVisible && state == WallperPlayerState.Playing
     }.stateIn(scope, SharingStarted.Eagerly, false)
 
+    private val playback = VideoPlaybackControl(player, settings, savingPower, screenOffs, scope)
+
+    /** The launcher's page offset, null without pages. */
+    private val launcherOffset = MutableStateFlow<Float?>(null)
+
+    /** What the renderer pans with; kept here for a renderer made after a GL restart. */
+    @Volatile
+    private var pageOffset: Float? = null
+
     // Waits until the decoder lets go of the old texture, which the old GL thread releases on exit.
     private val gl = RestartableGl(
         holder = holder,
@@ -81,14 +97,23 @@ internal class GLWallpaperEngine(
             host.showPlaceholder("The video player failed")
         }
         scope.launch { framesExpected.collect(gl::setFramesExpected) }
-        player.play()
+        scope.launch {
+            combine(launcherOffset, settings) { offset, settings -> offset.takeIf { settings.scrollsWithPages } }
+                .distinctUntilChanged()
+                .collect { offset ->
+                    pageOffset = offset
+                    gl.current.renderer.pageOffset = offset
+                    // A paused video gets no new frames to draw the move with.
+                    gl.current.thread.requestRender()
+                }
+        }
     }
 
     override fun pause() {
         Timber.d("paused")
         visible.value = false
         gl.setVisible(false)
-        player.pause()
+        playback.setVisible(false)
     }
 
     override fun resume() {
@@ -96,7 +121,11 @@ internal class GLWallpaperEngine(
         visible.value = true
         gl.setVisible(true)
         gl.current.thread.requestRender()
-        player.play()
+        playback.setVisible(true)
+    }
+
+    override fun onOffsetsChanged(xOffset: Float, xOffsetStep: Float) {
+        launcherOffset.value = xOffset.takeIf { xOffsetStep > 0f }
     }
 
     override fun onSurfaceChanged(width: Int, height: Int) = gl.onSurfaceChanged(width, height)
@@ -124,7 +153,7 @@ internal class GLWallpaperEngine(
                     if (gl.isCurrent(this@Gl) && !released) player.setVideoSurface(surface)
                 }
             },
-        )
+        ).apply { pageOffset = this@GLWallpaperEngine.pageOffset }
 
         override val thread: WallpaperGLThread = WallpaperGLThread(
             surfaceHolder = holder,

@@ -15,14 +15,19 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.withTimeoutOrNull
 
 /**
  * Keeps two engines: the active one plays on the surface, the standby one is prepared off-screen and
  * paused. When [StallWatchdog] reports a stall, the supervisor either switches to the standby or gives
  * up with [WallperPlayerState.Failed]. The stalled engine is replaced by a new standby at the switch.
+ * A clip that doesn't loop and reaches its end isn't a stall: it stays there, [WallperPlayerState.Ended].
  *
  * Runs on the player thread, as every ExoPlayer call must; nothing here is thread-safe.
  */
@@ -43,6 +48,7 @@ internal class EngineSupervisor(
     private var active: ManagedEngine? = null
     private var standby: ManagedEngine? = null
     private var resumePositionMs = 0L
+    private var looping = true
 
     suspend fun run(playWhenReady: Flow<Boolean>) {
         createEngines()
@@ -58,6 +64,19 @@ internal class EngineSupervisor(
         active?.setSurface(surface)
     }
 
+    /** For every engine, those created later too. */
+    fun setLooping(looping: Boolean) {
+        this.looping = looping
+        active?.setLooping(looping)
+        standby?.setLooping(looping)
+    }
+
+    /** The active engine jumps to the clip start; engines created later start there too. */
+    fun seekToStart() {
+        resumePositionMs = 0
+        active?.seekTo(0)
+    }
+
     fun releaseAll() {
         active?.release()
         active = null
@@ -67,10 +86,16 @@ internal class EngineSupervisor(
 
     private suspend fun play() {
         var engine = active ?: createEngines()
+        // Played to the end before and looping now: start the clip over. Without looping it stays ended.
+        if (engine.isEnded.value && looping) engine.seekTo(0)
         engine.play()
         _state.value = WallperPlayerState.Playing
         while (true) {
-            val cause = watchdog.watch(engine)
+            val cause = watchOrEnd(engine)
+            if (cause == null) {
+                _state.value = WallperPlayerState.Ended
+                return
+            }
             log("Engine #${engine.id}: $cause")
             if (cause is StallCause.Failed && cause.errorCode in CONTENT_ERROR_CODES) {
                 return fail(FailureCause.ContentBroken(cause.errorCode))
@@ -82,6 +107,12 @@ internal class EngineSupervisor(
             _state.value = WallperPlayerState.Playing
         }
     }
+
+    /** Suspends while [engine] plays; returns why it stalled, or null once it ended without looping. */
+    private suspend fun watchOrEnd(engine: ManagedEngine): StallCause? = merge<StallCause?>(
+        engine.isEnded.filter { it }.map { null },
+        flow { emit(watchdog.watch(engine)) },
+    ).first()
 
     /** Paused for long: frees both decoders; the next [play] creates them again where playback stopped. */
     private suspend fun pause() {
@@ -97,14 +128,16 @@ internal class EngineSupervisor(
 
     /** Returns the active engine. */
     private fun createEngines(): ManagedEngine {
-        val engine = factory.create(resumePositionMs, surface, playWhenReady = false)
+        val engine = factory.create(resumePositionMs, surface, playWhenReady = false).apply { setLooping(looping) }
         active = engine
         createStandby()
         return engine
     }
 
     private fun createStandby(): ManagedEngine =
-        factory.create(positionMs = 0, surface = null, playWhenReady = false).also { standby = it }
+        factory.create(positionMs = 0, surface = null, playWhenReady = false)
+            .apply { setLooping(looping) }
+            .also { standby = it }
 
     /**
      * A ready standby, within the retry budget. A standby that failed while waiting, or doesn't get

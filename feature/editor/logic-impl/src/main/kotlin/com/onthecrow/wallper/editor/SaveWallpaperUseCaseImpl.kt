@@ -9,6 +9,8 @@ import com.onthecrow.wallper.editor.domain.SaveWallpaperUseCase
 import com.onthecrow.wallper.editor.domain.model.ExportStatus
 import com.onthecrow.wallper.editor.domain.model.PreparedMedia
 import com.onthecrow.wallper.editor.export.VideoExporter
+import com.onthecrow.wallper.settings.domain.AppSettingsSource
+import com.onthecrow.wallper.wallpapers.domain.ActivateWallpaperUseCase
 import com.onthecrow.wallper.wallpapers.domain.AddWallpaperUseCase
 import com.onthecrow.wallper.wallpapers.domain.UpdateWallpaperUseCase
 import com.onthecrow.wallper.wallpapers.domain.model.NewWallpaper
@@ -25,6 +27,8 @@ internal class SaveWallpaperUseCaseImpl @Inject constructor(
     private val videoExporter: VideoExporter,
     private val addWallpaperUseCase: AddWallpaperUseCase,
     private val updateWallpaperUseCase: UpdateWallpaperUseCase,
+    private val activateWallpaperUseCase: ActivateWallpaperUseCase,
+    private val appSettings: AppSettingsSource,
     private val dispatchersProvider: DispatchersProvider,
 ) : SaveWallpaperUseCase {
 
@@ -68,11 +72,17 @@ internal class SaveWallpaperUseCaseImpl @Inject constructor(
                 val originalPath = if (edited != null) media.path else mediaStorage.persistTempMedia().also(persisted::add)
                 NewWallpaper.Media(media.type, originalPath, thumbnailPath, crop, clip, media.mediaInfo)
             }
-            if (edited != null) updateWallpaperUseCase(edited.id, wallpaper) else addWallpaperUseCase(wallpaper)
+            if (edited != null) updateWallpaperUseCase(edited.id, wallpaper) else add(wallpaper)
         } catch (error: Throwable) {
             persisted.forEach(mediaStorage::delete)
             throw error
         }
+    }
+
+    /** A new wallpaper becomes the active one right away if the user wants it so. */
+    private suspend fun add(wallpaper: NewWallpaper) {
+        val id = addWallpaperUseCase(wallpaper)
+        if (appSettings.settings.value.activateNewWallpapers) activateWallpaperUseCase(id)
     }
 
     private fun persistThumbnail(type: MediaType): String? =

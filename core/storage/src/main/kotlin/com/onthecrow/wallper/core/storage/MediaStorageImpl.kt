@@ -55,5 +55,7 @@ internal class MediaStorageImpl @Inject constructor(
         }.onFailure(Timber::e)
     }
 
+    override fun sizeOf(path: String): Long = File(path).length()
+
     private fun randomName() = UUID.randomUUID().toString()
 }
