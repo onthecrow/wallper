@@ -9,6 +9,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.android.asCoroutineDispatcher
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
 import timber.log.Timber
 import java.util.concurrent.CountDownLatch
@@ -19,7 +22,8 @@ import java.util.concurrent.TimeUnit
  * and the teardown shared by every GL engine, the video one and the built-ins.
  *
  * The heartbeat and the restarts run on the engine's callback thread ([handler]); so do [restart] and [fail],
- * which post there. [setVisible], [setFramesExpected], [onSurfaceChanged] and [onSurfaceDestroyed] may come
+ * which post there. The heartbeat runs only while frames are expected: a hidden or still wallpaper never
+ * wakes for it. [setVisible], [setFramesExpected], [onSurfaceChanged] and [onSurfaceDestroyed] may come
  * from any thread, and their latest values also reach a thread started later.
  *
  * A thread is replaced only after it has really exited. One stuck in the driver keeps its EGL surface on
@@ -54,8 +58,7 @@ class RestartableGl<S : RestartableGl.Session>(
     @Volatile
     private var visible = true
 
-    @Volatile
-    private var framesExpected = false
+    private val framesExpected = MutableStateFlow(false)
 
     @Volatile
     private var width = holder.surfaceFrame.width()
@@ -77,7 +80,7 @@ class RestartableGl<S : RestartableGl.Session>(
     /** Starts the first thread and the heartbeat. Separate from the constructor: sessions refer back to this. */
     fun start() {
         startSession(newSession())
-        scope.launch { watchHeartbeat() }
+        scope.launch { GlHeartbeat.run(framesExpected, ::checkHeartbeat) }
     }
 
     fun isCurrent(candidate: S): Boolean = session === candidate
@@ -90,7 +93,7 @@ class RestartableGl<S : RestartableGl.Session>(
 
     /** Frames are expected now (visible, and something animates): arms the heartbeat. */
     fun setFramesExpected(expected: Boolean) {
-        framesExpected = expected
+        framesExpected.value = expected
         armedSinceMs = when {
             !expected -> null
             else -> armedSinceMs ?: SystemClock.elapsedRealtime()
@@ -142,19 +145,15 @@ class RestartableGl<S : RestartableGl.Session>(
     }
 
     /** A GL thread stuck inside a driver call can't notice that itself. */
-    private suspend fun watchHeartbeat() {
-        while (true) {
-            delay(HEARTBEAT_CHECK_MS)
-            val running = session ?: continue
-            val thread = running.thread
-            val hung = GlHeartbeat.isHung(
-                nowMs = SystemClock.elapsedRealtime(),
-                armedSinceMs = armedSinceMs,
-                lastLoopAtMs = thread.lastLoopAtMs,
-                slowFrame = thread.presentedFrames - slowFromFrame < GlHeartbeat.SLOW_FRAMES,
-            )
-            if (hung) restartNow("GL thread unresponsive")
-        }
+    private fun checkHeartbeat() {
+        val thread = session?.thread ?: return
+        val hung = GlHeartbeat.isHung(
+            nowMs = SystemClock.elapsedRealtime(),
+            armedSinceMs = armedSinceMs,
+            lastLoopAtMs = thread.lastLoopAtMs,
+            slowFrame = thread.presentedFrames - slowFromFrame < GlHeartbeat.SLOW_FRAMES,
+        )
+        if (hung) restartNow("GL thread unresponsive")
     }
 
     private fun restartNow(reason: String) {
@@ -176,22 +175,19 @@ class RestartableGl<S : RestartableGl.Session>(
     private fun startSession(next: S) {
         session = next
         slowFromFrame = 0
-        armedSinceMs = if (framesExpected) SystemClock.elapsedRealtime() else null
+        armedSinceMs = if (framesExpected.value) SystemClock.elapsedRealtime() else null
         // The latest state, read after the session changed: an update racing with this reaches one or the other.
         val thread = next.thread
         thread.onSurfaceCreatedOrChanged(width, height)
         if (!visible) thread.onPauseRendering()
-        thread.setFramesExpected(framesExpected)
+        thread.setFramesExpected(framesExpected.value)
         thread.start()
-    }
-
-    private companion object {
-        const val HEARTBEAT_CHECK_MS = 500L
     }
 }
 
-/** When a GL thread counts as hung. Pure, so it is tested on the JVM. */
+/** When a GL thread counts as hung, and when it is checked. Free of Android types, so it is tested on the JVM. */
 object GlHeartbeat {
+    const val CHECK_INTERVAL_MS = 500L
     const val TIMEOUT_MS = 2_000L
 
     /** The first frames of a thread, or after new shaders, compile them: seconds on a cold driver cache. */
@@ -199,6 +195,20 @@ object GlHeartbeat {
 
     /** Frames that count as slow after the mark: a frame already in flight when it was set may come first. */
     const val SLOW_FRAMES = 2L
+
+    /**
+     * Calls [check] every [CHECK_INTERVAL_MS] while [framesExpected] is true, and never otherwise: nothing
+     * can hang while no frames are expected, and a hidden wallpaper must not wake the CPU.
+     */
+    suspend fun run(framesExpected: Flow<Boolean>, check: () -> Unit) {
+        framesExpected.collectLatest { expected ->
+            if (!expected) return@collectLatest
+            while (true) {
+                delay(CHECK_INTERVAL_MS)
+                check()
+            }
+        }
+    }
 
     /**
      * @param armedSinceMs when frames became expected (or the thread was replaced); null while none are.
