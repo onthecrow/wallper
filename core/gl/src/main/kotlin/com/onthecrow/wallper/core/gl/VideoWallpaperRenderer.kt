@@ -33,7 +33,12 @@ class VideoWallpaperRenderer(
     /** The texture of a lost context. The player may still decode into it; released on the first new frame. */
     private var retired: OpenGLExternalTexture? = null
 
-    override fun setOffset(xOffset: Float, yOffset: Float) {}
+    /**
+     * Where the launcher is between its pages, 0 (the first) to 1 (the last), or null to show the crop as
+     * chosen ([PageScroll]). Any thread; request a render after it.
+     */
+    @Volatile
+    var pageOffset: Float? = null
 
     override fun onSurfaceCreated() {
         Timber.d("onSurfaceCreated")
@@ -65,7 +70,7 @@ class VideoWallpaperRenderer(
         // Latching on every draw re-arms a SurfaceTexture that stopped sending frame callbacks.
         val isNewFrame = currentTexture.latch()
         if (isNewFrame) releaseRetired()
-        currentScene.draw(currentTexture)
+        currentScene.draw(currentTexture, pageOffset)
         return isNewFrame
     }
 

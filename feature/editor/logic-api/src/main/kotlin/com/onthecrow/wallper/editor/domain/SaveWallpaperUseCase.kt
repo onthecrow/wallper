@@ -8,6 +8,7 @@ import kotlinx.coroutines.flow.Flow
 
 /**
  * Saves what the editor made of [PreparedMedia]: a new wallpaper, or the new version of the one it edits.
+ * A new one becomes the active wallpaper if the user wants it so (`AppSettings.activateNewWallpapers`).
  *
  * Without [process] the original is kept and the wallpaper crops and trims it while it plays. With it a
  * video is exported cropped and trimmed, and only the export is kept: the wallpaper can't be edited again.

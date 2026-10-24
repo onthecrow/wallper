@@ -12,12 +12,16 @@ import com.onthecrow.wallper.core.navigation.Navigator
 import com.onthecrow.wallper.editor.EditorDestination
 import com.onthecrow.wallper.editor.domain.IsMediaSupportedUseCase
 import com.onthecrow.wallper.settings.SettingsDestination
+import com.onthecrow.wallper.settings.domain.AppSettingsSource
 import com.onthecrow.wallper.wallpapers.domain.ActivateWallpaperUseCase
 import com.onthecrow.wallper.wallpapers.domain.DeleteWallpaperUseCase
 import com.onthecrow.wallper.wallpapers.domain.ObserveWallpapersUseCase
 import com.onthecrow.wallper.wallpapers.mapper.toItem
+import com.onthecrow.wallper.wallpapers.model.WallpaperItem
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
@@ -34,6 +38,7 @@ internal class WallpapersViewModel @Inject constructor(
     private val isMediaSupportedUseCase: IsMediaSupportedUseCase,
     private val liveWallpaperController: LiveWallpaperController,
     private val builtInPreviews: BuiltInPreviews,
+    private val appSettings: AppSettingsSource,
     private val navigator: Navigator,
     private val dispatchersProvider: DispatchersProvider,
 ) : BaseViewModel<WallpapersEvent, WallpapersState, WallpapersReducer>(WallpapersState(), reducer) {
@@ -55,14 +60,20 @@ internal class WallpapersViewModel @Inject constructor(
             }
         }.launchIn(viewModelScope)
 
-        observeWallpapersUseCase()
-            .map { wallpapers ->
-                wallpapers.map { it.toItem() }.filter { item -> item.builtIn?.let(liveWallpaperController::isSupported) ?: true }
-            }
+        combine(observeWallpapersUseCase(), appSettings.settings.map { it.showBuiltInWallpapers }) { wallpapers, showsBuiltIns ->
+            wallpapers.map { it.toItem() }.filter { item -> item.isListed(showsBuiltIns) }
+        }
+            .distinctUntilChanged()
             .onEach { items -> onEvent(WallpapersEvent.OnWallpapersChanged(items)) }
             .catch { onEvent(WallpapersEvent.OnWallpapersLoadFailed(it.message.orEmpty())) }
             .flowOn(dispatchersProvider.io)
             .launchIn(viewModelScope)
+    }
+
+    /** A built-in this device can't draw never is; hidden built-ins are, while one is the active wallpaper. */
+    private fun WallpaperItem.isListed(showsBuiltIns: Boolean): Boolean {
+        val builtIn = builtIn ?: return true
+        return liveWallpaperController.isSupported(builtIn) && (showsBuiltIns || isActive)
     }
 
     private fun openEditor(uri: String) {

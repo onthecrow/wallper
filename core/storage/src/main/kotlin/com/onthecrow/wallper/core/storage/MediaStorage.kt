@@ -38,4 +38,7 @@ interface MediaStorage {
     fun clearTemp()
 
     fun delete(path: String)
+
+    /** The size of the file at [path] in bytes; 0 if there is none. Disk work: off the main thread. */
+    fun sizeOf(path: String): Long
 }

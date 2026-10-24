@@ -219,5 +219,74 @@ class EngineSupervisorTest {
         assertSame(recreated, standby.surface)
     }
 
+    @Test
+    fun `a clip that doesn't loop stops on its end without a switch`() = runTest {
+        val factory = FakeEngineFactory()
+        val supervisor = start(factory)
+        supervisor.setLooping(false)
+
+        advanceTimeBy(12_000)
+
+        val (active, standby) = factory.created
+        assertEquals(WallperPlayerState.Ended, supervisor.state.value)
+        assertEquals(10_000, active.positionMs)
+        assertFalse(active.released)
+        assertFalse(standby.loops)
+        assertEquals(2, factory.created.size)
+    }
+
+    @Test
+    fun `a play after the end starts the clip over`() = runTest {
+        val factory = FakeEngineFactory()
+        val supervisor = start(factory)
+        supervisor.setLooping(false)
+        advanceTimeBy(12_000)
+
+        playWhenReady.value = false
+        runCurrent()
+        playWhenReady.value = true
+        runCurrent()
+
+        val active = factory.created.first()
+        assertTrue("#1 seekTo 0" in factory.journal)
+        assertTrue(active.playing)
+        assertEquals(WallperPlayerState.Playing, supervisor.state.value)
+    }
+
+    @Test
+    fun `seek to start moves the playing engine and where new engines start`() = runTest {
+        val factory = FakeEngineFactory()
+        val supervisor = start(factory)
+        advanceTimeBy(3_000)
+
+        supervisor.seekToStart()
+        assertTrue("#1 seekTo 0" in factory.journal)
+
+        // Paused for long, the engines are released: the next ones start at the clip start.
+        advanceTimeBy(3_000)
+        playWhenReady.value = false
+        advanceTimeBy(20_000)
+        supervisor.seekToStart()
+        playWhenReady.value = true
+        runCurrent()
+        assertEquals(0, factory.created[2].startPositionMs)
+    }
+
+    @Test
+    fun `looping reaches every engine, the ones made later too`() = runTest {
+        val factory = FakeEngineFactory()
+        val supervisor = start(factory)
+
+        supervisor.setLooping(false)
+        val (stalled, standby) = factory.created
+        advanceTimeBy(2_000)
+        stalled.healthy = false
+        advanceTimeBy(1_000)
+
+        assertFalse(stalled.loops)
+        assertFalse(standby.loops)
+        assertFalse(factory.created[2].loops)
+    }
+
     private fun newSurface() = Surface(SurfaceTexture(0))
 }

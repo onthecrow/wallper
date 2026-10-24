@@ -10,7 +10,10 @@ sealed interface EditorDestination : Destination {
     @Serializable
     data class New(val uri: String) : EditorDestination
 
-    /** Saved wallpaper [wallpaperId]. Only one that keeps its original can be edited. */
+    /**
+     * Saved wallpaper [wallpaperId]. Only one that keeps its original can be edited. With [optimise] the
+     * editor starts by switching to optimised, as if the user did: the first time it explains it first.
+     */
     @Serializable
-    data class Edit(val wallpaperId: Int) : EditorDestination
+    data class Edit(val wallpaperId: Int, val optimise: Boolean = false) : EditorDestination
 }

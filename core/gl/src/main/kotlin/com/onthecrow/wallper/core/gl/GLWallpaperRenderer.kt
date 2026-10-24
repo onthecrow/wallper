@@ -11,8 +11,6 @@ abstract class GLWallpaperRenderer {
     /** Draws one frame. Returns true if it put a new video frame on screen (the render guard's progress signal). */
     abstract fun onDrawFrame(): Boolean
 
-    abstract fun setOffset(xOffset: Float, yOffset: Float)
-
     /** The context is about to be destroyed and recreated; GL objects die with it. */
     open fun onContextLost() = dispose()
 

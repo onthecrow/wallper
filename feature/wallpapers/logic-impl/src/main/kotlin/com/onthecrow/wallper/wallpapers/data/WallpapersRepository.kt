@@ -14,7 +14,8 @@ internal class WallpapersRepository @Inject constructor(
 
     suspend fun get(id: Int): WallpaperEntity? = wallpaperDao.get(id)
 
-    suspend fun insert(wallpaper: WallpaperEntity) = wallpaperDao.insert(wallpaper)
+    /** Returns the new wallpaper's id. */
+    suspend fun insert(wallpaper: WallpaperEntity): Int = wallpaperDao.insert(wallpaper).toInt()
 
     suspend fun update(wallpaper: WallpaperEntity) = wallpaperDao.update(wallpaper)
 
