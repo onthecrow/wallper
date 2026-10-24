@@ -8,7 +8,6 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,33 +16,26 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.material3.CenterAlignedTopAppBar
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import com.onthecrow.wallper.core.designsystem.R as DesignR
 import com.onthecrow.wallper.core.designsystem.component.FAB
 import com.onthecrow.wallper.core.model.BuiltInWallpaper
 import com.onthecrow.wallper.wallpapers.model.WallpaperItem
 import com.onthecrow.wallper.wallpapers.ui.R
+import com.onthecrow.wallper.wallpapers.view.DeleteWallpaperDialog
 import com.onthecrow.wallper.wallpapers.view.WallpaperCard
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
@@ -93,7 +85,7 @@ internal fun WallpapersScreen(
             )
         },
         floatingActionButton = {
-            FAB {
+            FAB(contentDescription = stringResource(R.string.add_wallpaper)) {
                 pickMedia.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
             }
         }
@@ -109,56 +101,34 @@ internal fun WallpapersScreen(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             items(state.items, { wallpaper -> wallpaper.id }) { wallpaper ->
-                var expanded by remember { mutableStateOf(false) }
-                Box(
+                WallpaperCard(
+                    wallpaper = wallpaper,
+                    onClick = { onEvent(WallpapersEvent.OnWallpaperClick(wallpaper.id)) },
+                    onEditClick = {
+                        val builtIn = wallpaper.builtIn
+                        onEvent(
+                            if (builtIn != null) {
+                                WallpapersEvent.OnBuiltInSettingsClick(builtIn)
+                            } else {
+                                WallpapersEvent.OnEditClick(wallpaper.id)
+                            }
+                        )
+                    },
+                    onDeleteClick = { onEvent(WallpapersEvent.OnDeleteClick(wallpaper.id)) },
                     modifier = Modifier
                         .aspectRatio(1f)
                         .fillMaxWidth()
                         .animateItem(),
-                ) {
-                    WallpaperCard(
-                        wallpaper = wallpaper,
-                        onCardClick = { onEvent(WallpapersEvent.OnWallpaperClick(wallpaper.id)) },
-                        onCardLongClick = { expanded = true }
-                    )
-                    DropdownMenu(
-                        expanded = expanded,
-                        offset = DpOffset(x = 0.dp, y = 8.dp),
-                        onDismissRequest = { expanded = false },
-                    ) {
-                        val builtIn = wallpaper.builtIn
-                        if (builtIn != null) {
-                            // Built-ins have no media to edit and can't be deleted.
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.settings)) },
-                                onClick = {
-                                    expanded = false
-                                    onEvent(WallpapersEvent.OnBuiltInSettingsClick(builtIn))
-                                },
-                            )
-                        } else {
-                            // A processed video keeps no original to edit.
-                            if (wallpaper.isEditable) {
-                                DropdownMenuItem(
-                                    text = { Text(stringResource(R.string.edit)) },
-                                    onClick = {
-                                        expanded = false
-                                        onEvent(WallpapersEvent.OnEditClick(wallpaper.id))
-                                    },
-                                )
-                            }
-                            DropdownMenuItem(
-                                text = { Text(stringResource(R.string.delete)) },
-                                onClick = {
-                                    expanded = false
-                                    onEvent(WallpapersEvent.OnDeleteClick(wallpaper.id))
-                                },
-                            )
-                        }
-                    }
-                }
+                )
             }
         }
+    }
+
+    state.deleteCandidate?.let { id ->
+        DeleteWallpaperDialog(
+            onConfirm = { onEvent(WallpapersEvent.OnDeleteConfirm(id)) },
+            onDismiss = { onEvent(WallpapersEvent.OnDeleteDismiss) },
+        )
     }
 }
 
@@ -169,8 +139,8 @@ private fun WallpapersScreenPreview() {
         state = WallpapersState(
             items = listOf(
                 WallpaperItem(1, null, false, BuiltInWallpaper.BLACK_HOLE),
-                WallpaperItem(2, "", true, isEditable = true),
-                WallpaperItem(3, "", false),
+                WallpaperItem(2, "", true),
+                WallpaperItem(3, "", false, isOptimised = true),
             ),
         ),
         eventFlow = emptyFlow(),

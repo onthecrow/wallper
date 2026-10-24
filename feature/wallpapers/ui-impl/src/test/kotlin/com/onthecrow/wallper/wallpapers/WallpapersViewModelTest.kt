@@ -85,19 +85,19 @@ class WallpapersViewModelTest {
     fun `wallpapers are shown with the thumbnail for videos`() = runTest(dispatcher) {
         val viewModel = createViewModel()
 
-        assertEquals(listOf(WallpaperItem(1, "thumbnail-1", false, isEditable = true)), viewModel.state.value.items)
+        assertEquals(listOf(WallpaperItem(1, "thumbnail-1", false)), viewModel.state.value.items)
 
         wallpapers.value = listOf(wallpaper(id = 2, type = MediaType.IMAGE))
-        assertEquals(listOf(WallpaperItem(2, "original-2", false, isEditable = true)), viewModel.state.value.items)
+        assertEquals(listOf(WallpaperItem(2, "original-2", false)), viewModel.state.value.items)
     }
 
     @Test
-    fun `a processed video shows its thumbnail and can't be edited`() = runTest(dispatcher) {
+    fun `an optimised video shows its thumbnail and can't be edited`() = runTest(dispatcher) {
         wallpapers.value = listOf(Wallpaper.ProcessedVideo(id = 3, path = "processed-3", thumbnailPath = "thumbnail-3", isActive = true))
 
         val viewModel = createViewModel()
 
-        assertEquals(listOf(WallpaperItem(3, "thumbnail-3", true, isEditable = false)), viewModel.state.value.items)
+        assertEquals(listOf(WallpaperItem(3, "thumbnail-3", true, isOptimised = true)), viewModel.state.value.items)
     }
 
     @Test
@@ -110,14 +110,36 @@ class WallpapersViewModelTest {
     }
 
     @Test
-    fun `click activates and delete removes`() = runTest(dispatcher) {
+    fun `click activates`() = runTest(dispatcher) {
         val viewModel = createViewModel()
 
         viewModel.onEvent(WallpapersEvent.OnWallpaperClick(1))
-        viewModel.onEvent(WallpapersEvent.OnDeleteClick(1))
 
         assertEquals(listOf(1), activated)
+    }
+
+    @Test
+    fun `delete asks first and removes only once confirmed`() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+
+        viewModel.onEvent(WallpapersEvent.OnDeleteClick(1))
+        assertEquals(1, viewModel.state.value.deleteCandidate)
+        assertEquals(emptyList(), deleted)
+
+        viewModel.onEvent(WallpapersEvent.OnDeleteConfirm(1))
         assertEquals(listOf(1), deleted)
+        assertEquals(null, viewModel.state.value.deleteCandidate)
+    }
+
+    @Test
+    fun `a dismissed delete removes nothing`() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+
+        viewModel.onEvent(WallpapersEvent.OnDeleteClick(1))
+        viewModel.onEvent(WallpapersEvent.OnDeleteDismiss)
+
+        assertEquals(emptyList(), deleted)
+        assertEquals(null, viewModel.state.value.deleteCandidate)
     }
 
     @Test
@@ -128,7 +150,7 @@ class WallpapersViewModelTest {
         assertEquals(
             listOf(
                 WallpaperItem(5, null, false, BuiltInWallpaper.BLACK_HOLE),
-                WallpaperItem(1, "thumbnail-1", false, isEditable = true),
+                WallpaperItem(1, "thumbnail-1", false),
             ),
             viewModel.state.value.items,
         )
@@ -162,7 +184,7 @@ class WallpapersViewModelTest {
         wallpapers.value = listOf(builtIn(id = 5), wallpaper(id = 1, type = MediaType.VIDEO))
         val viewModel = createViewModel()
 
-        assertEquals(listOf(WallpaperItem(1, "thumbnail-1", false, isEditable = true)), viewModel.state.value.items)
+        assertEquals(listOf(WallpaperItem(1, "thumbnail-1", false)), viewModel.state.value.items)
         assertEquals(emptyList(), previews.requests)
     }
 

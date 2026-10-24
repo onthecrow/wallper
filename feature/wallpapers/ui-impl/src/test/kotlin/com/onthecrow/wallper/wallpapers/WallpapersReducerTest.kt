@@ -50,6 +50,15 @@ class WallpapersReducerTest {
     }
 
     @Test
+    fun `a delete waits for its confirmation`() = runTest {
+        val asked = reducer.reduce(WallpapersState(), WallpapersEvent.OnDeleteClick(3))
+        assertEquals(3, asked.deleteCandidate)
+
+        assertEquals(null, reducer.reduce(asked, WallpapersEvent.OnDeleteConfirm(3)).deleteCandidate)
+        assertEquals(null, reducer.reduce(asked, WallpapersEvent.OnDeleteDismiss).deleteCandidate)
+    }
+
+    @Test
     fun `user actions do not touch the state`() = runTest {
         val initial = WallpapersState()
 
