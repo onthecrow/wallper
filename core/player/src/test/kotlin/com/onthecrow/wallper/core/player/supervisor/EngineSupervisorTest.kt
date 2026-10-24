@@ -236,7 +236,7 @@ class EngineSupervisorTest {
     }
 
     @Test
-    fun `a play after the end starts the clip over`() = runTest {
+    fun `an ended clip stays on its end through a pause, until it seeks to the start`() = runTest {
         val factory = FakeEngineFactory()
         val supervisor = start(factory)
         supervisor.setLooping(false)
@@ -246,10 +246,32 @@ class EngineSupervisorTest {
         runCurrent()
         playWhenReady.value = true
         runCurrent()
+        assertFalse("#1 seekTo 0" in factory.journal)
+        assertEquals(WallperPlayerState.Ended, supervisor.state.value)
 
-        val active = factory.created.first()
+        playWhenReady.value = false
+        runCurrent()
+        supervisor.seekToStart()
+        playWhenReady.value = true
+        runCurrent()
         assertTrue("#1 seekTo 0" in factory.journal)
-        assertTrue(active.playing)
+        assertEquals(WallperPlayerState.Playing, supervisor.state.value)
+    }
+
+    @Test
+    fun `an ended clip starts over once looping is back on`() = runTest {
+        val factory = FakeEngineFactory()
+        val supervisor = start(factory)
+        supervisor.setLooping(false)
+        advanceTimeBy(12_000)
+
+        supervisor.setLooping(true)
+        playWhenReady.value = false
+        runCurrent()
+        playWhenReady.value = true
+        runCurrent()
+
+        assertTrue("#1 seekTo 0" in factory.journal)
         assertEquals(WallperPlayerState.Playing, supervisor.state.value)
     }
 

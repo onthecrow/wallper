@@ -43,6 +43,7 @@ internal class GLWallpaperEngine(
     playerFactory: WallperPlayerFactory,
     settings: Flow<VideoWallpaperSettings>,
     savingPower: Flow<Boolean>,
+    screenOffs: Flow<Unit>,
     private val host: EngineHost,
 ) : WallpaperEngine() {
 
@@ -67,7 +68,7 @@ internal class GLWallpaperEngine(
         isVisible && state == WallperPlayerState.Playing
     }.stateIn(scope, SharingStarted.Eagerly, false)
 
-    private val playback = VideoPlaybackControl(player, settings, savingPower, scope)
+    private val playback = VideoPlaybackControl(player, settings, savingPower, screenOffs, scope)
 
     /** The launcher's page offset, null without pages. */
     private val launcherOffset = MutableStateFlow<Float?>(null)

@@ -23,12 +23,13 @@ internal class VideoWallpaperEngine(
     playerFactory: WallperPlayerFactory,
     settings: Flow<VideoWallpaperSettings>,
     savingPower: Flow<Boolean>,
+    screenOffs: Flow<Unit>,
     private val host: EngineHost,
 ) : WallpaperEngine() {
 
     private val player = playerFactory.create(PlayerMedia(processedPath))
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
-    private val playback = VideoPlaybackControl(player, settings, savingPower, scope)
+    private val playback = VideoPlaybackControl(player, settings, savingPower, screenOffs, scope)
 
     init {
         Timber.d("created")
