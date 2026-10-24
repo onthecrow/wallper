@@ -1,7 +1,13 @@
 <resources>
-    <string name="open_context_menu">Long press to edit or remove</string>
     <string name="delete">Delete</string>
     <string name="edit">Edit</string>
     <string name="settings">Settings</string>
     <string name="unsupported_file">File isn\'t supported</string>
+    <string name="add_wallpaper">Add wallpaper</string>
+    <string name="original">Original</string>
+    <string name="optimised">Optimised</string>
+    <string name="animation_3d">3D animation</string>
+    <string name="active_wallpaper">Active wallpaper</string>
+    <string name="delete_wallpaper_title">Delete this wallpaper?</string>
+    <string name="delete_wallpaper_text">Wallper\'s copy of it goes too. The file in your gallery stays.</string>
 </resources>

@@ -10,6 +10,9 @@ internal class WallpapersReducer @Inject constructor() : Reducer<WallpapersState
         when (event) {
             is WallpapersEvent.OnWallpapersChanged -> state.copy(items = event.items.withPreviews(state.builtInPreviews))
             is WallpapersEvent.OnWallpapersLoadFailed -> state.copy(error = event.message)
+            is WallpapersEvent.OnDeleteClick -> state.copy(deleteCandidate = event.id)
+            is WallpapersEvent.OnDeleteConfirm,
+            WallpapersEvent.OnDeleteDismiss -> state.copy(deleteCandidate = null)
             is WallpapersEvent.OnBuiltInPreviewLoaded -> {
                 val previews = state.builtInPreviews + (event.wallpaper to event.path)
                 state.copy(items = state.items.withPreviews(previews), builtInPreviews = previews)

@@ -8,7 +8,10 @@ internal sealed interface WallpapersEvent : Event {
     // User actions
     data class OnWallpaperClick(val id: Int) : WallpapersEvent
     data class OnEditClick(val id: Int) : WallpapersEvent
+    /** Asks first: the wallpaper's files go with it. */
     data class OnDeleteClick(val id: Int) : WallpapersEvent
+    data class OnDeleteConfirm(val id: Int) : WallpapersEvent
+    data object OnDeleteDismiss : WallpapersEvent
     data class OnBuiltInSettingsClick(val wallpaper: BuiltInWallpaper) : WallpapersEvent
     data class OnMediaPicked(val uri: String) : WallpapersEvent
     data object OnSettingsClick : WallpapersEvent
