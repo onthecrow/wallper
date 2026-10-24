@@ -85,10 +85,28 @@ class WallpapersViewModelTest {
     fun `wallpapers are shown with the thumbnail for videos`() = runTest(dispatcher) {
         val viewModel = createViewModel()
 
-        assertEquals(listOf(WallpaperItem(1, "thumbnail-1", false)), viewModel.state.value.items)
+        assertEquals(listOf(WallpaperItem(1, "thumbnail-1", false, isEditable = true)), viewModel.state.value.items)
 
         wallpapers.value = listOf(wallpaper(id = 2, type = MediaType.IMAGE))
-        assertEquals(listOf(WallpaperItem(2, "original-2", false)), viewModel.state.value.items)
+        assertEquals(listOf(WallpaperItem(2, "original-2", false, isEditable = true)), viewModel.state.value.items)
+    }
+
+    @Test
+    fun `a processed video shows its thumbnail and can't be edited`() = runTest(dispatcher) {
+        wallpapers.value = listOf(Wallpaper.ProcessedVideo(id = 3, path = "processed-3", thumbnailPath = "thumbnail-3", isActive = true))
+
+        val viewModel = createViewModel()
+
+        assertEquals(listOf(WallpaperItem(3, "thumbnail-3", true, isEditable = false)), viewModel.state.value.items)
+    }
+
+    @Test
+    fun `edit opens the editor on the saved wallpaper`() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+
+        viewModel.onEvent(WallpapersEvent.OnEditClick(1))
+
+        assertEquals(listOf<Destination>(EditorDestination.Edit(1)), navigator.destinations)
     }
 
     @Test
@@ -108,7 +126,10 @@ class WallpapersViewModelTest {
         val viewModel = createViewModel()
 
         assertEquals(
-            listOf(WallpaperItem(5, null, false, BuiltInWallpaper.BLACK_HOLE), WallpaperItem(1, "thumbnail-1", false)),
+            listOf(
+                WallpaperItem(5, null, false, BuiltInWallpaper.BLACK_HOLE),
+                WallpaperItem(1, "thumbnail-1", false, isEditable = true),
+            ),
             viewModel.state.value.items,
         )
 
@@ -141,7 +162,7 @@ class WallpapersViewModelTest {
         wallpapers.value = listOf(builtIn(id = 5), wallpaper(id = 1, type = MediaType.VIDEO))
         val viewModel = createViewModel()
 
-        assertEquals(listOf(WallpaperItem(1, "thumbnail-1", false)), viewModel.state.value.items)
+        assertEquals(listOf(WallpaperItem(1, "thumbnail-1", false, isEditable = true)), viewModel.state.value.items)
         assertEquals(emptyList(), previews.requests)
     }
 
@@ -169,7 +190,7 @@ class WallpapersViewModelTest {
 
         viewModel.onEvent(WallpapersEvent.OnMediaPicked("content://video"))
 
-        assertEquals(listOf<Destination>(EditorDestination("content://video")), navigator.destinations)
+        assertEquals(listOf<Destination>(EditorDestination.New("content://video")), navigator.destinations)
     }
 
     @Test
@@ -189,7 +210,6 @@ class WallpapersViewModelTest {
         id = id,
         type = type,
         originalPath = "original-$id",
-        processedPath = null,
         thumbnailPath = "thumbnail-$id",
         crop = CropRect(0, 0, 10, 10),
         clip = ClipRange(0, 1000),

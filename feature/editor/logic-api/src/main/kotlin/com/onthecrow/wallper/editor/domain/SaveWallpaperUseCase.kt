@@ -7,16 +7,18 @@ import com.onthecrow.wallper.editor.domain.model.PreparedMedia
 import kotlinx.coroutines.flow.Flow
 
 /**
- * Copies the prepared media to permanent storage and saves the wallpaper.
- * With [preCrop] a video is first exported cropped and trimmed, so the service can play it without GL cropping.
+ * Saves what the editor made of [PreparedMedia]: a new wallpaper, or the new version of the one it edits.
+ *
+ * Without [process] the original is kept and the wallpaper crops and trims it while it plays. With it a
+ * video is exported cropped and trimmed, and only the export is kept: the wallpaper can't be edited again.
  * Files reach permanent storage only once the wallpaper is saved; the scratch ones stay until
  * [DiscardPreparedMediaUseCase].
  */
-interface CreateWallpaperUseCase {
+interface SaveWallpaperUseCase {
     operator fun invoke(
         media: PreparedMedia,
         crop: CropRect,
         clip: ClipRange,
-        preCrop: Boolean,
+        process: Boolean,
     ): Flow<ExportStatus>
 }

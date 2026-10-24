@@ -12,9 +12,11 @@ internal class WallpapersRepository @Inject constructor(
 
     fun observeActive(): Flow<WallpaperEntity?> = wallpaperDao.observeActive()
 
-    suspend fun get(id: Int): WallpaperEntity = wallpaperDao.get(id)
+    suspend fun get(id: Int): WallpaperEntity? = wallpaperDao.get(id)
 
     suspend fun insert(wallpaper: WallpaperEntity) = wallpaperDao.insert(wallpaper)
+
+    suspend fun update(wallpaper: WallpaperEntity) = wallpaperDao.update(wallpaper)
 
     suspend fun delete(wallpaper: WallpaperEntity) = wallpaperDao.delete(wallpaper)
 

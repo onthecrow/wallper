@@ -240,6 +240,7 @@ class WallperWallpaperService : WallpaperService() {
                 computedColors = when (wallpaper) {
                     is WallpaperSpec.BuiltIn -> builtIns[wallpaper.wallpaper]?.colors()
                     is WallpaperSpec.Media -> decodeSmall(wallpaper.thumbnailPath)?.let(::colorsOf)
+                    is WallpaperSpec.ProcessedVideo -> decodeSmall(wallpaper.thumbnailPath)?.let(::colorsOf)
                     null -> {
                         val frame = surfaceHolder?.surfaceFrame
                         val height = if (frame == null || frame.width() <= 0) COLORS_SIZE else COLORS_SIZE * frame.height() / frame.width()

@@ -9,13 +9,17 @@ import com.onthecrow.wallper.core.model.MediaInfo
 import com.onthecrow.wallper.core.model.MediaType
 import com.onthecrow.wallper.core.navigation.Destination
 import com.onthecrow.wallper.core.navigation.Navigator
-import com.onthecrow.wallper.editor.domain.CreateWallpaperUseCase
 import com.onthecrow.wallper.editor.domain.PrepareMediaUseCase
+import com.onthecrow.wallper.editor.domain.PrepareSavedMediaUseCase
+import com.onthecrow.wallper.editor.domain.ProcessingInfoMemory
+import com.onthecrow.wallper.editor.domain.SaveWallpaperUseCase
+import com.onthecrow.wallper.editor.domain.model.EditedWallpaper
 import com.onthecrow.wallper.editor.domain.model.ExportStatus
 import com.onthecrow.wallper.editor.domain.model.PreparedMedia
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
@@ -26,16 +30,29 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertIs
+import kotlin.test.assertNotNull
 import kotlin.test.assertNull
+import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class EditorViewModelTest {
 
+    private data class SaveCall(val media: PreparedMedia, val crop: CropRect, val clip: ClipRange, val process: Boolean)
+
     private val dispatcher = UnconfinedTestDispatcher()
     private val media = PreparedMedia("temp/media", MediaType.VIDEO, MediaInfo(1920, 1080, 0, 10_000))
+    private val savedMedia = PreparedMedia(
+        path = "originals/a",
+        type = MediaType.VIDEO,
+        mediaInfo = MediaInfo(1920, 1080, 0, 10_000),
+        edited = EditedWallpaper(id = 4, thumbnailPath = "thumbnails/a", crop = CropRect(0, 0, 50, 100), clip = ClipRange(2_000, 6_000)),
+    )
+    private val crop = CropRect(0, 0, 100, 200)
     private var prepareResult: Result<PreparedMedia> = Result.success(media)
-    private var exportStatuses: List<ExportStatus> = listOf(ExportStatus.InProgress(10), ExportStatus.Success)
-    private val createCalls = mutableListOf<Triple<CropRect, ClipRange, Boolean>>()
+    private val preparedSaved = mutableListOf<Int>()
+    private var exportStatuses: Flow<ExportStatus> = flowOf(ExportStatus.InProgress(10), ExportStatus.Success)
+    private val saveCalls = mutableListOf<SaveCall>()
+    private val memory = FakeProcessingInfoMemory()
     private var backNavigations = 0
     private var discards = 0
 
@@ -45,19 +62,26 @@ class EditorViewModelTest {
     @AfterTest
     fun tearDown() = Dispatchers.resetMain()
 
-    private fun createViewModel() = EditorViewModel(
-        destination = EditorDestination("content://video"),
+    private fun createViewModel(destination: EditorDestination = EditorDestination.New("content://video")) = EditorViewModel(
+        destination = destination,
         reducer = EditorReducer(),
         prepareMediaUseCase = object : PrepareMediaUseCase {
             override suspend fun invoke(uri: String) = prepareResult
         },
-        createWallpaperUseCase = object : CreateWallpaperUseCase {
-            override fun invoke(media: PreparedMedia, crop: CropRect, clip: ClipRange, preCrop: Boolean): Flow<ExportStatus> {
-                createCalls += Triple(crop, clip, preCrop)
-                return flowOf(*exportStatuses.toTypedArray())
+        prepareSavedMediaUseCase = object : PrepareSavedMediaUseCase {
+            override suspend fun invoke(wallpaperId: Int): Result<PreparedMedia> {
+                preparedSaved += wallpaperId
+                return Result.success(savedMedia)
+            }
+        },
+        saveWallpaperUseCase = object : SaveWallpaperUseCase {
+            override fun invoke(media: PreparedMedia, crop: CropRect, clip: ClipRange, process: Boolean): Flow<ExportStatus> {
+                saveCalls += SaveCall(media, crop, clip, process)
+                return exportStatuses
             }
         },
         discardPreparedMediaUseCase = { discards++ },
+        processingInfoMemory = memory,
         navigator = object : Navigator {
             override fun navigate(destination: Destination) = Unit
             override fun navigateBack() { backNavigations++ }
@@ -69,6 +93,15 @@ class EditorViewModelTest {
         val viewModel = createViewModel()
 
         assertEquals(media, viewModel.state.value.media)
+    }
+
+    @Test
+    fun `a saved wallpaper is opened by its id, with its trim`() = runTest(dispatcher) {
+        val viewModel = createViewModel(EditorDestination.Edit(4))
+
+        assertEquals(listOf(4), preparedSaved)
+        assertEquals(savedMedia, viewModel.state.value.media)
+        assertEquals(ClipRange(2_000, 6_000), viewModel.state.value.trim)
     }
 
     @Test
@@ -120,33 +153,100 @@ class EditorViewModelTest {
     }
 
     @Test
-    fun `save exports the trimmed part and goes back on success`() = runTest(dispatcher) {
+    fun `save keeps the trimmed part and goes back on success`() = runTest(dispatcher) {
         val viewModel = createViewModel()
         viewModel.onEvent(EditorEvent.OnTrimChange(ClipRange(1_000, 5_000)))
-        viewModel.onEvent(EditorEvent.OnAdditionalProcessingToggle)
 
-        viewModel.onEvent(EditorEvent.OnSaveClick(CropRect(0, 0, 100, 200)))
+        viewModel.onEvent(EditorEvent.OnSaveClick(crop))
 
-        assertEquals(Triple(CropRect(0, 0, 100, 200), ClipRange(1_000, 5_000), true), createCalls.single())
+        assertEquals(SaveCall(media, crop, ClipRange(1_000, 5_000), process = false), saveCalls.single())
         assertEquals(ExportStatus.Success, viewModel.state.value.exportStatus)
         assertEquals(1, backNavigations)
     }
 
     @Test
-    fun `save without moving the handles exports the whole video`() = runTest(dispatcher) {
+    fun `save without moving the handles keeps the whole video`() = runTest(dispatcher) {
         val viewModel = createViewModel()
 
-        viewModel.onEvent(EditorEvent.OnSaveClick(CropRect(0, 0, 100, 200)))
+        viewModel.onEvent(EditorEvent.OnSaveClick(crop))
 
-        assertEquals(ClipRange(0, 10_000), createCalls.single().second)
+        assertEquals(ClipRange(0, 10_000), saveCalls.single().clip)
     }
 
     @Test
-    fun `failed export stays on the screen`() = runTest(dispatcher) {
-        exportStatuses = listOf(ExportStatus.Error(IllegalStateException("encoder")))
+    fun `an edit saves over the wallpaper it opened`() = runTest(dispatcher) {
+        val viewModel = createViewModel(EditorDestination.Edit(4))
+
+        viewModel.onEvent(EditorEvent.OnSaveClick(crop))
+
+        assertEquals(SaveCall(savedMedia, crop, ClipRange(2_000, 6_000), process = false), saveCalls.single())
+        assertEquals(1, backNavigations)
+    }
+
+    @Test
+    fun `the first switch to optimised waits for OK on the explanation, then saves optimised`() = runTest(dispatcher) {
         val viewModel = createViewModel()
 
-        viewModel.onEvent(EditorEvent.OnSaveClick(CropRect(0, 0, 100, 200)))
+        viewModel.onEvent(EditorEvent.OnOptimisedToggle)
+
+        assertNotNull(viewModel.state.value.processingInfo)
+        assertEquals(false, viewModel.state.value.isOptimised)
+        assertEquals(1, memory.marks)
+
+        viewModel.onEvent(EditorEvent.OnProcessingInfoConfirm)
+        viewModel.onEvent(EditorEvent.OnSaveClick(crop))
+
+        assertNull(viewModel.state.value.processingInfo)
+        assertEquals(SaveCall(media, crop, ClipRange(0, 10_000), process = true), saveCalls.single())
+        assertEquals(1, backNavigations)
+    }
+
+    @Test
+    fun `dismissing the explanation stays original`() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+        viewModel.onEvent(EditorEvent.OnOptimisedToggle)
+
+        viewModel.onEvent(EditorEvent.OnProcessingInfoDismiss)
+        viewModel.onEvent(EditorEvent.OnSaveClick(crop))
+
+        assertNull(viewModel.state.value.processingInfo)
+        assertEquals(false, saveCalls.single().process)
+    }
+
+    @Test
+    fun `an explanation seen before doesn't hold the switch`() = runTest(dispatcher) {
+        memory.seen = true
+        val viewModel = createViewModel()
+
+        viewModel.onEvent(EditorEvent.OnOptimisedToggle)
+
+        assertNull(viewModel.state.value.processingInfo)
+        assertEquals(true, viewModel.state.value.isOptimised)
+        assertEquals(0, memory.marks)
+    }
+
+    @Test
+    fun `the question mark counts as seen`() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+
+        viewModel.onEvent(EditorEvent.OnProcessingInfoClick)
+        viewModel.onEvent(EditorEvent.OnProcessingInfoConfirm)
+
+        assertEquals(false, viewModel.state.value.isOptimised)
+        assertEquals(1, memory.marks)
+
+        viewModel.onEvent(EditorEvent.OnOptimisedToggle)
+        assertNull(viewModel.state.value.processingInfo)
+        assertEquals(true, viewModel.state.value.isOptimised)
+        assertEquals(1, memory.marks)
+    }
+
+    @Test
+    fun `failed export stays on the screen and can be saved again`() = runTest(dispatcher) {
+        exportStatuses = flowOf(ExportStatus.Error(IllegalStateException("encoder")))
+        val viewModel = createViewModel()
+
+        viewModel.onEvent(EditorEvent.OnSaveClick(crop))
 
         assertIs<ExportStatus.Error>(viewModel.state.value.exportStatus)
         assertEquals(0, backNavigations)
@@ -155,7 +255,33 @@ class EditorViewModelTest {
 
         assertNull(viewModel.state.value.exportStatus)
         assertEquals(0, backNavigations)
-        viewModel.onEvent(EditorEvent.OnSaveClick(CropRect(0, 0, 100, 200)))
-        assertEquals(2, createCalls.size)
+        viewModel.onEvent(EditorEvent.OnSaveClick(crop))
+        assertEquals(2, saveCalls.size)
+    }
+
+    @Test
+    fun `a save that throws shows the error instead of hanging`() = runTest(dispatcher) {
+        exportStatuses = flow {
+            emit(ExportStatus.InProgress(10))
+            throw IllegalStateException("database")
+        }
+        val viewModel = createViewModel()
+
+        viewModel.onEvent(EditorEvent.OnSaveClick(crop))
+
+        assertIs<ExportStatus.Error>(viewModel.state.value.exportStatus)
+        assertNull(viewModel.state.value.save)
+        assertEquals(0, backNavigations)
+    }
+
+    private class FakeProcessingInfoMemory : ProcessingInfoMemory {
+        var seen = false
+        var marks = 0
+
+        override suspend fun isSeen() = seen
+
+        override fun markSeen() {
+            marks++
+        }
     }
 }

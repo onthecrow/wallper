@@ -2,6 +2,7 @@ package com.onthecrow.wallper.editor.cropper.state
 
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.unit.IntSize
 import com.onthecrow.wallper.editor.cropper.settings.CropProperties
 
@@ -11,6 +12,7 @@ import com.onthecrow.wallper.editor.cropper.settings.CropProperties
  * configuration to allow changing pan, zoom, and rotation.
  * @param imageSize size of the **Bitmap**
  * @param containerSize size of the Composable that draws **Bitmap**
+ * @param initialCropRect the crop to start from, in **Bitmap** pixels; null centres the largest one
  * @param cropProperties wrapper class that contains crop state properties such as
  * crop type,
  * @param keys are used to reset remember block to initial calculations. This can be used
@@ -22,6 +24,7 @@ internal fun rememberCropState(
     imageSize: IntSize,
     containerSize: IntSize,
     drawAreaSize: IntSize,
+    initialCropRect: Rect?,
     cropProperties: CropProperties,
     vararg keys: Any?
 ): CropState {
@@ -40,6 +43,7 @@ internal fun rememberCropState(
             aspectRatio = aspectRatio,
             containerSize = containerSize,
             drawAreaSize = drawAreaSize,
+            initialCropRect = initialCropRect,
             overlayRatio = overlayRatio,
             handleSize = handleSize,
             fling = fling,

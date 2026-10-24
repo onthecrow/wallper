@@ -1,6 +1,8 @@
 package com.onthecrow.wallper.editor.di
 
+import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.ui.Modifier
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.onthecrow.wallper.core.navigation.FeatureEntry
@@ -20,15 +22,26 @@ internal object EditorUiModule {
 
     @Provides
     @IntoSet
-    fun provideEditorEntry(): FeatureEntry<*> = featureEntry<EditorDestination> { destination, modifier ->
-        val viewModel = hiltViewModel<EditorViewModel, EditorViewModel.Factory>(
-            creationCallback = { factory -> factory.create(destination) },
-        )
-        val state by viewModel.state.collectAsStateWithLifecycle()
-        EditorScreen(
-            state = state,
-            onEvent = viewModel::onEvent,
-            modifier = modifier,
-        )
+    fun provideNewWallpaperEntry(): FeatureEntry<*> = featureEntry<EditorDestination.New> { destination, modifier ->
+        EditorEntry(destination, modifier)
     }
+
+    @Provides
+    @IntoSet
+    fun provideEditWallpaperEntry(): FeatureEntry<*> = featureEntry<EditorDestination.Edit> { destination, modifier ->
+        EditorEntry(destination, modifier)
+    }
+}
+
+@Composable
+private fun EditorEntry(destination: EditorDestination, modifier: Modifier) {
+    val viewModel = hiltViewModel<EditorViewModel, EditorViewModel.Factory>(
+        creationCallback = { factory -> factory.create(destination) },
+    )
+    val state by viewModel.state.collectAsStateWithLifecycle()
+    EditorScreen(
+        state = state,
+        onEvent = viewModel::onEvent,
+        modifier = modifier,
+    )
 }

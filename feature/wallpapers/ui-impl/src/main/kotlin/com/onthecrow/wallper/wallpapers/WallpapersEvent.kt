@@ -7,6 +7,7 @@ import com.onthecrow.wallper.wallpapers.model.WallpaperItem
 internal sealed interface WallpapersEvent : Event {
     // User actions
     data class OnWallpaperClick(val id: Int) : WallpapersEvent
+    data class OnEditClick(val id: Int) : WallpapersEvent
     data class OnDeleteClick(val id: Int) : WallpapersEvent
     data class OnBuiltInSettingsClick(val wallpaper: BuiltInWallpaper) : WallpapersEvent
     data class OnMediaPicked(val uri: String) : WallpapersEvent

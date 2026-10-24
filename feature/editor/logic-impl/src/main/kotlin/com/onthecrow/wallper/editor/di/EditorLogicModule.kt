@@ -1,13 +1,17 @@
 package com.onthecrow.wallper.editor.di
 
-import com.onthecrow.wallper.editor.CreateWallpaperUseCaseImpl
 import com.onthecrow.wallper.editor.DiscardPreparedMediaUseCaseImpl
 import com.onthecrow.wallper.editor.IsMediaSupportedUseCaseImpl
 import com.onthecrow.wallper.editor.PrepareMediaUseCaseImpl
-import com.onthecrow.wallper.editor.domain.CreateWallpaperUseCase
+import com.onthecrow.wallper.editor.PrepareSavedMediaUseCaseImpl
+import com.onthecrow.wallper.editor.ProcessingInfoMemoryImpl
+import com.onthecrow.wallper.editor.SaveWallpaperUseCaseImpl
 import com.onthecrow.wallper.editor.domain.DiscardPreparedMediaUseCase
 import com.onthecrow.wallper.editor.domain.IsMediaSupportedUseCase
 import com.onthecrow.wallper.editor.domain.PrepareMediaUseCase
+import com.onthecrow.wallper.editor.domain.PrepareSavedMediaUseCase
+import com.onthecrow.wallper.editor.domain.ProcessingInfoMemory
+import com.onthecrow.wallper.editor.domain.SaveWallpaperUseCase
 import com.onthecrow.wallper.editor.export.TransformerVideoExporter
 import com.onthecrow.wallper.editor.export.VideoExporter
 import dagger.Binds
@@ -26,7 +30,13 @@ internal abstract class EditorLogicModule {
     abstract fun bindPrepareMedia(impl: PrepareMediaUseCaseImpl): PrepareMediaUseCase
 
     @Binds
-    abstract fun bindCreateWallpaper(impl: CreateWallpaperUseCaseImpl): CreateWallpaperUseCase
+    abstract fun bindPrepareSavedMedia(impl: PrepareSavedMediaUseCaseImpl): PrepareSavedMediaUseCase
+
+    @Binds
+    abstract fun bindSaveWallpaper(impl: SaveWallpaperUseCaseImpl): SaveWallpaperUseCase
+
+    @Binds
+    abstract fun bindProcessingInfoMemory(impl: ProcessingInfoMemoryImpl): ProcessingInfoMemory
 
     @Binds
     abstract fun bindDiscardPreparedMedia(impl: DiscardPreparedMediaUseCaseImpl): DiscardPreparedMediaUseCase

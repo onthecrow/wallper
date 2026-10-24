@@ -4,15 +4,19 @@ import android.content.Context
 import com.onthecrow.wallper.core.engine.ActiveWallpaperSource
 import com.onthecrow.wallper.wallpapers.ActivateWallpaperUseCaseImpl
 import com.onthecrow.wallper.wallpapers.ActiveWallpaperSourceImpl
+import com.onthecrow.wallper.wallpapers.AddWallpaperUseCaseImpl
 import com.onthecrow.wallper.wallpapers.DeleteWallpaperUseCaseImpl
+import com.onthecrow.wallper.wallpapers.GetWallpaperUseCaseImpl
 import com.onthecrow.wallper.wallpapers.ObserveWallpapersUseCaseImpl
-import com.onthecrow.wallper.wallpapers.SaveWallpaperUseCaseImpl
+import com.onthecrow.wallper.wallpapers.UpdateWallpaperUseCaseImpl
 import com.onthecrow.wallper.wallpapers.data.database.WallpaperDao
 import com.onthecrow.wallper.wallpapers.data.database.WallpapersDatabase
 import com.onthecrow.wallper.wallpapers.domain.ActivateWallpaperUseCase
+import com.onthecrow.wallper.wallpapers.domain.AddWallpaperUseCase
 import com.onthecrow.wallper.wallpapers.domain.DeleteWallpaperUseCase
+import com.onthecrow.wallper.wallpapers.domain.GetWallpaperUseCase
 import com.onthecrow.wallper.wallpapers.domain.ObserveWallpapersUseCase
-import com.onthecrow.wallper.wallpapers.domain.SaveWallpaperUseCase
+import com.onthecrow.wallper.wallpapers.domain.UpdateWallpaperUseCase
 import dagger.Binds
 import dagger.Module
 import dagger.Provides
@@ -35,7 +39,13 @@ internal abstract class WallpapersLogicModule {
     abstract fun bindDeleteWallpaper(impl: DeleteWallpaperUseCaseImpl): DeleteWallpaperUseCase
 
     @Binds
-    abstract fun bindSaveWallpaper(impl: SaveWallpaperUseCaseImpl): SaveWallpaperUseCase
+    abstract fun bindGetWallpaper(impl: GetWallpaperUseCaseImpl): GetWallpaperUseCase
+
+    @Binds
+    abstract fun bindAddWallpaper(impl: AddWallpaperUseCaseImpl): AddWallpaperUseCase
+
+    @Binds
+    abstract fun bindUpdateWallpaper(impl: UpdateWallpaperUseCaseImpl): UpdateWallpaperUseCase
 
     @Binds
     abstract fun bindActiveWallpaperSource(impl: ActiveWallpaperSourceImpl): ActiveWallpaperSource

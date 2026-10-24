@@ -4,6 +4,7 @@ import androidx.room.Dao
 import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.Query
+import androidx.room.Update
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -17,10 +18,13 @@ internal interface WallpaperDao {
     fun observeActive(): Flow<WallpaperEntity?>
 
     @Query("SELECT * FROM wallpapers WHERE id = :id")
-    suspend fun get(id: Int): WallpaperEntity
+    suspend fun get(id: Int): WallpaperEntity?
 
     @Insert
     suspend fun insert(wallpaper: WallpaperEntity)
+
+    @Update
+    suspend fun update(wallpaper: WallpaperEntity)
 
     @Delete
     suspend fun delete(wallpaper: WallpaperEntity)
