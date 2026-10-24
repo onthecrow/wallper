@@ -86,8 +86,8 @@ internal class EngineSupervisor(
 
     private suspend fun play() {
         var engine = active ?: createEngines()
-        // Played to the end before: start the clip over, whatever looping is now.
-        if (engine.isEnded.value) engine.seekTo(0)
+        // Played to the end before and looping now: start the clip over. Without looping it stays ended.
+        if (engine.isEnded.value && looping) engine.seekTo(0)
         engine.play()
         _state.value = WallperPlayerState.Playing
         while (true) {

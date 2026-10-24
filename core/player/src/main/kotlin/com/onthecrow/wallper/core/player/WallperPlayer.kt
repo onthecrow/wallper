@@ -28,7 +28,8 @@ interface WallperPlayer {
 
     /**
      * Whether the clip starts over at its end; it does by default. Without looping the player stops on the
-     * clip's last frame: [WallperPlayerState.Ended]. A [play] after that starts the clip over.
+     * clip's last frame, [WallperPlayerState.Ended], and stays there until [seekToStart] or until looping
+     * is back on.
      */
     fun setLooping(looping: Boolean)
 

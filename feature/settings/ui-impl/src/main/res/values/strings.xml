@@ -9,10 +9,10 @@
     <string name="settings_playback">Playback</string>
     <string name="settings_playback_loop">Loop</string>
     <string name="settings_playback_loop_description">Plays over and over, going on where it stopped</string>
-    <string name="settings_playback_restart">Start over when shown</string>
-    <string name="settings_playback_restart_description">Loops from the start each time you see it</string>
-    <string name="settings_playback_once">Play once when shown</string>
-    <string name="settings_playback_once_description">Then stays on its last frame. Easiest on the battery</string>
+    <string name="settings_playback_restart">Loop from the start</string>
+    <string name="settings_playback_restart_description">Starts over each time you turn on the screen</string>
+    <string name="settings_playback_once">Play once</string>
+    <string name="settings_playback_once_description">From the start each time you turn on the screen, then stays on its last frame. Easiest on the battery</string>
     <string name="settings_save_battery">Save battery</string>
     <string name="settings_save_battery_summary">Pause videos in Battery Saver and when the phone is hot</string>
     <string name="settings_scroll_with_pages">Move with home screen pages</string>
@@ -30,8 +30,8 @@
     <string name="settings_theme_system">System default</string>
     <string name="settings_theme_light">Light</string>
     <string name="settings_theme_dark">Dark</string>
-    <string name="settings_dynamic_color">Colours from wallpaper</string>
-    <string name="settings_dynamic_color_summary">Match the app to your phone\'s wallpaper</string>
+    <string name="settings_dynamic_color">Dynamic colours</string>
+    <string name="settings_dynamic_color_summary">Colour the app after your phone\'s wallpaper (Material You)</string>
     <string name="settings_section_help">Help</string>
     <string name="settings_send_report">Send a report</string>
     <string name="settings_send_report_summary">Share the app\'s log to help fix a problem</string>

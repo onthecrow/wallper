@@ -6,6 +6,7 @@ import com.onthecrow.wallper.core.model.VideoPlayback
 import com.onthecrow.wallper.core.player.WallperPlayer
 import com.onthecrow.wallper.core.player.WallperPlayerState
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.plus
@@ -23,9 +24,10 @@ class VideoPlaybackControlTest {
     private val player = FakePlayer()
     private val settings = MutableStateFlow(VideoWallpaperSettings())
     private val savingPower = MutableStateFlow(false)
+    private val screenOffs = MutableSharedFlow<Unit>()
 
     private fun TestScope.control() =
-        VideoPlaybackControl(player, settings, savingPower, backgroundScope + UnconfinedTestDispatcher(testScheduler))
+        VideoPlaybackControl(player, settings, savingPower, screenOffs, backgroundScope + UnconfinedTestDispatcher(testScheduler))
 
     @Test
     fun `plays while visible and pauses while hidden`() = runTest {
@@ -51,58 +53,74 @@ class VideoPlaybackControlTest {
     }
 
     @Test
-    fun `loop goes on from where it stopped`() = runTest {
+    fun `loop goes on from where it stopped, screen off or not`() = runTest {
         val control = control()
 
-        control.setVisible(false)
-        control.setVisible(true)
+        turnScreenOffAndOn(control)
 
         assertEquals(0, player.seeksToStart)
         assertTrue(player.loops)
     }
 
     @Test
-    fun `restart starts over at each show, and only then`() = runTest {
+    fun `restart goes on after an app, and starts over after the screen was off`() = runTest {
         settings.value = VideoWallpaperSettings(playback = VideoPlayback.RESTART)
         val control = control()
-        assertEquals(0, player.seeksToStart)
 
+        // Out to an app and back to the home screen.
         control.setVisible(false)
         control.setVisible(true)
-        assertEquals(1, player.seeksToStart)
+        assertEquals(0, player.seeksToStart)
 
-        // Back from Battery Saver: the same show goes on.
-        savingPower.value = true
-        savingPower.value = false
+        turnScreenOffAndOn(control)
         assertEquals(1, player.seeksToStart)
         assertTrue(player.loops)
     }
 
     @Test
-    fun `once plays without looping from the start of each show`() = runTest {
+    fun `once doesn't loop and starts over only after the screen was off`() = runTest {
         settings.value = VideoWallpaperSettings(playback = VideoPlayback.ONCE)
         val control = control()
         assertFalse(player.loops)
 
         control.setVisible(false)
         control.setVisible(true)
+        assertEquals(0, player.seeksToStart)
 
+        turnScreenOffAndOn(control)
         assertEquals(1, player.seeksToStart)
         assertTrue(player.playing)
     }
 
     @Test
-    fun `a show the battery saver held starts over once it plays`() = runTest {
+    fun `coming back from Battery Saver isn't a new wake`() = runTest {
+        settings.value = VideoWallpaperSettings(playback = VideoPlayback.RESTART)
+        control()
+
+        savingPower.value = true
+        savingPower.value = false
+
+        assertEquals(0, player.seeksToStart)
+        assertTrue(player.playing)
+    }
+
+    @Test
+    fun `a wake the battery saver held starts over once it plays`() = runTest {
         settings.value = VideoWallpaperSettings(playback = VideoPlayback.RESTART)
         val control = control()
         savingPower.value = true
 
-        control.setVisible(false)
-        control.setVisible(true)
+        turnScreenOffAndOn(control)
         assertEquals(0, player.seeksToStart)
 
         savingPower.value = false
         assertEquals(1, player.seeksToStart)
+    }
+
+    private suspend fun turnScreenOffAndOn(control: VideoPlaybackControl) {
+        control.setVisible(false)
+        screenOffs.emit(Unit)
+        control.setVisible(true)
     }
 
     private class FakePlayer : WallperPlayer {
