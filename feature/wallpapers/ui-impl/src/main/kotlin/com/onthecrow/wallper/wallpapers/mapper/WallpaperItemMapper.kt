@@ -9,6 +9,12 @@ internal fun Wallpaper.toItem() = when (this) {
         id = id,
         picturePath = if (type == MediaType.VIDEO) thumbnailPath else originalPath,
         isActive = isActive,
+        isEditable = true,
+    )
+    is Wallpaper.ProcessedVideo -> WallpaperItem(
+        id = id,
+        picturePath = thumbnailPath,
+        isActive = isActive,
     )
     // The picture is the preview: it is rendered in the background and added by the reducer.
     is Wallpaper.BuiltIn -> WallpaperItem(

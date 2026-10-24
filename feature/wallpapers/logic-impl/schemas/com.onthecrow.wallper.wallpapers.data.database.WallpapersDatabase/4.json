@@ -1,0 +1,135 @@
+{
+  "formatVersion": 1,
+  "database": {
+    "version": 4,
+    "identityHash": "d3dde18db20c98b877e6de24e0018f6a",
+    "entities": [
+      {
+        "tableName": "wallpapers",
+        "createSql": "CREATE TABLE IF NOT EXISTS `${TABLE_NAME}` (`id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, `type` TEXT NOT NULL, `original_path` TEXT, `processed_path` TEXT, `thumbnail_path` TEXT NOT NULL, `crop_left` INTEGER NOT NULL, `crop_top` INTEGER NOT NULL, `crop_right` INTEGER NOT NULL, `crop_bottom` INTEGER NOT NULL, `clip_start_ms` INTEGER NOT NULL, `clip_end_ms` INTEGER NOT NULL, `media_width` INTEGER NOT NULL, `media_height` INTEGER NOT NULL, `media_rotation` INTEGER NOT NULL, `media_duration_ms` INTEGER NOT NULL, `is_active` INTEGER NOT NULL, `built_in` TEXT)",
+        "fields": [
+          {
+            "fieldPath": "id",
+            "columnName": "id",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "type",
+            "columnName": "type",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "originalPath",
+            "columnName": "original_path",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "processedPath",
+            "columnName": "processed_path",
+            "affinity": "TEXT"
+          },
+          {
+            "fieldPath": "thumbnailPath",
+            "columnName": "thumbnail_path",
+            "affinity": "TEXT",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cropLeft",
+            "columnName": "crop_left",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cropTop",
+            "columnName": "crop_top",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cropRight",
+            "columnName": "crop_right",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "cropBottom",
+            "columnName": "crop_bottom",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "clipStartMs",
+            "columnName": "clip_start_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "clipEndMs",
+            "columnName": "clip_end_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mediaWidth",
+            "columnName": "media_width",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mediaHeight",
+            "columnName": "media_height",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mediaRotation",
+            "columnName": "media_rotation",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "mediaDurationMs",
+            "columnName": "media_duration_ms",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "isActive",
+            "columnName": "is_active",
+            "affinity": "INTEGER",
+            "notNull": true
+          },
+          {
+            "fieldPath": "builtIn",
+            "columnName": "built_in",
+            "affinity": "TEXT"
+          }
+        ],
+        "primaryKey": {
+          "autoGenerate": true,
+          "columnNames": [
+            "id"
+          ]
+        },
+        "indices": [
+          {
+            "name": "index_wallpapers_built_in",
+            "unique": true,
+            "columnNames": [
+              "built_in"
+            ],
+            "orders": [],
+            "createSql": "CREATE UNIQUE INDEX IF NOT EXISTS `index_wallpapers_built_in` ON `${TABLE_NAME}` (`built_in`)"
+          }
+        ]
+      }
+    ],
+    "setupQueries": [
+      "CREATE TABLE IF NOT EXISTS room_master_table (id INTEGER PRIMARY KEY,identity_hash TEXT)",
+      "INSERT OR REPLACE INTO room_master_table (id,identity_hash) VALUES(42, 'd3dde18db20c98b877e6de24e0018f6a')"
+    ]
+  }
+}

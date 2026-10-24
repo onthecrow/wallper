@@ -54,6 +54,7 @@ class WallpapersReducerTest {
         val initial = WallpapersState()
 
         assertSame(initial, reducer.reduce(initial, WallpapersEvent.OnWallpaperClick(1)))
+        assertSame(initial, reducer.reduce(initial, WallpapersEvent.OnEditClick(1)))
         assertSame(initial, reducer.reduce(initial, WallpapersEvent.OnMediaPicked("content://x")))
         assertSame(initial, reducer.reduce(initial, WallpapersEvent.OnBuiltInSettingsClick(BuiltInWallpaper.BLACK_HOLE)))
     }

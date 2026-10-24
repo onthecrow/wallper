@@ -43,6 +43,8 @@ internal fun ImageCropper(
     /** Null for a picture: there is no video to show under the crop frame. */
     player: EditorPlayer?,
     videoSize: IntSize,
+    /** The crop to start from, in video pixels like [cropRect]; null centres the largest one. */
+    initialCropRect: Rect? = null,
     cropStyle: CropStyle = CropDefaults.style(),
     cropProperties: CropProperties,
     backgroundColor: Color = Color.Transparent,
@@ -104,6 +106,7 @@ internal fun ImageCropper(
             imageSize = IntSize(bitmapWidth, bitmapHeight),
             containerSize = IntSize(containerWidthPx, containerHeightPx),
             drawAreaSize = IntSize(imageWidthPx, imageHeightPx),
+            initialCropRect = initialCropRect,
             cropProperties = cropProperties,
             keys = resetKeys
         )

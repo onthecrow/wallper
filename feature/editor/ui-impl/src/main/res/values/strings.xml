@@ -1,4 +1,12 @@
 <resources>
     <string name="editor_play">Play</string>
     <string name="editor_pause">Pause</string>
+    <string name="editor_set_trim_start">Start here</string>
+    <string name="editor_set_trim_end">End here</string>
+    <string name="editor_original">Original</string>
+    <string name="editor_optimised">Optimised</string>
+    <string name="editor_processing_info">What are original and optimised?</string>
+    <string name="editor_processing_info_title">Original or optimised</string>
+    <string name="editor_original_description">Wallper keeps your video as it is and crops it while it plays. You can edit the wallpaper later.</string>
+    <string name="editor_optimised_description">Wallper saves only the part you picked, already cropped and trimmed. It takes less space and is easier on the battery, but you can\'t edit it later, only delete it.</string>
 </resources>

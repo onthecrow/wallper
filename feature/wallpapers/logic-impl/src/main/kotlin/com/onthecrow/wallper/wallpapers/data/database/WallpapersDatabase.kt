@@ -5,7 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [WallpaperEntity::class], version = 3, exportSchema = true)
+@Database(entities = [WallpaperEntity::class], version = 4, exportSchema = true)
 internal abstract class WallpapersDatabase : RoomDatabase() {
     abstract fun wallpaperDao(): WallpaperDao
 
@@ -16,7 +16,7 @@ internal abstract class WallpapersDatabase : RoomDatabase() {
         /** The builder with every migration and the built-ins seeding; shared by the app and the migration test. */
         fun builder(context: Context): Builder<WallpapersDatabase> =
             Room.databaseBuilder(context, WallpapersDatabase::class.java, NAME)
-                .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4)
                 .addCallback(SeedBuiltInWallpapersCallback)
     }
 }

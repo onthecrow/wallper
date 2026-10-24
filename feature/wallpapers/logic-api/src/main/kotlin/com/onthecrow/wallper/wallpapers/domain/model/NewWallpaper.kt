@@ -5,13 +5,23 @@ import com.onthecrow.wallper.core.model.CropRect
 import com.onthecrow.wallper.core.model.MediaInfo
 import com.onthecrow.wallper.core.model.MediaType
 
-/** A wallpaper whose files are already in permanent storage, but which has no record yet. */
-data class NewWallpaper(
-    val type: MediaType,
-    val originalPath: String,
-    val processedPath: String?,
-    val thumbnailPath: String,
-    val crop: CropRect,
-    val clip: ClipRange,
-    val mediaInfo: MediaInfo,
-)
+/** What the editor made: its files are already in permanent storage, but no record shows them yet. */
+sealed interface NewWallpaper {
+    val thumbnailPath: String
+
+    /** See [Wallpaper.Media]. */
+    data class Media(
+        val type: MediaType,
+        val originalPath: String,
+        override val thumbnailPath: String,
+        val crop: CropRect,
+        val clip: ClipRange,
+        val mediaInfo: MediaInfo,
+    ) : NewWallpaper
+
+    /** See [Wallpaper.ProcessedVideo]. */
+    data class ProcessedVideo(
+        val path: String,
+        override val thumbnailPath: String,
+    ) : NewWallpaper
+}

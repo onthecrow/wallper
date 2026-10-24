@@ -30,6 +30,8 @@ internal val CropState.cropData: CropData
  * of the Composable. [drawAreaSize] can be smaller than [containerSize] initially based
  * on content scale of Image composable
  * @param drawAreaSize size of the area that **Bitmap** is drawn
+ * @param initialCropRect the crop to start from, in **Bitmap** pixels like [cropRect]; null centres the
+ * largest one of [aspectRatio]
  * @param fling when set to true dragging pointer builds up velocity. When last
  * pointer leaves Composable a movement invoked against friction till velocity drops below
  * to threshold
@@ -39,6 +41,7 @@ internal abstract class CropState internal constructor(
     imageSize: IntSize,
     containerSize: IntSize,
     drawAreaSize: IntSize,
+    initialCropRect: Rect?,
     internal var fling: Boolean = true,
     internal var aspectRatio: Float,
     internal var overlayRatio: Float,
@@ -49,7 +52,7 @@ internal abstract class CropState internal constructor(
 ) {
 
     private val animatableRectOverlay = Animatable(
-        getOverlayFromAspectRatio(
+        initialCropRect?.let(::getOverlayFromCropRect) ?: getOverlayFromAspectRatio(
             containerSize.width.toFloat(),
             containerSize.height.toFloat(),
             aspectRatio,
@@ -263,6 +266,21 @@ internal abstract class CropState internal constructor(
         val offsetY = (containerHeight - height) / 2f
 
         return Rect(offset = Offset(offsetX, offsetY), size = Size(width, height))
+    }
+
+    /**
+     * Create [Rect] to draw overlay over [cropRect] of the **Bitmap**: the reverse of [getCropRectangle]
+     * while the image fills its draw area
+     */
+    private fun getOverlayFromCropRect(cropRect: Rect): Rect {
+        val scaleX = drawAreaRect.width / imageSize.width
+        val scaleY = drawAreaRect.height / imageSize.height
+        return Rect(
+            left = drawAreaRect.left + cropRect.left * scaleX,
+            top = drawAreaRect.top + cropRect.top * scaleY,
+            right = drawAreaRect.left + cropRect.right * scaleX,
+            bottom = drawAreaRect.top + cropRect.bottom * scaleY,
+        )
     }
 
     /**
