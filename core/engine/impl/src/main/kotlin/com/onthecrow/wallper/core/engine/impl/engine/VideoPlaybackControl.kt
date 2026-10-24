@@ -8,13 +8,14 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
-import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.flow.runningFold
 import kotlinx.coroutines.launch
 
 /**
  * Plays a video wallpaper's [player] while the wallpaper is visible, unless the user wants it to save
- * battery and the phone [savingPower]; a pause keeps the frame on screen. Each time the wallpaper is shown
- * again, [VideoPlayback] decides whether the video goes on or starts over, and whether it loops.
+ * battery and the phone [savingPower]; a pause keeps the frame on screen. [VideoPlayback] decides whether
+ * the video loops, and whether it starts over the first time it plays after the screen was off: a new
+ * look at the phone. Coming back to it from an app or from Battery Saver isn't one: the video goes on.
  *
  * Decides on [scope]'s thread; [setVisible] may come from any thread.
  */
@@ -22,24 +23,24 @@ internal class VideoPlaybackControl(
     private val player: WallperPlayer,
     settings: Flow<VideoWallpaperSettings>,
     savingPower: Flow<Boolean>,
+    screenOffs: Flow<Unit>,
     scope: CoroutineScope,
 ) {
-    /** [shows] counts the times the wallpaper became visible: each one is a new start for some modes. */
-    private data class Visibility(val visible: Boolean, val shows: Int)
+    private data class Command(val play: Boolean, val wake: Int, val playback: VideoPlayback)
 
-    private data class Command(val play: Boolean, val show: Int, val playback: VideoPlayback)
+    private val visible = MutableStateFlow(true)
 
-    private val visibility = MutableStateFlow(Visibility(visible = true, shows = 0))
-
-    /** The show the player last played for. A fresh player is at the clip start already. */
-    private var playedShow = 0
+    /** The wake the player last played in. A fresh player is at the clip start already. */
+    private var playedWake = 0
 
     init {
+        // Each screen-off begins a new wake.
+        val wakes = screenOffs.runningFold(0) { count, _ -> count + 1 }
         scope.launch {
-            combine(visibility, settings, savingPower) { visibility, settings, saving ->
+            combine(visible, settings, savingPower, wakes) { visible, settings, saving, wake ->
                 Command(
-                    play = visibility.visible && !(settings.pausesToSaveBattery && saving),
-                    show = visibility.shows,
+                    play = visible && !(settings.pausesToSaveBattery && saving),
+                    wake = wake,
                     playback = settings.playback,
                 )
             }
@@ -49,9 +50,7 @@ internal class VideoPlaybackControl(
     }
 
     fun setVisible(visible: Boolean) {
-        visibility.update { current ->
-            if (visible && !current.visible) Visibility(visible = true, shows = current.shows + 1) else current.copy(visible = visible)
-        }
+        this.visible.value = visible
     }
 
     private fun apply(command: Command) {
@@ -60,9 +59,8 @@ internal class VideoPlaybackControl(
             player.pause()
             return
         }
-        // Coming back from Battery Saver isn't a new show: the video goes on.
-        if (command.show != playedShow && command.playback != VideoPlayback.LOOP) player.seekToStart()
-        playedShow = command.show
+        if (command.wake != playedWake && command.playback != VideoPlayback.LOOP) player.seekToStart()
+        playedWake = command.wake
         player.play()
     }
 }
