@@ -55,6 +55,9 @@ import kotlin.math.abs
  * by a CPU-side [BlackHoleScene]. Frames are paced by `Choreographer` on a callback thread: 0 fps when
  * hidden, idle and active rates in between, a still frame when the device is hot.
  *
+ * Hidden, it does no work at all: no frames, no gyroscope, no GL heartbeat, and new lens tables wait
+ * until it shows again. Only listeners that cost nothing until they fire stay registered.
+ *
  * Everything except the [WallpaperEngine] overrides runs on the callback thread.
  */
 internal class BlackHoleWallpaperEngine(
@@ -166,7 +169,6 @@ internal class BlackHoleWallpaperEngine(
                 powerManager?.addThermalStatusListener({ handler.post(it) }, listener)
                 powerManager?.currentThermalStatus?.let(::onThermalStatus)
             }
-            loadTables()
             onVisible(true)
         }
         scope.launch { settingsStore.settings.collect(::onSettings) }
@@ -233,6 +235,7 @@ internal class BlackHoleWallpaperEngine(
             scene.resetInputs()
             registerGyro()
             gl.setVisible(true)
+            loadTables() // what the heat or the settings changed while hidden
             stillDrawn = false
             lastDrawnNanos = Long.MIN_VALUE
             draw(System.nanoTime()) // a fresh frame right away, never a stale one
@@ -341,7 +344,12 @@ internal class BlackHoleWallpaperEngine(
         return QualityController(remembered ?: settings.quality.startLevel)
     }
 
+    /**
+     * Reading or generating tables takes up to seconds of every core, and they wait in memory for the
+     * next frame: a hidden wallpaper leaves that to [onVisible]. The GPU keeps the old ones until then.
+     */
     private fun loadTables() {
+        if (!visible) return
         val key = lensTableKey(params, currentLevel())
         if (key == tablesKey) return
         tablesKey = key

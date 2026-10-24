@@ -13,4 +13,6 @@ dependencies {
     implementation(projects.core.diagnostics)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.timber)
+
+    testImplementation(libs.kotlinx.coroutines.test)
 }
