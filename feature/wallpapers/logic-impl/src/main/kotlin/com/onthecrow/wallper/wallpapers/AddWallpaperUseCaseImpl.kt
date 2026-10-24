@@ -9,5 +9,5 @@ import javax.inject.Inject
 internal class AddWallpaperUseCaseImpl @Inject constructor(
     private val wallpapersRepository: WallpapersRepository,
 ) : AddWallpaperUseCase {
-    override suspend fun invoke(wallpaper: NewWallpaper) = wallpapersRepository.insert(wallpaper.toEntity())
+    override suspend fun invoke(wallpaper: NewWallpaper): Int = wallpapersRepository.insert(wallpaper.toEntity())
 }

@@ -19,4 +19,5 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.androidx.appcompat.resources)
     implementation(libs.timber)
+    testImplementation(libs.kotlinx.coroutines.test)
 }

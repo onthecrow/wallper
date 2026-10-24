@@ -35,6 +35,9 @@ internal class ExoPlayerEngine(
     private val _loopBoundaries = MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
     override val loopBoundaries = _loopBoundaries.asSharedFlow()
 
+    private val _isEnded = MutableStateFlow(false)
+    override val isEnded = _isEnded.asStateFlow()
+
     private var released = false
 
     init {
@@ -70,7 +73,15 @@ internal class ExoPlayerEngine(
 
     override fun pause() = player.pause()
 
-    override fun seekTo(positionMs: Long) = player.seekTo(positionMs)
+    override fun seekTo(positionMs: Long) {
+        // Right away: the state change comes later, and a play() right after the seek must not see the end.
+        _isEnded.value = false
+        player.seekTo(positionMs)
+    }
+
+    override fun setLooping(looping: Boolean) {
+        if (!released) player.repeatMode = if (looping) Player.REPEAT_MODE_ONE else Player.REPEAT_MODE_OFF
+    }
 
     override fun release() {
         if (released) return
@@ -85,6 +96,7 @@ internal class ExoPlayerEngine(
 
     override fun onPlaybackStateChanged(playbackState: Int) {
         _isReady.value = playbackState == Player.STATE_READY
+        _isEnded.value = playbackState == Player.STATE_ENDED
     }
 
     override fun onPlayerError(error: PlaybackException) {

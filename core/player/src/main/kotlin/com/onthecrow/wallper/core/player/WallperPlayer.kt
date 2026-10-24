@@ -26,6 +26,15 @@ interface WallperPlayer {
 
     fun pause()
 
+    /**
+     * Whether the clip starts over at its end; it does by default. Without looping the player stops on the
+     * clip's last frame: [WallperPlayerState.Ended]. A [play] after that starts the clip over.
+     */
+    fun setLooping(looping: Boolean)
+
+    /** Moves to the start of the clip: right away while playing, otherwise for the next [play]. */
+    fun seekToStart()
+
     /** Blocks the caller for at most a second. */
     fun release()
 }
@@ -42,6 +51,9 @@ sealed interface WallperPlayerState {
     data object Idle : WallperPlayerState
 
     data object Playing : WallperPlayerState
+
+    /** Played to the end of the clip without looping; the last frame stays on the surface. */
+    data object Ended : WallperPlayerState
 
     /** The active engine stalled; switching to the standby one. */
     data class Recovering(val cause: StallCause) : WallperPlayerState

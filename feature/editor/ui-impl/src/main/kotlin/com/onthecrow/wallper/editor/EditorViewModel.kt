@@ -63,6 +63,8 @@ internal class EditorViewModel @AssistedInject constructor(
 
         viewModelScope.launch {
             onEvent(EditorEvent.OnProcessingInfoSeenLoaded(processingInfoMemory.isSeen()))
+            // After the flag: whether the switch waits for the explanation depends on it.
+            if ((destination as? EditorDestination.Edit)?.optimise == true) onEvent(EditorEvent.OnOptimisedToggle)
         }
         prepareMedia()
     }

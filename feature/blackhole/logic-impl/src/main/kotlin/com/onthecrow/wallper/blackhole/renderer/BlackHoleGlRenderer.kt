@@ -36,7 +36,6 @@ internal class BlackHoleGlRenderer(
         return drawn
     }
 
-    override fun setOffset(xOffset: Float, yOffset: Float) = Unit
 
     override fun onContextLost() = renderer.onContextLost()
 

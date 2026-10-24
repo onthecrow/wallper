@@ -2,6 +2,9 @@
 
 package com.onthecrow.wallper.settings
 
+import android.os.Build
+import android.text.format.Formatter
+import android.widget.Toast
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
@@ -21,11 +24,12 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -37,6 +41,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -45,12 +50,22 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.core.app.ShareCompat
+import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import com.onthecrow.wallper.core.model.VideoPlayback
+import com.onthecrow.wallper.settings.domain.AppSettings
+import com.onthecrow.wallper.settings.domain.ThemeMode
 import com.onthecrow.wallper.settings.ui.R
+import com.onthecrow.wallper.settings.view.ChoiceDialog
+import com.onthecrow.wallper.settings.view.ClickableItem
+import com.onthecrow.wallper.settings.view.SectionHeader
 import com.onthecrow.wallper.settings.view.SignatureFooter
+import com.onthecrow.wallper.settings.view.SwitchItem
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
+import java.io.File
 
 @Composable
 internal fun SettingsScreen(
@@ -60,10 +75,23 @@ internal fun SettingsScreen(
     modifier: Modifier = Modifier,
 ) {
     val context = LocalContext.current
+    val reportSubject = stringResource(R.string.settings_report_subject)
+    val reportChooserTitle = stringResource(R.string.settings_report_chooser)
+    val reportFailed = stringResource(R.string.settings_report_failed)
 
     LaunchedEffect(eventFlow) {
         eventFlow.collect { event ->
-            if (event is SettingsEvent.OpenLiveWallpaperChooser) context.startActivity(event.intent)
+            when (event) {
+                is SettingsEvent.OpenLiveWallpaperChooser -> context.startActivity(event.intent)
+                is SettingsEvent.ShareReport -> ShareCompat.IntentBuilder(context)
+                    .setType("text/plain")
+                    .setStream(FileProvider.getUriForFile(context, "${context.packageName}$REPORTS_AUTHORITY", File(event.path)))
+                    .setSubject(reportSubject)
+                    .setChooserTitle(reportChooserTitle)
+                    .startChooser()
+                SettingsEvent.OnReportFailed -> Toast.makeText(context, reportFailed, Toast.LENGTH_LONG).show()
+                else -> Unit
+            }
         }
     }
     // Back from the system wallpaper picker or from anywhere else the wallpaper could have changed.
@@ -72,10 +100,12 @@ internal fun SettingsScreen(
         onPauseOrDispose { }
     }
 
+    // As in Pixel's settings: a large title that collapses into the bar as the list scrolls.
+    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
     Scaffold(
-        modifier = modifier,
+        modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(
+            LargeTopAppBar(
                 title = { Text(text = stringResource(R.string.settings_title)) },
                 navigationIcon = {
                     IconButton(onClick = { onEvent(SettingsEvent.OnBackClick) }) {
@@ -85,6 +115,7 @@ internal fun SettingsScreen(
                         )
                     }
                 },
+                scrollBehavior = scrollBehavior,
             )
         },
     ) { padding ->
@@ -99,6 +130,10 @@ internal fun SettingsScreen(
                     isSet = state.isWallpaperSet,
                     onSetClick = { onEvent(SettingsEvent.OnSetWallpaperClick) },
                 )
+                VideoSection(state.settings, onEvent)
+                ListSection(state.settings, state.storageBytes, onEvent)
+                AppearanceSection(state.settings, onEvent)
+                HelpSection(state.isReportInProgress, onEvent)
                 Spacer(modifier = Modifier.weight(1f))
                 SignatureFooter(
                     modifier = Modifier
@@ -108,7 +143,131 @@ internal fun SettingsScreen(
             }
         }
     }
+
+    when (state.dialog) {
+        SettingsDialog.PLAYBACK -> ChoiceDialog(
+            title = stringResource(R.string.settings_playback),
+            options = VideoPlayback.entries,
+            selected = state.settings.videoPlayback,
+            label = { stringResource(it.labelRes) },
+            description = { stringResource(it.descriptionRes) },
+            onSelect = { onEvent(SettingsEvent.OnPlaybackSelect(it)) },
+            onDismiss = { onEvent(SettingsEvent.OnDialogDismiss) },
+        )
+        SettingsDialog.THEME -> ChoiceDialog(
+            title = stringResource(R.string.settings_theme),
+            options = ThemeMode.entries,
+            selected = state.settings.theme,
+            label = { stringResource(it.labelRes) },
+            description = { null },
+            onSelect = { onEvent(SettingsEvent.OnThemeSelect(it)) },
+            onDismiss = { onEvent(SettingsEvent.OnDialogDismiss) },
+        )
+        null -> Unit
+    }
 }
+
+@Composable
+private fun VideoSection(settings: AppSettings, onEvent: (SettingsEvent) -> Unit) {
+    SectionHeader(text = stringResource(R.string.settings_section_video))
+    ClickableItem(
+        title = stringResource(R.string.settings_playback),
+        summary = stringResource(settings.videoPlayback.labelRes),
+        onClick = { onEvent(SettingsEvent.OnPlaybackClick) },
+    )
+    SwitchItem(
+        title = stringResource(R.string.settings_save_battery),
+        summary = stringResource(R.string.settings_save_battery_summary),
+        checked = settings.pauseVideoToSaveBattery,
+        onCheckedChange = { onEvent(SettingsEvent.OnSaveBatteryChange(it)) },
+    )
+    SwitchItem(
+        title = stringResource(R.string.settings_scroll_with_pages),
+        summary = stringResource(R.string.settings_scroll_with_pages_summary),
+        checked = settings.scrollVideoWithPages,
+        onCheckedChange = { onEvent(SettingsEvent.OnScrollWithPagesChange(it)) },
+    )
+}
+
+@Composable
+private fun ListSection(settings: AppSettings, storageBytes: Long?, onEvent: (SettingsEvent) -> Unit) {
+    val context = LocalContext.current
+    SectionHeader(text = stringResource(R.string.settings_section_list))
+    SwitchItem(
+        title = stringResource(R.string.settings_activate_new),
+        summary = stringResource(R.string.settings_activate_new_summary),
+        checked = settings.activateNewWallpapers,
+        onCheckedChange = { onEvent(SettingsEvent.OnActivateNewWallpapersChange(it)) },
+    )
+    SwitchItem(
+        title = stringResource(R.string.settings_show_built_ins),
+        summary = stringResource(R.string.settings_show_built_ins_summary),
+        checked = settings.showBuiltInWallpapers,
+        onCheckedChange = { onEvent(SettingsEvent.OnShowBuiltInWallpapersChange(it)) },
+    )
+    ClickableItem(
+        title = stringResource(R.string.settings_storage),
+        summary = storageBytes?.let { stringResource(R.string.settings_storage_summary, Formatter.formatShortFileSize(context, it)) }
+            ?: stringResource(R.string.settings_storage_counting),
+        onClick = { onEvent(SettingsEvent.OnStorageClick) },
+    )
+}
+
+@Composable
+private fun AppearanceSection(settings: AppSettings, onEvent: (SettingsEvent) -> Unit) {
+    SectionHeader(text = stringResource(R.string.settings_section_appearance))
+    ClickableItem(
+        title = stringResource(R.string.settings_theme),
+        summary = stringResource(settings.theme.labelRes),
+        onClick = { onEvent(SettingsEvent.OnThemeClick) },
+    )
+    // Material You colours exist from Android 12.
+    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+        SwitchItem(
+            title = stringResource(R.string.settings_dynamic_color),
+            summary = stringResource(R.string.settings_dynamic_color_summary),
+            checked = settings.dynamicColor,
+            onCheckedChange = { onEvent(SettingsEvent.OnDynamicColorChange(it)) },
+        )
+    }
+}
+
+@Composable
+private fun HelpSection(isReportInProgress: Boolean, onEvent: (SettingsEvent) -> Unit) {
+    SectionHeader(text = stringResource(R.string.settings_section_help))
+    ClickableItem(
+        title = stringResource(R.string.settings_send_report),
+        summary = stringResource(R.string.settings_send_report_summary),
+        onClick = { onEvent(SettingsEvent.OnSendReportClick) },
+        enabled = !isReportInProgress,
+        trailingContent = if (isReportInProgress) {
+            { CircularProgressIndicator(modifier = Modifier.size(24.dp), strokeWidth = 3.dp) }
+        } else {
+            null
+        },
+    )
+}
+
+private val VideoPlayback.labelRes: Int
+    get() = when (this) {
+        VideoPlayback.LOOP -> R.string.settings_playback_loop
+        VideoPlayback.RESTART -> R.string.settings_playback_restart
+        VideoPlayback.ONCE -> R.string.settings_playback_once
+    }
+
+private val VideoPlayback.descriptionRes: Int
+    get() = when (this) {
+        VideoPlayback.LOOP -> R.string.settings_playback_loop_description
+        VideoPlayback.RESTART -> R.string.settings_playback_restart_description
+        VideoPlayback.ONCE -> R.string.settings_playback_once_description
+    }
+
+private val ThemeMode.labelRes: Int
+    get() = when (this) {
+        ThemeMode.SYSTEM -> R.string.settings_theme_system
+        ThemeMode.LIGHT -> R.string.settings_theme_light
+        ThemeMode.DARK -> R.string.settings_theme_dark
+    }
 
 @Composable
 private fun WallpaperItem(isSet: Boolean?, onSetClick: () -> Unit) {
@@ -205,6 +364,8 @@ private fun FadeSlot(visible: Boolean, content: @Composable () -> Unit) {
     }
 }
 
+/** Appended to the package name; the FileProvider in this module's manifest has the same authority. */
+private const val REPORTS_AUTHORITY = ".reports"
 private const val LOADER_DELAY_MS = 150L
 private const val FADE_MS = 220
 private const val HIDDEN_SCALE = 0.9f

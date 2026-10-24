@@ -72,6 +72,7 @@ dependencies {
     implementation(projects.feature.editor.uiImpl)
     implementation(projects.feature.blackhole.logicImpl)
     implementation(projects.feature.blackhole.uiImpl)
+    implementation(projects.feature.settings.logicImpl)
     implementation(projects.feature.settings.uiImpl)
 
     implementation(libs.androidx.core.ktx)
