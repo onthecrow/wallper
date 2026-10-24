@@ -9,4 +9,6 @@ internal data class WallpapersState(
     /** Previews rendered so far. Kept apart from [items] so that they survive list updates. */
     val builtInPreviews: Map<BuiltInWallpaper, String> = emptyMap(),
     val error: String = "",
+    /** The wallpaper whose deletion waits for the user's confirmation. */
+    val deleteCandidate: Int? = null,
 ) : State
