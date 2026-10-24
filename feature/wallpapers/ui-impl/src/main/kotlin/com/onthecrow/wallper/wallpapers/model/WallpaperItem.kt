@@ -7,8 +7,8 @@ internal data class WallpaperItem(
     /** Null while there is nothing to show: a built-in's preview is still being rendered. */
     val picturePath: String?,
     val isActive: Boolean,
-    /** Set for the wallpapers that ship with the app: their menu has settings instead of delete. */
+    /** Set for the wallpapers that ship with the app: they have settings instead of media, and stay. */
     val builtIn: BuiltInWallpaper? = null,
-    /** The user's media whose original is kept; a processed video can only be deleted. */
-    val isEditable: Boolean = false,
+    /** The user's video kept only as an optimised export: it can't be edited, only deleted. */
+    val isOptimised: Boolean = false,
 )

@@ -46,7 +46,7 @@ internal class WallpapersViewModel @Inject constructor(
             when (event) {
                 is WallpapersEvent.OnWallpaperClick -> activateWallpaper(event.id)
                 is WallpapersEvent.OnEditClick -> navigator.navigate(EditorDestination.Edit(event.id))
-                is WallpapersEvent.OnDeleteClick -> deleteWallpaper(event.id)
+                is WallpapersEvent.OnDeleteConfirm -> deleteWallpaper(event.id)
                 is WallpapersEvent.OnBuiltInSettingsClick -> navigator.navigate(event.wallpaper.settingsDestination())
                 is WallpapersEvent.OnWallpapersChanged -> event.items.mapNotNull { it.builtIn }.forEach(::followPreview)
                 is WallpapersEvent.OnMediaPicked -> openEditor(event.uri)
