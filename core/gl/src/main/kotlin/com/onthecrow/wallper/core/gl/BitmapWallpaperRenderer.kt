@@ -82,7 +82,6 @@ class BitmapWallpaperRenderer(
         return false
     }
 
-    override fun setOffset(xOffset: Float, yOffset: Float) { }
 
     override fun dispose() {
         Timber.d("BitmapRenderer.dispose")

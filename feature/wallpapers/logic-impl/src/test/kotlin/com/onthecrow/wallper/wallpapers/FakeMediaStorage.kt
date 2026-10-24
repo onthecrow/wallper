@@ -20,4 +20,7 @@ internal class FakeMediaStorage : MediaStorage {
     override fun delete(path: String) {
         deletedPaths += path
     }
+
+    /** Ten bytes a character of its path, so sizes differ. */
+    override fun sizeOf(path: String): Long = path.length * 10L
 }

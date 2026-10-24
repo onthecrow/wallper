@@ -23,6 +23,9 @@ internal interface ManagedEngine {
     /** Emits when the clip loops to its start. */
     val loopBoundaries: SharedFlow<Unit>
 
+    /** In STATE_ENDED: the clip played to its end without looping. A seek leaves it. */
+    val isEnded: StateFlow<Boolean>
+
     val positionMs: Long
 
     fun setSurface(surface: Surface?)
@@ -34,6 +37,8 @@ internal interface ManagedEngine {
     fun pause()
 
     fun seekTo(positionMs: Long)
+
+    fun setLooping(looping: Boolean)
 
     /** Idempotent. */
     fun release()

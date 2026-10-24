@@ -82,6 +82,26 @@ class WallpapersLogicTest {
     }
 
     @Test
+    fun `adding returns the new wallpaper's id`() = runTest {
+        assertEquals(1, add(media))
+        assertEquals(2, add(processed))
+    }
+
+    @Test
+    fun `storage counts every file of the user's wallpapers and none of the built-ins`() = runTest {
+        add(media)
+        add(processed)
+        dao.rows.value += builtInEntity(id = 3, key = BuiltInWallpaper.BLACK_HOLE.key)
+
+        val sizes = ObserveWallpaperStorageUseCaseImpl(repository, storage)().first()
+
+        assertEquals(listOf(1, 2), sizes.map { it.wallpaper.id })
+        // The fake's file takes ten bytes a character of its path.
+        assertEquals(("originals/a".length + "thumbnails/a".length) * 10L, sizes[0].bytes)
+        assertEquals(("originals/b.mp4".length + "thumbnails/b".length) * 10L, sizes[1].bytes)
+    }
+
+    @Test
     fun `there is nothing to get for an unknown id`() = runTest {
         assertNull(GetWallpaperUseCaseImpl(repository)(7))
     }

@@ -28,6 +28,8 @@ internal class FakeMediaStorage : MediaStorage {
         if (path != tempProcessedFile.path) deleted += path
     }
 
+    override fun sizeOf(path: String) = 0L
+
     companion object {
         const val MEDIA = "originals/media"
         const val PROCESSED = "originals/processed.mp4"

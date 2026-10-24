@@ -15,19 +15,22 @@ internal class OpenGLScene(
     private val programId: Int
     private val uMVPMatrixHandle: Int
     private val uTexMatrixHandle: Int
+    private val uUvShiftHandle: Int
     private val aPositionHandle: Int
     private val aTextureCoordHandler: Int
 
     private val vertexShader = """
         uniform mat4 uMVPMatrix;
         uniform mat4 uTexMatrix;
+        uniform vec2 uUvShift;
         attribute vec4 aPosition;
         attribute vec4 aTextureCoord;
         varying vec2 vTextureCoord;
 
         void main() {
             gl_Position = uMVPMatrix * aPosition;
-            vTextureCoord = (uTexMatrix * aTextureCoord).xy;
+            // The shift moves the crop window in the upright frame, before the buffer's own transform.
+            vTextureCoord = (uTexMatrix * (aTextureCoord + vec4(uUvShift, 0.0, 0.0))).xy;
         }
     """.trimIndent()
 
@@ -42,7 +45,8 @@ internal class OpenGLScene(
         }
     """.trimIndent()
 
-    private val verticesData = getVerticesData(mediaInfo, rect)
+    private val uvCoords = UVCoords.fromRect(mediaInfo.displayWidth, mediaInfo.displayHeight, rect)
+    private val verticesData = getVerticesData(uvCoords)
 
     init {
         GLES20.glViewport(0, 0, sceneWidth, sceneHeight)
@@ -75,6 +79,12 @@ internal class OpenGLScene(
             throw RuntimeException("Could not get attrib location for uTexMatrix")
         }
 
+        uUvShiftHandle = GLES20.glGetUniformLocation(programId, "uUvShift")
+        checkGlError("glGetUniformLocation uUvShift")
+        if (uUvShiftHandle == -1) {
+            throw RuntimeException("Could not get attrib location for uUvShift")
+        }
+
         aTextureCoordHandler = GLES20.glGetAttribLocation(programId, "aTextureCoord")
         checkGlError("glGetAttribLocation aTextureCoord")
         if (aTextureCoordHandler == -1) {
@@ -93,12 +103,16 @@ internal class OpenGLScene(
         if (deleteProgram) GLES20.glDeleteProgram(programId)
     }
 
-    fun draw(texture: OpenGLExternalTexture) {
+    /** @param pageOffset the launcher's page offset to pan the crop with, or null to show it as chosen. */
+    fun draw(texture: OpenGLExternalTexture, pageOffset: Float?) {
         GLES20.glClearColor(0f, 0f, 0f, 1.0f)
         GLES20.glClear(GLES20.GL_DEPTH_BUFFER_BIT or GLES20.GL_COLOR_BUFFER_BIT)
 
         GLES20.glUseProgram(programId)
         checkGlError("glUseProgram")
+
+        val shiftU = pageOffset?.let { PageScroll.shiftU(uvCoords.topLeft.u, uvCoords.topRight.u, it) } ?: 0f
+        GLES20.glUniform2f(uUvShiftHandle, shiftU, 0f)
 
         texture.draw(
             aPositionHandle = aPositionHandle,
@@ -108,8 +122,7 @@ internal class OpenGLScene(
         )
     }
 
-    private fun getVerticesData(mediaInfo: MediaInfo, rect: CropRect): FloatArray {
-        val uvCoords = UVCoords.fromRect(mediaInfo.displayWidth, mediaInfo.displayHeight, rect)
+    private fun getVerticesData(uvCoords: UVCoords): FloatArray {
         return floatArrayOf(
             // X,   Y,      Z,     U,  V
             -1.0f, -1.0f, 1.0f, uvCoords.bottomLeft.u, uvCoords.bottomLeft.v,

@@ -19,8 +19,10 @@ internal class FakeWallpaperDao(initial: List<WallpaperEntity> = emptyList()) : 
 
     override suspend fun get(id: Int): WallpaperEntity? = rows.value.firstOrNull { it.id == id }
 
-    override suspend fun insert(wallpaper: WallpaperEntity) {
-        rows.update { list -> list + wallpaper.copy(id = (list.maxOfOrNull { it.id } ?: 0) + 1) }
+    override suspend fun insert(wallpaper: WallpaperEntity): Long {
+        val id = (rows.value.maxOfOrNull { it.id } ?: 0) + 1
+        rows.update { list -> list + wallpaper.copy(id = id) }
+        return id.toLong()
     }
 
     override suspend fun update(wallpaper: WallpaperEntity) {

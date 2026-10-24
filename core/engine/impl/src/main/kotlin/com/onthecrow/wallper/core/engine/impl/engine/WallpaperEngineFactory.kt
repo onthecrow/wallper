@@ -3,6 +3,7 @@ package com.onthecrow.wallper.core.engine.impl.engine
 import android.content.Context
 import android.view.SurfaceHolder
 import com.onthecrow.wallper.core.engine.EngineHost
+import com.onthecrow.wallper.core.engine.VideoWallpaperSettingsSource
 import com.onthecrow.wallper.core.engine.WallpaperEngine
 import com.onthecrow.wallper.core.engine.WallpaperSpec
 import com.onthecrow.wallper.core.engine.impl.BuiltInWallpapers
@@ -13,6 +14,8 @@ import javax.inject.Inject
 internal class WallpaperEngineFactory @Inject constructor(
     private val playerFactory: WallperPlayerFactory,
     private val builtIns: BuiltInWallpapers,
+    private val videoSettings: VideoWallpaperSettingsSource,
+    private val powerSaving: PowerSaving,
 ) {
     /**
      * @param wallpaper the wallpaper to show, or null for the placeholder.
@@ -29,9 +32,13 @@ internal class WallpaperEngineFactory @Inject constructor(
         is WallpaperSpec.BuiltIn -> builtIns[wallpaper.wallpaper]
             ?.createEngine(baseContext, surfaceHolder, isPreview, host)
             ?: PlaceholderWallpaperEngine(baseContext, surfaceHolder)
-        is WallpaperSpec.ProcessedVideo -> VideoWallpaperEngine(surfaceHolder, wallpaper.path, playerFactory, host)
+        is WallpaperSpec.ProcessedVideo -> VideoWallpaperEngine(
+            surfaceHolder, wallpaper.path, playerFactory, videoSettings.settings, powerSaving.isSaving, host,
+        )
         is WallpaperSpec.Media -> when (wallpaper.type) {
-            MediaType.VIDEO -> GLWallpaperEngine(surfaceHolder, wallpaper, playerFactory, host)
+            MediaType.VIDEO -> GLWallpaperEngine(
+                surfaceHolder, wallpaper, playerFactory, videoSettings.settings, powerSaving.isSaving, host,
+            )
             // TODO Images are not rendered yet and fall back to the placeholder.
             MediaType.IMAGE -> PlaceholderWallpaperEngine(baseContext, surfaceHolder)
         }

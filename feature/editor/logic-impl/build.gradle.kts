@@ -10,6 +10,7 @@ android {
 dependencies {
     api(projects.feature.editor.logicApi)
     implementation(projects.feature.wallpapers.logicApi)
+    implementation(projects.feature.settings.logicApi)
     implementation(projects.core.coroutines)
     implementation(projects.core.storage)
     implementation(libs.androidx.core.ktx)

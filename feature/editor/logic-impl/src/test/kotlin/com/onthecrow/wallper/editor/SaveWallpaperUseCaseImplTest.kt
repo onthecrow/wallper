@@ -9,11 +9,16 @@ import com.onthecrow.wallper.editor.domain.model.EditedWallpaper
 import com.onthecrow.wallper.editor.domain.model.ExportStatus
 import com.onthecrow.wallper.editor.domain.model.PreparedMedia
 import com.onthecrow.wallper.editor.export.VideoExporter
+import com.onthecrow.wallper.settings.domain.AppSettings
+import com.onthecrow.wallper.settings.domain.AppSettingsSource
+import com.onthecrow.wallper.wallpapers.domain.ActivateWallpaperUseCase
 import com.onthecrow.wallper.wallpapers.domain.AddWallpaperUseCase
 import com.onthecrow.wallper.wallpapers.domain.UpdateWallpaperUseCase
 import com.onthecrow.wallper.wallpapers.domain.model.NewWallpaper
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
@@ -33,6 +38,8 @@ class SaveWallpaperUseCaseImplTest {
     private val exports = mutableListOf<Pair<String, String>>()
     private var exportResult: List<ExportStatus> = listOf(ExportStatus.InProgress(50), ExportStatus.Success)
     private var saveError: Exception? = null
+    private val activated = mutableListOf<Int>()
+    private val appSettings = MutableStateFlow(AppSettings())
 
     private val useCase = SaveWallpaperUseCaseImpl(
         mediaStorage = storage,
@@ -43,9 +50,10 @@ class SaveWallpaperUseCaseImplTest {
             }
         },
         addWallpaperUseCase = object : AddWallpaperUseCase {
-            override suspend fun invoke(wallpaper: NewWallpaper) {
+            override suspend fun invoke(wallpaper: NewWallpaper): Int {
                 saveError?.let { throw it }
                 added += wallpaper
+                return NEW_ID
             }
         },
         updateWallpaperUseCase = object : UpdateWallpaperUseCase {
@@ -53,6 +61,15 @@ class SaveWallpaperUseCaseImplTest {
                 saveError?.let { throw it }
                 updated += id to wallpaper
             }
+        },
+        activateWallpaperUseCase = object : ActivateWallpaperUseCase {
+            override suspend fun invoke(id: Int) {
+                activated += id
+            }
+        },
+        appSettings = object : AppSettingsSource {
+            override val settings = appSettings
+            override fun update(transform: (AppSettings) -> AppSettings) = appSettings.update(transform)
         },
         dispatchersProvider = object : DispatchersProvider {
             override val main = dispatcher
@@ -124,6 +141,23 @@ class SaveWallpaperUseCaseImplTest {
     }
 
     @Test
+    fun `a new wallpaper becomes the active one, if the user wants it so`() = runTest(dispatcher) {
+        useCase(video, crop, clip, process = false).toList()
+        assertEquals(listOf(NEW_ID), activated)
+
+        appSettings.value = AppSettings(activateNewWallpapers = false)
+        useCase(video, crop, clip, process = false).toList()
+        assertEquals(listOf(NEW_ID), activated)
+    }
+
+    @Test
+    fun `an edit doesn't change which wallpaper is active`() = runTest(dispatcher) {
+        useCase(savedVideo, crop, clip, process = false).toList()
+
+        assertTrue(activated.isEmpty())
+    }
+
+    @Test
     fun `an edit without processing only changes the crop and the trim`() = runTest(dispatcher) {
         useCase(savedVideo, crop, clip, process = false).toList()
 
@@ -142,5 +176,9 @@ class SaveWallpaperUseCaseImplTest {
         assertEquals(listOf("originals/a" to "editor/processed.mp4"), exports)
         assertEquals(7 to NewWallpaper.ProcessedVideo(FakeMediaStorage.PROCESSED, "thumbnails/old"), updated.single())
         assertEquals(listOf(FakeMediaStorage.PROCESSED), storage.persisted)
+    }
+
+    private companion object {
+        const val NEW_ID = 42
     }
 }

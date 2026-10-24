@@ -8,6 +8,9 @@ import com.onthecrow.wallper.core.navigation.featureEntry
 import com.onthecrow.wallper.settings.SettingsDestination
 import com.onthecrow.wallper.settings.SettingsScreen
 import com.onthecrow.wallper.settings.SettingsViewModel
+import com.onthecrow.wallper.settings.StorageDestination
+import com.onthecrow.wallper.settings.storage.StorageScreen
+import com.onthecrow.wallper.settings.storage.StorageViewModel
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -26,6 +29,18 @@ internal object SettingsUiModule {
         SettingsScreen(
             state = state,
             eventFlow = viewModel.eventFlow,
+            onEvent = viewModel::onEvent,
+            modifier = modifier,
+        )
+    }
+
+    @Provides
+    @IntoSet
+    fun provideStorageEntry(): FeatureEntry<*> = featureEntry<StorageDestination> { _, modifier ->
+        val viewModel = hiltViewModel<StorageViewModel>()
+        val state by viewModel.state.collectAsStateWithLifecycle()
+        StorageScreen(
+            state = state,
             onEvent = viewModel::onEvent,
             modifier = modifier,
         )

@@ -2,6 +2,7 @@ package com.onthecrow.wallper.core.engine.impl.engine
 
 import android.view.SurfaceHolder
 import com.onthecrow.wallper.core.engine.EngineHost
+import com.onthecrow.wallper.core.engine.VideoWallpaperSettings
 import com.onthecrow.wallper.core.engine.WallpaperEngine
 import com.onthecrow.wallper.core.player.PlayerMedia
 import com.onthecrow.wallper.core.player.WallperPlayerFactory
@@ -10,6 +11,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import timber.log.Timber
@@ -19,11 +21,14 @@ internal class VideoWallpaperEngine(
     surfaceHolder: () -> SurfaceHolder,
     processedPath: String,
     playerFactory: WallperPlayerFactory,
+    settings: Flow<VideoWallpaperSettings>,
+    savingPower: Flow<Boolean>,
     private val host: EngineHost,
 ) : WallpaperEngine() {
 
     private val player = playerFactory.create(PlayerMedia(processedPath))
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+    private val playback = VideoPlaybackControl(player, settings, savingPower, scope)
 
     init {
         Timber.d("created")
@@ -32,12 +37,11 @@ internal class VideoWallpaperEngine(
             host.showPlaceholder("The video player failed")
         }
         player.setVideoSurface(surfaceHolder().surface)
-        player.play()
     }
 
-    override fun pause() = player.pause()
+    override fun pause() = playback.setVisible(false)
 
-    override fun resume() = player.play()
+    override fun resume() = playback.setVisible(true)
 
     // The system takes the surface back once onSurfaceDestroyed returns; setVideoSurface waits for the decoder.
     override fun onSurfaceDestroyed() = player.setVideoSurface(null)
