@@ -5,6 +5,8 @@ import com.onthecrow.wallper.core.mvi.State
 internal data class StorageState(
     /** Largest first; null until counted. */
     val items: List<StorageItem>? = null,
+    /** The wallpaper whose deletion waits for the user's confirmation. */
+    val deleteCandidate: Int? = null,
 ) : State {
     val totalBytes: Long? get() = items?.sumOf { it.bytes }
 }
@@ -18,6 +20,6 @@ internal data class StorageItem(
 ) {
     enum class Kind { ORIGINAL_VIDEO, OPTIMISED_VIDEO, PICTURE }
 
-    /** Only a video kept as it was can be optimised; a picture is always kept as it is. */
-    val canOptimise: Boolean get() = kind == Kind.ORIGINAL_VIDEO
+    /** As on the list's card: an optimised video keeps no original to edit, it can only be deleted. */
+    val canEdit: Boolean get() = kind != Kind.OPTIMISED_VIDEO
 }

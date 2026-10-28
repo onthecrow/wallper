@@ -16,7 +16,7 @@
     <string name="settings_save_battery">Save battery</string>
     <string name="settings_save_battery_summary">Pause videos in Battery Saver and when the phone is hot</string>
     <string name="settings_scroll_with_pages">Move with home screen pages</string>
-    <string name="settings_scroll_with_pages_summary">Original videos pan as you swipe between pages</string>
+    <string name="settings_scroll_with_pages_summary">Original videos pan and the black hole turns as you swipe between pages</string>
     <string name="settings_section_list">Wallpaper list</string>
     <string name="settings_activate_new">Use new wallpapers right away</string>
     <string name="settings_activate_new_summary">A wallpaper you add becomes the current one</string>
@@ -30,8 +30,8 @@
     <string name="settings_theme_system">System default</string>
     <string name="settings_theme_light">Light</string>
     <string name="settings_theme_dark">Dark</string>
-    <string name="settings_dynamic_color">Dynamic colours</string>
-    <string name="settings_dynamic_color_summary">Colour the app after your phone\'s wallpaper (Material You)</string>
+    <string name="settings_system_colors">System colours</string>
+    <string name="settings_system_colors_summary">Use the colours of your phone\'s theme</string>
     <string name="settings_section_help">Help</string>
     <string name="settings_send_report">Send a report</string>
     <string name="settings_send_report_summary">Share the app\'s log to help fix a problem</string>
@@ -39,11 +39,10 @@
     <string name="settings_report_chooser">Send the report</string>
     <string name="settings_report_failed">The report couldn\'t be created</string>
     <string name="storage_title">Storage</string>
-    <string name="storage_explanation">An optimised video keeps only the part you picked, already cropped and trimmed. It takes less space, but it can\'t be edited afterwards.</string>
+    <string name="storage_explanation">An optimised video keeps only the part you picked, already cropped and trimmed. It takes less space, but it can\'t be edited afterwards. To optimise a video, edit it.</string>
     <string name="storage_original_video">Original video</string>
     <string name="storage_optimised_video">Optimised video</string>
     <string name="storage_picture">Picture</string>
-    <string name="storage_optimise">Optimise</string>
     <string name="storage_empty">Your wallpapers will show here</string>
     <string name="settings_footer_signature">Developed with ❤️ by</string>
     <string name="settings_footer_contact">Feel free to reach me if you have any questions</string>
@@ -51,4 +50,5 @@
     <string name="settings_footer_telegram" translatable="false">Telegram</string>
     <string name="settings_footer_github" translatable="false">GitHub</string>
     <string name="settings_footer_instagram" translatable="false">Instagram</string>
+    <string name="settings_version">Version %1$s</string>
 </resources>

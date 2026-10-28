@@ -24,10 +24,19 @@ class StorageReducerTest {
     }
 
     @Test
-    fun `user actions change nothing by themselves`() = runTest {
+    fun `navigation changes nothing by itself`() = runTest {
         val state = StorageState(items = emptyList())
 
         assertSame(state, reducer.reduce(state, StorageEvent.OnBackClick))
-        assertSame(state, reducer.reduce(state, StorageEvent.OnOptimiseClick(1)))
+        assertSame(state, reducer.reduce(state, StorageEvent.OnEditClick(1)))
+    }
+
+    @Test
+    fun `a deletion waits for the confirmation, which ends it either way`() = runTest {
+        val asked = reducer.reduce(StorageState(), StorageEvent.OnDeleteClick(4))
+        assertEquals(4, asked.deleteCandidate)
+
+        assertNull(reducer.reduce(asked, StorageEvent.OnDeleteConfirm(4)).deleteCandidate)
+        assertNull(reducer.reduce(asked, StorageEvent.OnDeleteDismiss).deleteCandidate)
     }
 }

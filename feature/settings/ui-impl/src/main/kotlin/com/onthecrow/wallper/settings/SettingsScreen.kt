@@ -24,11 +24,11 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -57,6 +57,7 @@ import com.onthecrow.wallper.core.model.VideoPlayback
 import com.onthecrow.wallper.settings.domain.AppSettings
 import com.onthecrow.wallper.settings.domain.ThemeMode
 import com.onthecrow.wallper.settings.ui.R
+import com.onthecrow.wallper.settings.view.AppVersion
 import com.onthecrow.wallper.settings.view.ChoiceDialog
 import com.onthecrow.wallper.settings.view.ClickableItem
 import com.onthecrow.wallper.settings.view.SectionHeader
@@ -100,12 +101,12 @@ internal fun SettingsScreen(
         onPauseOrDispose { }
     }
 
-    // As in Pixel's settings: a large title that collapses into the bar as the list scrolls.
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    // A plain bar: a large collapsing title only takes the room of the settings.
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     Scaffold(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            LargeTopAppBar(
+            TopAppBar(
                 title = { Text(text = stringResource(R.string.settings_title)) },
                 navigationIcon = {
                     IconButton(onClick = { onEvent(SettingsEvent.OnBackClick) }) {
@@ -130,6 +131,13 @@ internal fun SettingsScreen(
                     isSet = state.isWallpaperSet,
                     onSetClick = { onEvent(SettingsEvent.OnSetWallpaperClick) },
                 )
+                // Every wallpaper follows it, not only videos: it sits with the wallpaper, above the sections.
+                SwitchItem(
+                    title = stringResource(R.string.settings_scroll_with_pages),
+                    summary = stringResource(R.string.settings_scroll_with_pages_summary),
+                    checked = state.settings.scrollVideoWithPages,
+                    onCheckedChange = { onEvent(SettingsEvent.OnScrollWithPagesChange(it)) },
+                )
                 VideoSection(state.settings, onEvent)
                 ListSection(state.settings, state.storageBytes, onEvent)
                 AppearanceSection(state.settings, onEvent)
@@ -138,7 +146,12 @@ internal fun SettingsScreen(
                 SignatureFooter(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 24.dp, bottom = 8.dp),
+                        .padding(top = 24.dp),
+                )
+                AppVersion(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp, bottom = 8.dp),
                 )
             }
         }
@@ -181,12 +194,6 @@ private fun VideoSection(settings: AppSettings, onEvent: (SettingsEvent) -> Unit
         checked = settings.pauseVideoToSaveBattery,
         onCheckedChange = { onEvent(SettingsEvent.OnSaveBatteryChange(it)) },
     )
-    SwitchItem(
-        title = stringResource(R.string.settings_scroll_with_pages),
-        summary = stringResource(R.string.settings_scroll_with_pages_summary),
-        checked = settings.scrollVideoWithPages,
-        onCheckedChange = { onEvent(SettingsEvent.OnScrollWithPagesChange(it)) },
-    )
 }
 
 @Composable
@@ -221,11 +228,11 @@ private fun AppearanceSection(settings: AppSettings, onEvent: (SettingsEvent) ->
         summary = stringResource(settings.theme.labelRes),
         onClick = { onEvent(SettingsEvent.OnThemeClick) },
     )
-    // Material You colours exist from Android 12.
+    // The system's colours (Material You) exist from Android 12: from the wallpaper or picked by the user.
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
         SwitchItem(
-            title = stringResource(R.string.settings_dynamic_color),
-            summary = stringResource(R.string.settings_dynamic_color_summary),
+            title = stringResource(R.string.settings_system_colors),
+            summary = stringResource(R.string.settings_system_colors_summary),
             checked = settings.dynamicColor,
             onCheckedChange = { onEvent(SettingsEvent.OnDynamicColorChange(it)) },
         )

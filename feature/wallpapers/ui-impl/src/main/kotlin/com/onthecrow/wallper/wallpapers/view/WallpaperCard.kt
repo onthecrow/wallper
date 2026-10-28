@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toOffset
 import coil.compose.AsyncImage
+import com.onthecrow.wallper.core.designsystem.R as DesignR
 import com.onthecrow.wallper.core.model.BuiltInWallpaper
 import com.onthecrow.wallper.wallpapers.model.WallpaperItem
 import com.onthecrow.wallper.wallpapers.ui.R
@@ -88,14 +89,14 @@ internal fun WallpaperCard(
                 if (!wallpaper.isOptimised) {
                     IconButton(onClick = onEditClick, colors = iconColors) {
                         Icon(
-                            painter = painterResource(R.drawable.ic_edit),
-                            contentDescription = stringResource(if (wallpaper.builtIn != null) R.string.settings else R.string.edit),
+                            painter = painterResource(DesignR.drawable.ic_edit),
+                            contentDescription = stringResource(if (wallpaper.builtIn != null) R.string.settings else DesignR.string.edit),
                         )
                     }
                 }
                 if (wallpaper.builtIn == null) {
                     IconButton(onClick = onDeleteClick, colors = iconColors) {
-                        Icon(painter = painterResource(R.drawable.ic_delete), contentDescription = stringResource(R.string.delete))
+                        Icon(painter = painterResource(DesignR.drawable.ic_delete), contentDescription = stringResource(DesignR.string.delete))
                     }
                 }
             }

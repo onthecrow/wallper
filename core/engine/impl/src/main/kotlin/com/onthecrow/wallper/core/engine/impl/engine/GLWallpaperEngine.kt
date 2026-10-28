@@ -5,7 +5,7 @@ import android.os.HandlerThread
 import android.view.Surface
 import android.view.SurfaceHolder
 import com.onthecrow.wallper.core.engine.EngineHost
-import com.onthecrow.wallper.core.engine.VideoWallpaperSettings
+import com.onthecrow.wallper.core.engine.WallpaperSettings
 import com.onthecrow.wallper.core.engine.WallpaperEngine
 import com.onthecrow.wallper.core.engine.WallpaperSpec
 import com.onthecrow.wallper.core.gl.RestartableGl
@@ -23,7 +23,6 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.combine
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -34,14 +33,15 @@ import timber.log.Timber
  *
  * Only binds the two sides together: the renderer's video surface goes to the player. Each side recovers
  * on its own. The player replaces its decoder behind that surface; the GL side repairs EGL inside the GL
- * thread, and a broken or hung GL thread is recreated here without touching the player. When the user
- * wants it, the crop pans with the launcher's pages ([VideoWallpaperRenderer.pageOffset]).
+ * thread, and a broken or hung GL thread is recreated here without touching the player. The crop pans
+ * with the launcher's pages ([VideoWallpaperRenderer.pageOffset]); with the user's setting off the
+ * service reports no pages.
  */
 internal class GLWallpaperEngine(
     surfaceHolder: () -> SurfaceHolder,
     wallpaper: WallpaperSpec.Media,
     playerFactory: WallperPlayerFactory,
-    settings: Flow<VideoWallpaperSettings>,
+    settings: Flow<WallpaperSettings>,
     savingPower: Flow<Boolean>,
     screenOffs: Flow<Unit>,
     private val host: EngineHost,
@@ -98,14 +98,12 @@ internal class GLWallpaperEngine(
         }
         scope.launch { framesExpected.collect(gl::setFramesExpected) }
         scope.launch {
-            combine(launcherOffset, settings) { offset, settings -> offset.takeIf { settings.scrollsWithPages } }
-                .distinctUntilChanged()
-                .collect { offset ->
-                    pageOffset = offset
-                    gl.current.renderer.pageOffset = offset
-                    // A paused video gets no new frames to draw the move with.
-                    gl.current.thread.requestRender()
-                }
+            launcherOffset.collect { offset ->
+                pageOffset = offset
+                gl.current.renderer.pageOffset = offset
+                // A paused video gets no new frames to draw the move with.
+                gl.current.thread.requestRender()
+            }
         }
     }
 

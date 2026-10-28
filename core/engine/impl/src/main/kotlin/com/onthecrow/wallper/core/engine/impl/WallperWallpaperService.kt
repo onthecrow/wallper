@@ -14,6 +14,7 @@ import androidx.core.graphics.drawable.toBitmap
 import com.onthecrow.wallper.core.engine.ActiveWallpaperSource
 import com.onthecrow.wallper.core.engine.EngineHost
 import com.onthecrow.wallper.core.engine.WallpaperEngine
+import com.onthecrow.wallper.core.engine.WallpaperSettingsSource
 import com.onthecrow.wallper.core.engine.WallpaperSpec
 import com.onthecrow.wallper.core.engine.impl.engine.WallpaperEngineFactory
 import dagger.hilt.android.AndroidEntryPoint
@@ -24,7 +25,9 @@ import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.catch
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.launchIn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -43,6 +46,9 @@ class WallperWallpaperService : WallpaperService() {
 
     @Inject
     internal lateinit var builtIns: BuiltInWallpapers
+
+    @Inject
+    internal lateinit var wallpaperSettings: WallpaperSettingsSource
 
     override fun onCreateEngine(): Engine {
         Timber.d("onCreateEngine")
@@ -64,6 +70,9 @@ class WallperWallpaperService : WallpaperService() {
 
         /** The width colors are computed at: WallpaperColors scales down anyway. */
         const val COLORS_SIZE = 112
+
+        /** Where a launcher without pages puts the wallpaper: in the middle. */
+        const val NO_PAGES_OFFSET = 0.5f
     }
 
     @RequiresApi(Build.VERSION_CODES.O_MR1)
@@ -127,9 +136,23 @@ class WallperWallpaperService : WallpaperService() {
             }
             .stateIn(engineScope, SharingStarted.Eagerly, null)
 
+        /** The launcher's last page offset and step; null until it sends any. */
+        private var launcherOffsets: Pair<Float, Float>? = null
+
+        /** The user's «Move with home screen pages»; off, every wallpaper is told there are no pages. */
+        private var scrollsWithPages = true
+
         init {
             activeWallpaperSource.activations
                 .onEach { retryRequested = true }
+                .launchIn(engineScope)
+            wallpaperSettings.settings
+                .map { it.scrollsWithPages }
+                .distinctUntilChanged()
+                .onEach { scrolls ->
+                    scrollsWithPages = scrolls
+                    dispatchOffsets()
+                }
                 .launchIn(engineScope)
         }
 
@@ -184,7 +207,18 @@ class WallperWallpaperService : WallpaperService() {
             yPixelOffset: Int,
         ) {
             super.onOffsetsChanged(xOffset, yOffset, xOffsetStep, yOffsetStep, xPixelOffset, yPixelOffset)
-            wallpaperEngine?.onOffsetsChanged(xOffset, xOffsetStep)
+            launcherOffsets = xOffset to xOffsetStep
+            dispatchOffsets()
+        }
+
+        /** The launcher's offset, or none with the setting off: every engine stays where it is then. */
+        private fun dispatchOffsets() {
+            val (xOffset, xOffsetStep) = launcherOffsets ?: return
+            if (scrollsWithPages) {
+                wallpaperEngine?.onOffsetsChanged(xOffset, xOffsetStep)
+            } else {
+                wallpaperEngine?.onOffsetsChanged(NO_PAGES_OFFSET, 0f)
+            }
         }
 
         // API 30+: the system zooms the wallpaper out while unlocking, opening the shade or an app.
@@ -228,6 +262,8 @@ class WallperWallpaperService : WallpaperService() {
             wallpaperEngine = wallpaperEngineFactory
                 .create(baseContext, { surfaceHolder }, shownWallpaper, isPreview, this)
                 .also { if (!isVisible) it.pause() }
+            // From the page the launcher is on, not from the middle until the next swipe.
+            dispatchOffsets()
             computeColors(shownWallpaper)
         }
 
