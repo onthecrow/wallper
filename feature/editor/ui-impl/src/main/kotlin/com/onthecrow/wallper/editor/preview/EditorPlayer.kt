@@ -41,8 +41,6 @@ internal class EditorPlayer(context: Context, path: String, onError: (PlaybackEx
         repeatMode = Player.REPEAT_MODE_OFF
         addListener(object : Player.Listener {
             override fun onPlayerError(error: PlaybackException) {
-                // TODO Report to Sentry or Crashlytics once one is set up: Timber.e reaches Diagnostics.reporter,
-                //  which only writes to logcat for now.
                 Timber.e(error, "The editor preview can't play $path: ${error.errorCodeName}")
                 onError(error)
             }

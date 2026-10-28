@@ -5,8 +5,8 @@ import android.util.Log
 import com.onthecrow.wallper.core.diagnostics.CrashReporter
 
 /**
- * The release build's reporter until a crash reporting service is chosen: reports go to logcat, where
- * `adb logcat -s WallperReport` shows them on a release build too. Breadcrumbs stay out.
+ * The release build's reports in logcat, beside Crashlytics: `adb logcat -s WallperReport` and the in-app
+ * report show them, also in direct boot, before Crashlytics starts. Breadcrumbs stay out.
  */
 @SuppressLint("LogNotTimber") // Timber feeds this reporter: logging back through it would loop.
 internal class LogcatCrashReporter : CrashReporter {

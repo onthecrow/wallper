@@ -12,7 +12,8 @@ Design docs: [WALLPER_PLAYER_DESIGN.md](WALLPER_PLAYER_DESIGN.md) (video playbac
 - `unitTest` (from the convention plugins) runs `test` in plain Kotlin modules and `testDebugUnitTest` in Android ones; plain `testDebugUnitTest` skips the JVM modules.
 - Lint warnings fail the build. Older ones are kept in each module's `lint-baseline.xml`; don't add to it, fix new warnings.
 - CI (`.github/workflows/ci.yml`) runs `unitTest lintDebug assembleRelease validateBlackHoleShaders` on every pull request.
-- Release signing reads the Play upload key from `~/.gradle/gradle.properties` or the environment: `WALLPER_UPLOAD_STORE_FILE`, `WALLPER_UPLOAD_STORE_PASSWORD`, `WALLPER_UPLOAD_KEY_ALIAS`, `WALLPER_UPLOAD_KEY_PASSWORD`. Without them the release build is unsigned; never put them in the repository. Publish with `./gradlew bundleRelease`.
+- `app/google-services.json` isn't in git. Without it the build only warns, and the release build has no Firebase app (as on CI). A release build with it uploads its R8 mapping to Crashlytics.
+- Release signing reads the Play upload key from `~/.gradle/gradle.properties`, the environment or `singning/signing.properties` beside the key (git ignores the folder): `WALLPER_UPLOAD_STORE_FILE` (relative to the project root), `WALLPER_UPLOAD_STORE_PASSWORD`, `WALLPER_UPLOAD_KEY_ALIAS`, `WALLPER_UPLOAD_KEY_PASSWORD`. Without them the release build is unsigned; never put them in the repository. Publish with `./gradlew bundleRelease`.
 
 ## Modules
 
@@ -95,7 +96,7 @@ The player side and the GL side recover independently; there is no shared abstra
 
 - `Timber.w` is a breadcrumb and `Timber.e` a crash report: `ReportingTree` in `:app` forwards both to `Diagnostics.reporter` (`CrashReporter`). Log a failure the app recovers from with `Timber.e`, and the reason in the message.
 - `Diagnostics.reporter` is global on purpose: GL threads and engines aren't built by Hilt, and it must work in direct boot. Context keys: `gl_renderer` (`WallpaperGLThread`), `black_hole_quality`.
-- No crash reporting service yet: release builds log reports to logcat (`adb logcat -s WallperReport`). A service goes behind `CrashReporter`, initialized by hand in `Application.onCreate` without touching credential-encrypted storage.
+- Firebase (Crashlytics, Analytics) is in release builds only (`releaseImplementation`, the build type's code in `app/src/release` and `app/src/debug`): debug builds neither carry nor start it. Release builds report to Crashlytics (`FirebaseCrashReporter`) and to logcat (`adb logcat -s WallperReport`, read by the in-app report). Crashlytics keeps its files in credential-encrypted storage: Firebase starts it after the first unlock, and the reporter doesn't touch it before (`isUserUnlocked`), so reports in direct boot reach logcat only.
 - `ExitReasons` reports crashes and ANRs of earlier runs from `ApplicationExitInfo` (API 30+).
 
 ## MVI (`core:mvi`)
