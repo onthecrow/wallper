@@ -27,6 +27,8 @@ data class BlackHoleSettings(
     val starSizePx: Double = StarMath.sizePx(StarMath.DEFAULT_SHARPNESS),
     /** How much stars widen with the pixel footprint to avoid shimmering; lower is crisper. */
     val starWidening: Double = StarMath.footprintWidening(StarMath.DEFAULT_SHARPNESS),
+    /** Multiplies the light of every star; the Milky Way stays as it is. */
+    val starBrightness: Double = StarParams().brightness,
     /** Vertical field of view: lower brings the hole closer on screen without new lens tables. */
     val fovDeg: Double = CameraParams().fovYDeg,
     /** Multiplies the speed of [DiskParams.rotationPeriodSec]; 0 stops the disk. */
@@ -106,6 +108,7 @@ data class BlackHoleSettings(
             countScale = starCount.coerceIn(STAR_COUNT_RANGE),
             sizePx = starSizePx.coerceIn(STAR_SIZE_RANGE),
             footprintWidening = starWidening.coerceIn(STAR_WIDENING_RANGE),
+            brightness = starBrightness.coerceIn(STAR_BRIGHTNESS_RANGE),
         ),
         doppler = base.doppler.copy(enabled = dopplerEnabled, strength = dopplerStrength.coerceIn(0.0, 1.0)),
         input = base.input.copy(
@@ -153,7 +156,8 @@ data class BlackHoleSettings(
         val DISK_SPEED_RANGE = 0.0..4.0
         val STAR_COUNT_RANGE = 0.0..10.0
         val STAR_SHARPNESS_RANGE = 0.0..1.0
-        val STAR_SIZE_RANGE = 0.2..2.0
+        val STAR_SIZE_RANGE = 0.2..4.0
+        val STAR_BRIGHTNESS_RANGE = 0.25..4.0
         val STAR_WIDENING_RANGE = 0.0..0.5
         val FOV_RANGE = 30.0..90.0
         val ORBIT_RANGE = 60.0..3600.0

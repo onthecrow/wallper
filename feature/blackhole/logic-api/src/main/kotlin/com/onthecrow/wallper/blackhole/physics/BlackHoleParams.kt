@@ -116,7 +116,10 @@ data class StarParams(
      * gets a finer grid (see [StarMath.effectiveLayer]).
      */
     val countScale: Double = 10.0,
-    /** σ of a star in render pixels; [StarMath.sizePx] derives it from a sharpness. */
+    /**
+     * σ of a star in screen pixels; [StarMath.sizePx] derives it from a sharpness. A layer of small cells keeps
+     * a smaller one ([StarMath.layerSigmaRad]).
+     */
     val sizePx: Double = StarMath.sizePx(StarMath.DEFAULT_SHARPNESS),
     /**
      * How much a star widens with the pixel footprint: σ²_eff = σ² + w · fp² (§9.3 uses 0.25). Lower is

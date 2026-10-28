@@ -234,6 +234,13 @@ private fun BasicSettings(settings: BlackHoleSettings, onEvent: (BlackHoleSettin
         settings = settings,
         onEvent = onEvent,
     )
+    SettingsSliderRow(
+        slider = SettingsSlider.STAR_BRIGHTNESS,
+        label = stringResource(R.string.black_hole_star_brightness, settings.starBrightness),
+        supportingText = stringResource(R.string.black_hole_star_brightness_hint),
+        settings = settings,
+        onEvent = onEvent,
+    )
     OutlinedButton(onClick = { onEvent(BlackHoleSettingsEvent.OnShuffleStarsClick) }) {
         Text(text = stringResource(R.string.black_hole_shuffle_stars))
     }
@@ -324,6 +331,7 @@ private fun ColumnScope.AdvancedSettings(
     SettingsSliderRow(
         slider = SettingsSlider.STAR_SIZE,
         label = stringResource(R.string.black_hole_star_size, settings.starSizePx),
+        supportingText = stringResource(R.string.black_hole_star_size_hint),
         settings = settings,
         onEvent = onEvent,
     )

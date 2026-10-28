@@ -1,5 +1,8 @@
 package com.onthecrow.wallper.blackhole.physics
 
+import kotlin.math.PI
+import kotlin.math.sqrt
+import kotlin.math.tan
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
@@ -208,5 +211,41 @@ class StarMathTest {
         assertTrue(StarMath.footprintWidening(1.0) < StarMath.footprintWidening(0.0))
         assertEquals(0.25, StarMath.footprintWidening(0.0), 1e-12) // §9.3 at the softest
         assertEquals(0.6, StarMath.sharpnessOf(StarMath.sizePx(0.6)), 1e-12)
+    }
+
+    @Test
+    fun `a star keeps its size while its cells have room for it`() {
+        val sigma = StarMath.sigmaRad(sizePx = 1.0, tanHalfFovY = tan(PI * 53 / 360), screenHeightPx = 2772)
+
+        assertEquals(sigma, StarMath.layerSigmaRad(StarLayer(cells = 51, density = 0.8, flux = 2.5), sigma))
+    }
+
+    @Test
+    fun `a star of small cells stops growing where its narrowest cell would cut it off`() {
+        val sigma = StarMath.sigmaRad(sizePx = 1.0, tanHalfFovY = tan(PI * 53 / 360), screenHeightPx = 2772)
+        val small = StarLayer(cells = 496, density = 0.8, flux = 0.15)
+        val capped = StarMath.layerSigmaRad(small, sigma * 10)
+
+        assertTrue(capped < sigma)
+        assertEquals(capped, StarMath.layerSigmaRad(small, sigma * 20))
+        assertTrue(StarMath.layerSigmaRad(small.copy(cells = 170), sigma * 10) > capped)
+    }
+
+    @Test
+    fun `the cap holds in every cell of a face`() {
+        // The cell size of sky.glsl at every cell centre of a face.
+        val cells = 64
+        var narrowest = Double.MAX_VALUE
+        for (i in 0 until cells) for (j in 0 until cells) {
+            val tu = tan(((i + 0.5) / cells * 2 - 1) * PI / 4)
+            val tv = tan(((j + 0.5) / cells * 2 - 1) * PI / 4)
+            val w = 1 + tu * tu + tv * tv
+            val jacobian = PI * PI / 16 * (1 + tu * tu) * (1 + tv * tv) / (w * sqrt(w))
+            narrowest = minOf(narrowest, sqrt(jacobian) * 2 / cells)
+        }
+        val capped = StarMath.layerSigmaRad(StarLayer(cells = cells, density = 0.8, flux = 1.0), 1.0)
+
+        assertTrue(capped * StarMath.EDGE_SIGMAS <= StarMath.CELL_MARGIN * narrowest)
+        assertEquals(StarMath.CELL_MARGIN * narrowest, capped * StarMath.EDGE_SIGMAS, 0.02 * narrowest)
     }
 }

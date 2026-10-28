@@ -4,9 +4,9 @@ uniform samplerCube uHaze;
 uniform float uHazeEnabled;
 uniform float uStarsEnabled;
 uniform mat3 uStarRot[STAR_LAYERS];
-uniform vec4 uStarLayer[STAR_LAYERS];   // cells, density, flux, unused
+uniform vec4 uStarLayer[STAR_LAYERS];   // cells, density, flux, σ of its stars in radians
 uniform vec3 uStarAvg[STAR_LAYERS];     // mean radiance of the layer, coloured
-uniform float uStarSigma;                // σ of a star, radians
+uniform float uStarSigma;                // σ of a star before the layers cap it to their cells, radians
 uniform float uStarWidening;             // σ²_eff = σ² + w · fp²
 uniform vec2 uStarFade;                  // fp / cell where a layer starts and ends fading into its mean
 uniform float uMagPower;
@@ -81,7 +81,7 @@ vec3 starLayer(vec3 dir, float fp, int i) {
     float tint = fract(h.x * 61.7 + h.w * 13.1);
 
     // Flux-preserving widening by the pixel footprint; the layer fades into its mean when cells get sub-pixel.
-    float s2 = uStarSigma * uStarSigma;
+    float s2 = layer.w * layer.w;
     float s2eff = s2 + uStarWidening * fp * fp;
     float fade = 1.0 - smoothstep(uStarFade.x, uStarFade.y, fp / cellAngle);
     float star = step(h.x, probability) * magnitude * (s2 / s2eff) * fade * exp(-0.5 * dist * dist / s2eff);

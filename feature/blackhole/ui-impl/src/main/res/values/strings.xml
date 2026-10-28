@@ -61,9 +61,12 @@
     <string name="black_hole_recoil_return_hint">How quickly the hole comes back to its place</string>
     <string name="black_hole_disk_speed_hint">0 stops the disk</string>
     <string name="black_hole_star_count">Stars: ×%1$.1f</string>
+    <string name="black_hole_star_brightness">Star brightness: ×%1$.2f</string>
+    <string name="black_hole_star_brightness_hint">Outdoors in the sun, raise it together with the star size</string>
     <string name="black_hole_star_sharpness">Star sharpness: %1$.0f%%</string>
     <string name="black_hole_star_sharpness_hint">Sets star size and widening together; very sharp stars may shimmer a little while the camera moves</string>
     <string name="black_hole_star_size">Star size: %1$.2f px</string>
+    <string name="black_hole_star_size_hint">Faint stars sit close together and stop growing first; bright ones keep growing</string>
     <string name="black_hole_star_widening">Star widening: %1$.3f</string>
     <string name="black_hole_star_widening_hint">How much stars blur with the pixel footprint so they don\'t shimmer; lower is crisper</string>
     <string name="black_hole_fov">Field of view: %1$.0f°</string>
