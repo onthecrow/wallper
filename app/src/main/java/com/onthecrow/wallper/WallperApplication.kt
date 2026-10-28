@@ -7,7 +7,6 @@ import com.onthecrow.wallper.diagnostics.ReportingTree
 import com.onthecrow.wallper.diagnostics.installDiagnostics
 import dagger.hilt.android.HiltAndroidApp
 import timber.log.Timber
-import kotlin.concurrent.thread
 
 @HiltAndroidApp
 class WallperApplication : Application() {
@@ -18,7 +17,7 @@ class WallperApplication : Application() {
         installDiagnostics()
         Timber.plant(ReportingTree())
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            thread(name = "ExitReasons") { ExitReasons.reportNew(this) }
+            ExitReasons.reportOnceUnlocked(this)
         }
     }
 }

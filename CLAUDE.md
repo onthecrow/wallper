@@ -97,7 +97,7 @@ The player side and the GL side recover independently; there is no shared abstra
 - `Timber.w` is a breadcrumb and `Timber.e` a crash report: `ReportingTree` in `:app` forwards both to `Diagnostics.reporter` (`CrashReporter`). Log a failure the app recovers from with `Timber.e`, and the reason in the message.
 - `Diagnostics.reporter` is global on purpose: GL threads and engines aren't built by Hilt, and it must work in direct boot. Context keys: `gl_renderer` (`WallpaperGLThread`), `black_hole_quality`.
 - Firebase (Crashlytics, Analytics) is in release builds only (`releaseImplementation`, the build type's code in `app/src/release` and `app/src/debug`): debug builds neither carry nor start it. Release builds report to Crashlytics (`FirebaseCrashReporter`) and to logcat (`adb logcat -s WallperReport`, read by the in-app report). Crashlytics keeps its files in credential-encrypted storage: Firebase starts it after the first unlock, and the reporter doesn't touch it before (`isUserUnlocked`), so reports in direct boot reach logcat only.
-- `ExitReasons` reports crashes and ANRs of earlier runs from `ApplicationExitInfo` (API 30+).
+- `ExitReasons` reports crashes and ANRs of earlier runs from `ApplicationExitInfo` (API 30+), once the user has unlocked: before, a report reaches logcat only and would still count as reported. Crashlytics doesn't see native crashes, nor any before the first unlock.
 
 ## MVI (`core:mvi`)
 
