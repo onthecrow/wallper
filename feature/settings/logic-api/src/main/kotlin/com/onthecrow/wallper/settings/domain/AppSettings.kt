@@ -15,14 +15,14 @@ data class AppSettings(
     val videoPlayback: VideoPlayback = VideoPlayback.LOOP,
     /** Pause video wallpapers in Battery Saver and when the phone is hot. */
     val pauseVideoToSaveBattery: Boolean = true,
-    /** Pan original videos with the launcher's pages. */
+    /** Move every wallpaper with the launcher's pages: original videos pan, the black hole turns. */
     val scrollVideoWithPages: Boolean = true,
     /** Make a wallpaper the active one as soon as it is added. */
     val activateNewWallpapers: Boolean = true,
     /** List the built-in wallpapers; the active one stays listed anyway. */
     val showBuiltInWallpapers: Boolean = true,
     val theme: ThemeMode = ThemeMode.SYSTEM,
-    /** Material You: the colours of the phone's wallpaper (Android 12+). */
+    /** Material You: the phone's system colours, taken from its wallpaper or picked in its settings (Android 12+). */
     val dynamicColor: Boolean = true,
 ) {
     /** Only what differs from the defaults. */

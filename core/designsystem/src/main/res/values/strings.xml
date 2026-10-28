@@ -1,3 +1,7 @@
 <resources>
     <string name="app_name">Wallper</string>
+    <string name="delete">Delete</string>
+    <string name="edit">Edit</string>
+    <string name="delete_wallpaper_title">Delete this wallpaper?</string>
+    <string name="delete_wallpaper_text">Wallper\'s copy of it goes too. The file in your gallery stays.</string>
 </resources>

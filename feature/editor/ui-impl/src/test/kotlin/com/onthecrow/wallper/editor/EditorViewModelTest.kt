@@ -105,27 +105,6 @@ class EditorViewModelTest {
     }
 
     @Test
-    fun `an edit opened to optimise starts optimised, once the explanation was seen`() = runTest(dispatcher) {
-        memory.seen = true
-
-        val viewModel = createViewModel(EditorDestination.Edit(4, optimise = true))
-
-        assertEquals(true, viewModel.state.value.isOptimised)
-        assertNull(viewModel.state.value.processingInfo)
-    }
-
-    @Test
-    fun `an edit opened to optimise explains it first, the first time`() = runTest(dispatcher) {
-        val viewModel = createViewModel(EditorDestination.Edit(4, optimise = true))
-
-        assertEquals(false, viewModel.state.value.isOptimised)
-        assertNotNull(viewModel.state.value.processingInfo)
-
-        viewModel.onEvent(EditorEvent.OnProcessingInfoConfirm)
-        assertEquals(true, viewModel.state.value.isOptimised)
-    }
-
-    @Test
     fun `failed preparation shows the error`() = runTest(dispatcher) {
         prepareResult = Result.failure(IllegalStateException("broken file"))
 

@@ -31,11 +31,11 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.onthecrow.wallper.core.designsystem.R as DesignR
+import com.onthecrow.wallper.core.designsystem.component.DeleteWallpaperDialog
 import com.onthecrow.wallper.core.designsystem.component.FAB
 import com.onthecrow.wallper.core.model.BuiltInWallpaper
 import com.onthecrow.wallper.wallpapers.model.WallpaperItem
 import com.onthecrow.wallper.wallpapers.ui.R
-import com.onthecrow.wallper.wallpapers.view.DeleteWallpaperDialog
 import com.onthecrow.wallper.wallpapers.view.WallpaperCard
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow

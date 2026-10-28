@@ -1,9 +1,9 @@
 package com.onthecrow.wallper.settings.di
 
-import com.onthecrow.wallper.core.engine.VideoWallpaperSettingsSource
+import com.onthecrow.wallper.core.engine.WallpaperSettingsSource
 import com.onthecrow.wallper.settings.AppSettingsStore
 import com.onthecrow.wallper.settings.CreateReportUseCaseImpl
-import com.onthecrow.wallper.settings.VideoWallpaperSettingsSourceImpl
+import com.onthecrow.wallper.settings.WallpaperSettingsSourceImpl
 import com.onthecrow.wallper.settings.domain.AppSettingsSource
 import com.onthecrow.wallper.settings.domain.CreateReportUseCase
 import dagger.Binds
@@ -19,7 +19,7 @@ internal abstract class SettingsLogicModule {
     abstract fun bindAppSettingsSource(impl: AppSettingsStore): AppSettingsSource
 
     @Binds
-    abstract fun bindVideoWallpaperSettingsSource(impl: VideoWallpaperSettingsSourceImpl): VideoWallpaperSettingsSource
+    abstract fun bindWallpaperSettingsSource(impl: WallpaperSettingsSourceImpl): WallpaperSettingsSource
 
     @Binds
     abstract fun bindCreateReport(impl: CreateReportUseCaseImpl): CreateReportUseCase

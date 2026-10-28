@@ -7,6 +7,8 @@ internal class StorageReducer @Inject constructor() : Reducer<StorageState, Stor
     override suspend fun reduce(state: StorageState, event: StorageEvent): StorageState =
         when (event) {
             is StorageEvent.OnItemsChanged -> state.copy(items = event.items.sortedByDescending { it.bytes })
+            is StorageEvent.OnDeleteClick -> state.copy(deleteCandidate = event.id)
+            is StorageEvent.OnDeleteConfirm, StorageEvent.OnDeleteDismiss -> state.copy(deleteCandidate = null)
             else -> state
         }
 }

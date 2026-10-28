@@ -1,7 +1,7 @@
 package com.onthecrow.wallper.core.engine.impl.engine
 
 import android.view.Surface
-import com.onthecrow.wallper.core.engine.VideoWallpaperSettings
+import com.onthecrow.wallper.core.engine.WallpaperSettings
 import com.onthecrow.wallper.core.model.VideoPlayback
 import com.onthecrow.wallper.core.player.WallperPlayer
 import com.onthecrow.wallper.core.player.WallperPlayerState
@@ -22,7 +22,7 @@ import kotlin.test.assertTrue
 class VideoPlaybackControlTest {
 
     private val player = FakePlayer()
-    private val settings = MutableStateFlow(VideoWallpaperSettings())
+    private val settings = MutableStateFlow(WallpaperSettings())
     private val savingPower = MutableStateFlow(false)
     private val screenOffs = MutableSharedFlow<Unit>()
 
@@ -48,7 +48,7 @@ class VideoPlaybackControlTest {
         savingPower.value = true
         assertFalse(player.playing)
 
-        settings.value = VideoWallpaperSettings(pausesToSaveBattery = false)
+        settings.value = WallpaperSettings(pausesToSaveBattery = false)
         assertTrue(player.playing)
     }
 
@@ -64,7 +64,7 @@ class VideoPlaybackControlTest {
 
     @Test
     fun `restart goes on after an app, and starts over after the screen was off`() = runTest {
-        settings.value = VideoWallpaperSettings(playback = VideoPlayback.RESTART)
+        settings.value = WallpaperSettings(playback = VideoPlayback.RESTART)
         val control = control()
 
         // Out to an app and back to the home screen.
@@ -79,7 +79,7 @@ class VideoPlaybackControlTest {
 
     @Test
     fun `once doesn't loop and starts over only after the screen was off`() = runTest {
-        settings.value = VideoWallpaperSettings(playback = VideoPlayback.ONCE)
+        settings.value = WallpaperSettings(playback = VideoPlayback.ONCE)
         val control = control()
         assertFalse(player.loops)
 
@@ -94,7 +94,7 @@ class VideoPlaybackControlTest {
 
     @Test
     fun `coming back from Battery Saver isn't a new wake`() = runTest {
-        settings.value = VideoWallpaperSettings(playback = VideoPlayback.RESTART)
+        settings.value = WallpaperSettings(playback = VideoPlayback.RESTART)
         control()
 
         savingPower.value = true
@@ -106,7 +106,7 @@ class VideoPlaybackControlTest {
 
     @Test
     fun `a wake the battery saver held starts over once it plays`() = runTest {
-        settings.value = VideoWallpaperSettings(playback = VideoPlayback.RESTART)
+        settings.value = WallpaperSettings(playback = VideoPlayback.RESTART)
         val control = control()
         savingPower.value = true
 

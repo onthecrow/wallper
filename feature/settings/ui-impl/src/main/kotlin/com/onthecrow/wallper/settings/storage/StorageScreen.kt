@@ -4,6 +4,7 @@ package com.onthecrow.wallper.settings.storage
 
 import android.text.format.Formatter
 import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -14,12 +15,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.LargeTopAppBar
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -32,6 +32,8 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
+import com.onthecrow.wallper.core.designsystem.R as DesignR
+import com.onthecrow.wallper.core.designsystem.component.DeleteWallpaperDialog
 import com.onthecrow.wallper.settings.ui.R
 
 @Composable
@@ -40,11 +42,12 @@ internal fun StorageScreen(
     onEvent: (StorageEvent) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val scrollBehavior = TopAppBarDefaults.exitUntilCollapsedScrollBehavior()
+    // A plain bar: a large title only takes the room of the list.
+    val scrollBehavior = TopAppBarDefaults.pinnedScrollBehavior()
     Scaffold(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            LargeTopAppBar(
+            TopAppBar(
                 title = { Text(text = stringResource(R.string.storage_title)) },
                 navigationIcon = {
                     IconButton(onClick = { onEvent(StorageEvent.OnBackClick) }) {
@@ -74,9 +77,20 @@ internal fun StorageScreen(
                 }
             }
             items(items.orEmpty(), key = { it.id }) { item ->
-                StorageRow(item = item, onOptimiseClick = { onEvent(StorageEvent.OnOptimiseClick(item.id)) })
+                StorageRow(
+                    item = item,
+                    onEditClick = { onEvent(StorageEvent.OnEditClick(item.id)) },
+                    onDeleteClick = { onEvent(StorageEvent.OnDeleteClick(item.id)) },
+                )
             }
         }
+    }
+
+    state.deleteCandidate?.let { id ->
+        DeleteWallpaperDialog(
+            onConfirm = { onEvent(StorageEvent.OnDeleteConfirm(id)) },
+            onDismiss = { onEvent(StorageEvent.OnDeleteDismiss) },
+        )
     }
 }
 
@@ -102,7 +116,7 @@ private fun Summary(totalBytes: Long?) {
 }
 
 @Composable
-private fun StorageRow(item: StorageItem, onOptimiseClick: () -> Unit) {
+private fun StorageRow(item: StorageItem, onEditClick: () -> Unit, onDeleteClick: () -> Unit) {
     val context = LocalContext.current
     ListItem(
         leadingContent = {
@@ -117,14 +131,17 @@ private fun StorageRow(item: StorageItem, onOptimiseClick: () -> Unit) {
         },
         headlineContent = { Text(text = Formatter.formatShortFileSize(context, item.bytes)) },
         supportingContent = { Text(text = stringResource(item.kind.labelRes)) },
-        trailingContent = if (item.canOptimise) {
-            {
-                OutlinedButton(onClick = onOptimiseClick) {
-                    Text(text = stringResource(R.string.storage_optimise))
+        trailingContent = {
+            Row {
+                if (item.canEdit) {
+                    IconButton(onClick = onEditClick) {
+                        Icon(painter = painterResource(DesignR.drawable.ic_edit), contentDescription = stringResource(DesignR.string.edit))
+                    }
+                }
+                IconButton(onClick = onDeleteClick) {
+                    Icon(painter = painterResource(DesignR.drawable.ic_delete), contentDescription = stringResource(DesignR.string.delete))
                 }
             }
-        } else {
-            null
         },
     )
 }

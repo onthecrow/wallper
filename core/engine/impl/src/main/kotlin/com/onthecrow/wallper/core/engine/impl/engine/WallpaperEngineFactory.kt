@@ -3,7 +3,7 @@ package com.onthecrow.wallper.core.engine.impl.engine
 import android.content.Context
 import android.view.SurfaceHolder
 import com.onthecrow.wallper.core.engine.EngineHost
-import com.onthecrow.wallper.core.engine.VideoWallpaperSettingsSource
+import com.onthecrow.wallper.core.engine.WallpaperSettingsSource
 import com.onthecrow.wallper.core.engine.WallpaperEngine
 import com.onthecrow.wallper.core.engine.WallpaperSpec
 import com.onthecrow.wallper.core.engine.impl.BuiltInWallpapers
@@ -14,7 +14,7 @@ import javax.inject.Inject
 internal class WallpaperEngineFactory @Inject constructor(
     private val playerFactory: WallperPlayerFactory,
     private val builtIns: BuiltInWallpapers,
-    private val videoSettings: VideoWallpaperSettingsSource,
+    private val wallpaperSettings: WallpaperSettingsSource,
     private val powerSaving: PowerSaving,
     private val screenOffs: ScreenOffs,
 ) {
@@ -37,7 +37,7 @@ internal class WallpaperEngineFactory @Inject constructor(
             surfaceHolder = surfaceHolder,
             processedPath = wallpaper.path,
             playerFactory = playerFactory,
-            settings = videoSettings.settings,
+            settings = wallpaperSettings.settings,
             savingPower = powerSaving.isSaving,
             screenOffs = screenOffs.events,
             host = host,
@@ -47,7 +47,7 @@ internal class WallpaperEngineFactory @Inject constructor(
                 surfaceHolder = surfaceHolder,
                 wallpaper = wallpaper,
                 playerFactory = playerFactory,
-                settings = videoSettings.settings,
+                settings = wallpaperSettings.settings,
                 savingPower = powerSaving.isSaving,
                 screenOffs = screenOffs.events,
                 host = host,

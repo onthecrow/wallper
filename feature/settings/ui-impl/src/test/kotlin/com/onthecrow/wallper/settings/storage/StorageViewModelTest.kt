@@ -8,6 +8,7 @@ import com.onthecrow.wallper.core.model.MediaType
 import com.onthecrow.wallper.core.navigation.Destination
 import com.onthecrow.wallper.core.navigation.Navigator
 import com.onthecrow.wallper.editor.EditorDestination
+import com.onthecrow.wallper.wallpapers.domain.DeleteWallpaperUseCase
 import com.onthecrow.wallper.wallpapers.domain.ObserveWallpaperStorageUseCase
 import com.onthecrow.wallper.wallpapers.domain.model.Wallpaper
 import com.onthecrow.wallper.wallpapers.domain.model.WallpaperStorage
@@ -33,6 +34,7 @@ class StorageViewModelTest {
     private val dispatcher = UnconfinedTestDispatcher()
     private val storage = MutableStateFlow<List<WallpaperStorage>?>(null)
     private val destinations = mutableListOf<Destination>()
+    private val deleted = mutableListOf<Int>()
     private var backs = 0
 
     @BeforeTest
@@ -48,6 +50,9 @@ class StorageViewModelTest {
                 storage.collect { list -> list?.let { emit(it) } }
             }
         },
+        deleteWallpaperUseCase = object : DeleteWallpaperUseCase {
+            override suspend fun invoke(id: Int) { deleted += id }
+        },
         navigator = object : Navigator {
             override fun navigate(destination: Destination) { destinations += destination }
             override fun navigateBack() { backs++ }
@@ -60,7 +65,7 @@ class StorageViewModelTest {
     )
 
     @Test
-    fun `wallpapers are counted, the largest first, and only original videos can be optimised`() = runTest(dispatcher) {
+    fun `wallpapers are counted, the largest first, and only what keeps its original can be edited`() = runTest(dispatcher) {
         val viewModel = createViewModel()
         assertNull(viewModel.state.value.items)
 
@@ -79,16 +84,40 @@ class StorageViewModelTest {
             viewModel.state.value.items,
         )
         assertEquals(175_000, viewModel.state.value.totalBytes)
-        assertEquals(listOf(true, false, false), viewModel.state.value.items?.map { it.canOptimise })
+        assertEquals(listOf(true, false, true), viewModel.state.value.items?.map { it.canEdit })
     }
 
     @Test
-    fun `optimise opens the editor on the wallpaper, switched to optimised`() = runTest(dispatcher) {
+    fun `edit opens the editor on the wallpaper`() = runTest(dispatcher) {
         val viewModel = createViewModel()
 
-        viewModel.onEvent(StorageEvent.OnOptimiseClick(2))
+        viewModel.onEvent(StorageEvent.OnEditClick(2))
 
-        assertEquals(listOf<Destination>(EditorDestination.Edit(2, optimise = true)), destinations)
+        assertEquals(listOf<Destination>(EditorDestination.Edit(2)), destinations)
+    }
+
+    @Test
+    fun `a wallpaper is deleted only once the user confirms`() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+
+        viewModel.onEvent(StorageEvent.OnDeleteClick(3))
+        assertEquals(3, viewModel.state.value.deleteCandidate)
+        assertEquals(emptyList(), deleted)
+
+        viewModel.onEvent(StorageEvent.OnDeleteConfirm(3))
+        assertEquals(listOf(3), deleted)
+        assertNull(viewModel.state.value.deleteCandidate)
+    }
+
+    @Test
+    fun `a dismissed deletion deletes nothing`() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+
+        viewModel.onEvent(StorageEvent.OnDeleteClick(3))
+        viewModel.onEvent(StorageEvent.OnDeleteDismiss)
+
+        assertEquals(emptyList(), deleted)
+        assertNull(viewModel.state.value.deleteCandidate)
     }
 
     @Test

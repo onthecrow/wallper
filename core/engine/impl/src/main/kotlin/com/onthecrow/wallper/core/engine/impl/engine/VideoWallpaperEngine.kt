@@ -2,7 +2,7 @@ package com.onthecrow.wallper.core.engine.impl.engine
 
 import android.view.SurfaceHolder
 import com.onthecrow.wallper.core.engine.EngineHost
-import com.onthecrow.wallper.core.engine.VideoWallpaperSettings
+import com.onthecrow.wallper.core.engine.WallpaperSettings
 import com.onthecrow.wallper.core.engine.WallpaperEngine
 import com.onthecrow.wallper.core.player.PlayerMedia
 import com.onthecrow.wallper.core.player.WallperPlayerFactory
@@ -21,7 +21,7 @@ internal class VideoWallpaperEngine(
     surfaceHolder: () -> SurfaceHolder,
     processedPath: String,
     playerFactory: WallperPlayerFactory,
-    settings: Flow<VideoWallpaperSettings>,
+    settings: Flow<WallpaperSettings>,
     savingPower: Flow<Boolean>,
     screenOffs: Flow<Unit>,
     private val host: EngineHost,

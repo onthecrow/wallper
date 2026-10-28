@@ -1,4 +1,4 @@
-package com.onthecrow.wallper.wallpapers.view
+package com.onthecrow.wallper.core.designsystem.component
 
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Text
@@ -6,11 +6,11 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
-import com.onthecrow.wallper.wallpapers.ui.R
+import com.onthecrow.wallper.core.designsystem.R
 
-/** Deleting a wallpaper can't be undone: its files go with it. */
+/** Deleting a wallpaper can't be undone: its files go with it. The list and the storage screen ask alike. */
 @Composable
-internal fun DeleteWallpaperDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+fun DeleteWallpaperDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {

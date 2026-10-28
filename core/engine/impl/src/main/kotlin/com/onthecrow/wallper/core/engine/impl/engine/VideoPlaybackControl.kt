@@ -1,6 +1,6 @@
 package com.onthecrow.wallper.core.engine.impl.engine
 
-import com.onthecrow.wallper.core.engine.VideoWallpaperSettings
+import com.onthecrow.wallper.core.engine.WallpaperSettings
 import com.onthecrow.wallper.core.model.VideoPlayback
 import com.onthecrow.wallper.core.player.WallperPlayer
 import kotlinx.coroutines.CoroutineScope
@@ -21,7 +21,7 @@ import kotlinx.coroutines.launch
  */
 internal class VideoPlaybackControl(
     private val player: WallperPlayer,
-    settings: Flow<VideoWallpaperSettings>,
+    settings: Flow<WallpaperSettings>,
     savingPower: Flow<Boolean>,
     screenOffs: Flow<Unit>,
     scope: CoroutineScope,
