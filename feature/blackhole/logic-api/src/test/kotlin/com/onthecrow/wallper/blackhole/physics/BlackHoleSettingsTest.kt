@@ -79,6 +79,15 @@ class BlackHoleSettingsTest {
     }
 
     @Test
+    fun `star brightness reaches the stars and stays in range`() {
+        assertEquals(2.5, BlackHoleSettings(starBrightness = 2.5).applyTo(BlackHoleParams()).stars.brightness)
+        assertEquals(
+            BlackHoleSettings.STAR_BRIGHTNESS_RANGE.endInclusive,
+            BlackHoleSettings(starBrightness = 9.0).applyTo(BlackHoleParams()).stars.brightness,
+        )
+    }
+
+    @Test
     fun `the field of view reaches the camera`() {
         assertEquals(40.0, BlackHoleSettings(fovDeg = 40.0).applyTo(BlackHoleParams()).camera.fovYDeg)
         assertEquals(BlackHoleSettings.FOV_RANGE.start, BlackHoleSettings(fovDeg = 5.0).applyTo(BlackHoleParams()).camera.fovYDeg)

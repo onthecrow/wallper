@@ -85,6 +85,10 @@ internal enum class SettingsSlider(val range: ClosedFloatingPointRange<Double>) 
         override fun value(settings: BlackHoleSettings) = settings.starCount
         override fun set(settings: BlackHoleSettings, value: Double) = settings.copy(starCount = value)
     },
+    STAR_BRIGHTNESS(BlackHoleSettings.STAR_BRIGHTNESS_RANGE) {
+        override fun value(settings: BlackHoleSettings) = settings.starBrightness
+        override fun set(settings: BlackHoleSettings, value: Double) = settings.copy(starBrightness = value)
+    },
     /** A preset over size and widening: moving it sets both, the two sliders below fine-tune them. */
     STAR_SHARPNESS(BlackHoleSettings.STAR_SHARPNESS_RANGE) {
         override fun value(settings: BlackHoleSettings) = StarMath.sharpnessOf(settings.starSizePx)

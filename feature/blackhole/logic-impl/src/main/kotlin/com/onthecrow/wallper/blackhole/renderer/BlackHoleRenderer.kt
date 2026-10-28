@@ -305,13 +305,15 @@ internal class BlackHoleRenderer(assets: AssetManager) : BlackHoleFrameRenderer 
         program.set("uHazeEnabled", if (params.haze.enabled) 1f else 0f)
         program.set("uStarsEnabled", if (stars.enabled) 1f else 0f)
         program.setMat3v("uStarRot", starRotations(stars.seed))
-        program.set4v("uStarLayer", starLayerData)
-        // The average depends on the star size in pixels, so on the zoom: per frame, into the same array.
+        // σ and the average depend on the star size in pixels, so on the zoom: per frame, into the same arrays.
         starAverages.fill(0f)
         starLayers.forEachIndexed { index, layer ->
-            val radiance = StarMath.averageRadiance(layer, sigma, stars.magPower)
+            val layerSigma = StarMath.layerSigmaRad(layer, sigma)
+            starLayerData[4 * index + 3] = layerSigma.toFloat()
+            val radiance = StarMath.averageRadiance(layer, layerSigma, stars.magPower)
             for (channel in 0 until 3) starAverages[3 * index + channel] = (radiance * starTint[channel]).toFloat()
         }
+        program.set4v("uStarLayer", starLayerData)
         program.set3v("uStarAvg", starAverages)
         program.set("uStarSigma", sigma)
         program.set("uStarWidening", stars.footprintWidening)
@@ -343,12 +345,13 @@ internal class BlackHoleRenderer(assets: AssetManager) : BlackHoleFrameRenderer 
         starLayerData = FloatArray(4 * quality.starLayers) { i ->
             val layer = starLayers.getOrNull(i / 4)
             when {
-                // A missing layer stays empty; one cell, never zero cells: 1 / cells must not be infinite.
-                layer == null -> if (i % 4 == 0) 1f else 0f
+                // A missing layer stays empty; one cell, never zero cells: 1 / cells must not be infinite. Nor a
+                // zero σ: σ² / σ²_eff would be 0 / 0 without widening.
+                layer == null -> if (i % 4 == 0 || i % 4 == 3) 1f else 0f
                 i % 4 == 0 -> layer.cells.coerceAtLeast(1).toFloat()
                 i % 4 == 1 -> layer.density.toFloat()
                 i % 4 == 2 -> layer.flux.toFloat()
-                else -> 0f
+                else -> 0f // σ, per frame in lensPass
             }
         }
         for (channel in 0 until 3) {
