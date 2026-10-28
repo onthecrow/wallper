@@ -12,7 +12,7 @@ Design docs: [WALLPER_PLAYER_DESIGN.md](WALLPER_PLAYER_DESIGN.md) (video playbac
 - `unitTest` (from the convention plugins) runs `test` in plain Kotlin modules and `testDebugUnitTest` in Android ones; plain `testDebugUnitTest` skips the JVM modules.
 - Lint warnings fail the build. Older ones are kept in each module's `lint-baseline.xml`; don't add to it, fix new warnings.
 - CI (`.github/workflows/ci.yml`) runs `unitTest lintDebug assembleRelease validateBlackHoleShaders` on every pull request.
-- `app/google-services.json` isn't in git. Without it the build only warns, and the release build has no Firebase app (as on CI). A release build with it uploads its R8 mapping to Crashlytics.
+- `app/google-services.json` isn't in git. Without it the build only warns: the release build has no Firebase app and uploads no R8 mapping (as on CI). With it, a release build uploads its mapping to Crashlytics.
 - Release signing reads the Play upload key from `~/.gradle/gradle.properties`, the environment or `singning/signing.properties` beside the key (git ignores the folder): `WALLPER_UPLOAD_STORE_FILE` (relative to the project root), `WALLPER_UPLOAD_STORE_PASSWORD`, `WALLPER_UPLOAD_KEY_ALIAS`, `WALLPER_UPLOAD_KEY_PASSWORD`. Without them the release build is unsigned; never put them in the repository. Publish with `./gradlew bundleRelease`.
 
 ## Modules

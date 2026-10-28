@@ -1,4 +1,5 @@
 // The app shell: Application, MainActivity and the Hilt graph root. Feature and core code lives in its own modules.
+import com.google.firebase.crashlytics.buildtools.gradle.CrashlyticsExtension
 import com.google.gms.googleservices.GoogleServicesPlugin.MissingGoogleServicesStrategy
 import java.io.StringReader
 import java.util.Properties
@@ -21,6 +22,9 @@ val localSigning = Properties().apply {
 fun signingValue(name: String): String? =
     providers.gradleProperty(name).orElse(providers.environmentVariable(name)).orNull
         ?: localSigning.getProperty(name)
+
+/** google-services.json isn't in git: CI builds without it, so with no Firebase app and no mapping to upload. */
+val hasGoogleServices = providers.fileContents(layout.projectDirectory.file("google-services.json")).asBytes.isPresent
 
 android {
     namespace = "com.onthecrow.wallper"
@@ -58,6 +62,8 @@ android {
                 "proguard-rules.pro"
             )
             signingConfig = signingConfigs.findByName("release")
+            // The upload needs the app id from google-services.json.
+            configure<CrashlyticsExtension> { mappingFileUploadEnabled = hasGoogleServices }
         }
     }
     buildFeatures {
@@ -70,7 +76,7 @@ android {
     }
 }
 
-// google-services.json isn't in git: CI builds without it, so with no Firebase app.
+// Without google-services.json the plugin only warns.
 googleServices {
     missingGoogleServicesStrategy = MissingGoogleServicesStrategy.WARN
 }
