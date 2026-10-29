@@ -11,7 +11,8 @@ import java.util.concurrent.ConcurrentHashMap
 /**
  * Release builds: reports go to Crashlytics and to logcat, which the in-app report reads. Crashlytics keeps its
  * files in credential-encrypted storage, so Firebase starts it only after the first unlock: in direct boot the
- * reports reach logcat alone and the keys wait. A build without google-services.json has no Firebase app.
+ * reports reach logcat alone and the keys wait. So do reports while the user doesn't let Crashlytics collect
+ * («Share usage and crash data»). A build without google-services.json has no Firebase app.
  */
 internal class FirebaseCrashReporter(context: Context) : CrashReporter {
 
@@ -31,14 +32,17 @@ internal class FirebaseCrashReporter(context: Context) : CrashReporter {
 
     override fun recordNonFatal(message: String, error: Throwable?) {
         logcat.recordNonFatal(message, error)
-        val crashlytics = crashlytics() ?: return
+        val crashlytics = collecting() ?: return
         if (error != null) crashlytics.log(message)
         crashlytics.recordException(error ?: LoggedError(message))
     }
 
     override fun log(message: String) {
-        crashlytics()?.log(message)
+        collecting()?.log(message)
     }
+
+    /** Crashlytics stores what it gets while it's off and would send it at the next start if it's on by then. */
+    private fun collecting(): FirebaseCrashlytics? = crashlytics()?.takeIf { it.isCrashlyticsCollectionEnabled }
 
     private fun crashlytics(): FirebaseCrashlytics? {
         crashlytics?.let { return it }

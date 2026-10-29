@@ -38,6 +38,9 @@
     <string name="settings_report_subject">Wallper report</string>
     <string name="settings_report_chooser">Send the report</string>
     <string name="settings_report_failed">The report couldn\'t be created</string>
+    <string name="settings_section_privacy">Privacy</string>
+    <string name="settings_share_data">Share usage and crash data</string>
+    <string name="settings_share_data_summary">Usage statistics and crash reports help improve Wallper</string>
     <string name="settings_privacy_policy">Privacy policy</string>
     <string name="settings_privacy_policy_summary">What Wallper keeps, what it sends and why</string>
     <string name="storage_title">Storage</string>

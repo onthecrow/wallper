@@ -77,6 +77,7 @@ class SettingsViewModelTest {
         viewModel.onEvent(SettingsEvent.OnActivateNewWallpapersChange(false))
         viewModel.onEvent(SettingsEvent.OnShowBuiltInWallpapersChange(false))
         viewModel.onEvent(SettingsEvent.OnDynamicColorChange(false))
+        viewModel.onEvent(SettingsEvent.OnShareUsageAndCrashDataChange(false))
         viewModel.onEvent(SettingsEvent.OnPlaybackSelect(VideoPlayback.ONCE))
         viewModel.onEvent(SettingsEvent.OnThemeSelect(ThemeMode.DARK))
 
@@ -88,6 +89,7 @@ class SettingsViewModelTest {
             showBuiltInWallpapers = false,
             theme = ThemeMode.DARK,
             dynamicColor = false,
+            shareUsageAndCrashData = false,
         )
         assertEquals(expected, appSettings.value)
         assertEquals(expected, viewModel.state.value.settings)

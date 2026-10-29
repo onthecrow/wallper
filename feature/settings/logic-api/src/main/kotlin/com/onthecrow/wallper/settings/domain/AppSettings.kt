@@ -24,6 +24,8 @@ data class AppSettings(
     val theme: ThemeMode = ThemeMode.SYSTEM,
     /** Material You: the phone's system colours, taken from its wallpaper or picked in its settings (Android 12+). */
     val dynamicColor: Boolean = true,
+    /** Let Firebase collect usage statistics (Analytics) and crash reports (Crashlytics); only release builds have it. */
+    val shareUsageAndCrashData: Boolean = true,
 ) {
     /** Only what differs from the defaults. */
     fun encode(): String = json.encodeToString(serializer(), this)

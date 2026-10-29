@@ -65,6 +65,7 @@ internal class SettingsViewModel @Inject constructor(
                 is SettingsEvent.OnShowBuiltInWallpapersChange -> update { it.copy(showBuiltInWallpapers = event.enabled) }
                 is SettingsEvent.OnThemeSelect -> update { it.copy(theme = event.theme) }
                 is SettingsEvent.OnDynamicColorChange -> update { it.copy(dynamicColor = event.enabled) }
+                is SettingsEvent.OnShareUsageAndCrashDataChange -> update { it.copy(shareUsageAndCrashData = event.enabled) }
                 else -> Unit
             }
         }.launchIn(viewModelScope)
