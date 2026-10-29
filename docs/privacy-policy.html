@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>Wallper privacy policy</title>
+  <meta name="description" content="What the Wallper live wallpaper app keeps on your phone, what it sends, and why.">
+  <style>
+    :root {
+      --bg: #fbfaf8;
+      --surface: #f1efeb;
+      --text: #1c1b1a;
+      --muted: #5f5c57;
+      --accent: #4a5bd4;
+      --rule: #dedad3;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #121214;
+        --surface: #1c1c20;
+        --text: #e8e6e3;
+        --muted: #a3a09b;
+        --accent: #9aa7ff;
+        --rule: #2e2e33;
+      }
+    }
+    * { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font: 17px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    }
+    main {
+      max-width: 42rem;
+      margin: 0 auto;
+      padding: 48px 16px 64px;
+    }
+    h1 {
+      font-size: 2rem;
+      line-height: 1.2;
+      margin: 0 0 8px;
+      letter-spacing: -0.01em;
+    }
+    h2 {
+      font-size: 1.25rem;
+      line-height: 1.3;
+      margin: 40px 0 8px;
+    }
+    h3 {
+      font-size: 1.05rem;
+      margin: 24px 0 4px;
+    }
+    p, ul { margin: 0 0 12px; }
+    ul { padding-left: 1.25rem; }
+    li { margin-bottom: 6px; }
+    a { color: var(--accent); text-underline-offset: 2px; }
+    .meta { color: var(--muted); margin-bottom: 24px; }
+    .summary {
+      background: var(--surface);
+      border-radius: 16px;
+      padding: 16px 20px;
+      margin: 24px 0 8px;
+    }
+    .summary h2 { margin-top: 0; }
+    .summary ul { margin-bottom: 0; }
+    footer {
+      border-top: 1px solid var(--rule);
+      margin-top: 48px;
+      padding-top: 16px;
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+<main>
+  <h1>Wallper privacy policy</h1>
+  <p class="meta">Effective October 29, 2026</p>
+
+  <p>
+    Wallper is a live wallpaper app: you pick a video or a picture, crop it, and Wallper plays it on your home and
+    lock screens. It also has a built-in animated black hole. This policy explains what Wallper keeps on your phone,
+    what it sends, and why. It covers the Wallper app for Android, made by onthecrow.
+  </p>
+
+  <section class="summary">
+    <h2>In short</h2>
+    <ul>
+      <li>Your videos and pictures never leave your phone. Wallper edits and plays them on the device.</li>
+      <li>There's no account, no ads, and nothing is sold.</li>
+      <li>
+        Wallper uses Google's Firebase to learn how the app is used (Analytics) and why it crashes (Crashlytics).
+        Neither gets your media, your name or your precise location.
+      </li>
+      <li>A report with the app's log is sent only when you tap «Send a report», and only to where you choose.</li>
+    </ul>
+  </section>
+
+  <h2>What stays on your phone</h2>
+  <ul>
+    <li>
+      <strong>Your wallpapers.</strong> Wallper sees only the videos and pictures you pick in Android's photo picker;
+      it has no access to the rest of your gallery. It copies what you pick into its own private storage, along with
+      a thumbnail and, for an optimised video, the cropped and trimmed copy. Deleting a wallpaper in Wallper deletes
+      its copies; the original in your gallery stays.
+    </li>
+    <li>
+      <strong>Your settings,</strong> such as how videos play, the theme and the black hole's look, are kept in the
+      app's private storage.
+    </li>
+    <li>
+      <strong>Motion.</strong> The black hole turns as you move the phone, using its rotation sensor. Those readings
+      are used on the spot and are never stored or sent.
+    </li>
+  </ul>
+  <p>
+    Wallper keeps this data where Android makes it available before you unlock the phone after a restart, so the
+    wallpaper shows right away. Other apps can't read it. Wallper isn't backed up to your Google account; moving to a
+    new phone with a direct transfer may copy it. Uninstalling Wallper deletes all of it.
+  </p>
+
+  <h2>What Wallper sends, and why</h2>
+  <p>
+    Wallper uses two services of Firebase, run by Google LLC. They send data from your phone to Google's servers over
+    an encrypted connection. Google processes it on Wallper's behalf, as described in
+    <a href="https://firebase.google.com/support/privacy">Privacy and Security in Firebase</a> and the
+    <a href="https://policies.google.com/privacy">Google Privacy Policy</a>; Google's servers may be outside your
+    country.
+  </p>
+
+  <h3>Google Analytics for Firebase</h3>
+  <p>
+    It tells Wallper how many people use the app, for how long and on which devices, so effort goes where it matters.
+    It collects:
+  </p>
+  <ul>
+    <li>events such as the first start of the app, its sessions and how long it's in use;</li>
+    <li>
+      the device model, Android version, language, app version, and an approximate country or region, which Google
+      derives from the connection;
+    </li>
+    <li>an app instance identifier, a random number that is reset when you reinstall the app;</li>
+    <li>how you came to the app, if Google Play tells it (the install referrer);</li>
+    <li>
+      your device's advertising ID, if it has one and you haven't deleted it. Google uses it for summary reports such
+      as age ranges and interests, and to measure ad campaigns for Wallper, if there are any. Wallper shows no ads.
+      You can delete or reset the advertising ID in your phone's settings, usually under Privacy → Ads.
+    </li>
+  </ul>
+
+  <h3>Firebase Crashlytics</h3>
+  <p>When something goes wrong, Crashlytics tells Wallper what, so it can be fixed. It collects:</p>
+  <ul>
+    <li>crash and error reports: where in the app the problem happened, and the app's state at that moment;</li>
+    <li>
+      the app's own short notes before the problem, such as which wallpaper engine was running or that a file in the
+      app's storage couldn't be played. They never contain your videos or pictures;
+    </li>
+    <li>
+      the device model, Android version, app version, the phone's graphics chip, free memory and storage, battery
+      level, screen orientation, and whether the phone is rooted;
+    </li>
+    <li>a random installation identifier, reset when you reinstall the app.</li>
+  </ul>
+  <p>
+    Wallper uses this data because it has a legitimate interest in keeping the app working and improving it. It isn't
+    used to identify you, and it isn't combined with other data about you.
+  </p>
+
+  <h3>How long Google keeps it</h3>
+  <p>
+    Crashlytics keeps crash reports and their identifiers for 90 days. Analytics keeps event-level data for the
+    retention period set in Wallper's Google Analytics property, 2 months by default; summary reports, which describe
+    no single person, are kept longer.
+  </p>
+
+  <h2>Reports you send yourself</h2>
+  <p>
+    «Send a report» in the app's settings creates a text file with the app's version, your phone's manufacturer and
+    model, its Android version and build, the time, and the app's recent log: up to 5,000 lines of Wallper's own
+    messages, which may name files in the app's storage. Android's share sheet then opens, and you choose whether to
+    send it and to whom, for example by email or in a messenger. Nothing is sent automatically. The file stays in the
+    app's cache until the next report or until Android clears the cache.
+  </p>
+
+  <h2>What Wallper doesn't do</h2>
+  <ul>
+    <li>It doesn't ask for your name, email or phone number, and it has no account.</li>
+    <li>It doesn't read your location, contacts, camera, microphone or the rest of your gallery.</li>
+    <li>It doesn't show ads and doesn't sell or rent data.</li>
+  </ul>
+
+  <h2>Your choices</h2>
+  <ul>
+    <li>Delete any wallpaper in the app, or uninstall the app to delete everything it keeps on your phone.</li>
+    <li>Delete or reset your advertising ID in your phone's settings.</li>
+    <li>
+      Ask for the data Firebase holds about your installation to be deleted, or ask anything about this policy,
+      through the contacts below. Because Wallper doesn't know who you are, it may need you to help find your
+      installation.
+    </li>
+  </ul>
+  <p>
+    Depending on where you live, for example in the European Union or the United Kingdom, you may have the right to
+    access, correct or delete your data, to object to its use, and to complain to your data protection authority.
+  </p>
+
+  <h2>Children</h2>
+  <p>
+    Wallper isn't directed at children under 13 and doesn't knowingly collect data from them. If you think a child
+    has used it and you want their data deleted, get in touch.
+  </p>
+
+  <h2>Changes</h2>
+  <p>
+    When Wallper starts to handle data differently, this page changes and its date above changes with it. The link in
+    the app's settings always leads here.
+  </p>
+
+  <h2>Contact</h2>
+  <ul>
+    <li>Telegram: <a href="https://t.me/onthecrow">@onthecrow</a></li>
+    <li>GitHub: <a href="https://github.com/onthecrow/wallper/issues">github.com/onthecrow/wallper/issues</a></li>
+  </ul>
+
+  <footer>Wallper by onthecrow</footer>
+</main>
+</body>
+</html>
