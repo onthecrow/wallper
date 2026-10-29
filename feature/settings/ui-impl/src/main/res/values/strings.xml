@@ -38,6 +38,8 @@
     <string name="settings_report_subject">Wallper report</string>
     <string name="settings_report_chooser">Send the report</string>
     <string name="settings_report_failed">The report couldn\'t be created</string>
+    <string name="settings_privacy_policy">Privacy policy</string>
+    <string name="settings_privacy_policy_summary">What Wallper keeps, what it sends and why</string>
     <string name="storage_title">Storage</string>
     <string name="storage_explanation">An optimised video keeps only the part you picked, already cropped and trimmed. It takes less space, but it can\'t be edited afterwards. To optimise a video, edit it.</string>
     <string name="storage_original_video">Original video</string>

@@ -43,6 +43,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.clearAndSetSemantics
@@ -66,6 +67,7 @@ import com.onthecrow.wallper.settings.view.SwitchItem
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
+import timber.log.Timber
 import java.io.File
 
 @Composable
@@ -253,7 +255,19 @@ private fun HelpSection(isReportInProgress: Boolean, onEvent: (SettingsEvent) ->
             null
         },
     )
+    val uriHandler = LocalUriHandler.current
+    ClickableItem(
+        title = stringResource(R.string.settings_privacy_policy),
+        summary = stringResource(R.string.settings_privacy_policy_summary),
+        onClick = {
+            runCatching { uriHandler.openUri(PRIVACY_POLICY_URL) }
+                .onFailure { Timber.w(it, "Can't open %s", PRIVACY_POLICY_URL) }
+        },
+    )
 }
+
+/** docs/privacy-policy.html, served by GitHub Pages from main. */
+private const val PRIVACY_POLICY_URL = "https://onthecrow.github.io/wallper/privacy-policy.html"
 
 private val VideoPlayback.labelRes: Int
     get() = when (this) {
