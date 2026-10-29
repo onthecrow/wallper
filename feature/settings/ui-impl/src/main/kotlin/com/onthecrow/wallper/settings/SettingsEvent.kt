@@ -20,6 +20,7 @@ internal sealed interface SettingsEvent : Event {
     data object OnThemeClick : SettingsEvent
     data class OnThemeSelect(val theme: ThemeMode) : SettingsEvent
     data class OnDynamicColorChange(val enabled: Boolean) : SettingsEvent
+    data class OnShareUsageAndCrashDataChange(val enabled: Boolean) : SettingsEvent
     data object OnDialogDismiss : SettingsEvent
     data object OnSendReportClick : SettingsEvent
 

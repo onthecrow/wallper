@@ -143,6 +143,7 @@ internal fun SettingsScreen(
                 VideoSection(state.settings, onEvent)
                 ListSection(state.settings, state.storageBytes, onEvent)
                 AppearanceSection(state.settings, onEvent)
+                PrivacySection(state.settings, onEvent)
                 HelpSection(state.isReportInProgress, onEvent)
                 Spacer(modifier = Modifier.weight(1f))
                 SignatureFooter(
@@ -254,6 +255,17 @@ private fun HelpSection(isReportInProgress: Boolean, onEvent: (SettingsEvent) ->
         } else {
             null
         },
+    )
+}
+
+@Composable
+private fun PrivacySection(settings: AppSettings, onEvent: (SettingsEvent) -> Unit) {
+    SectionHeader(text = stringResource(R.string.settings_section_privacy))
+    SwitchItem(
+        title = stringResource(R.string.settings_share_data),
+        summary = stringResource(R.string.settings_share_data_summary),
+        checked = settings.shareUsageAndCrashData,
+        onCheckedChange = { onEvent(SettingsEvent.OnShareUsageAndCrashDataChange(it)) },
     )
     val uriHandler = LocalUriHandler.current
     ClickableItem(
