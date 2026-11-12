@@ -3,6 +3,7 @@ package com.onthecrow.wallper.wallpapers.group
 import com.onthecrow.wallper.core.model.BuiltInWallpaper
 import com.onthecrow.wallper.core.model.SlideDuration
 import com.onthecrow.wallper.core.mvi.State
+import com.onthecrow.wallper.wallpapers.domain.SwipeHintMemory
 import com.onthecrow.wallper.wallpapers.model.WallpaperItem
 
 /**
@@ -25,6 +26,11 @@ internal data class GroupEditorState(
     /** The group as it will be saved, in order. */
     val members: List<Int> = emptyList(),
     val slideDuration: SlideDuration = SlideDuration.DEFAULT,
+    /**
+     * Whether the members show the «swipe aside» hint: on the first few visits only ([SwipeHintMemory]). Null
+     * until it is known: the members wait for it, as a list doesn't show what comes in above its first item.
+     */
+    val showsSwipeHint: Boolean? = null,
     /** The save under way, until it fails; the screen closes once it succeeds. */
     val save: GroupSaveRequest? = null,
 ) : State {
@@ -38,6 +44,9 @@ internal data class GroupEditorState(
         get() = members.mapNotNull { id -> wallpapers.firstOrNull { it.id == id } }
 
     val canSave: Boolean get() = memberItems.size >= MIN_MEMBERS && save == null
+
+    /** The members can show: the group is read and so is whether the hint shows. */
+    val isArrangeReady: Boolean get() = isLoaded && showsSwipeHint != null
 
     companion object {
         /** A series of one wallpaper would be that wallpaper. */

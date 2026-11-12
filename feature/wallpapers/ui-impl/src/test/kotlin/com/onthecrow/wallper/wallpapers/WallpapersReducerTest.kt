@@ -69,13 +69,33 @@ class WallpapersReducerTest {
     }
 
     @Test
-    fun `a group that starts with a built-in shows its preview`() = runTest {
-        val group = WallpaperItem(5, null, false, isGroup = true, coverBuiltIn = BuiltInWallpaper.BLACK_HOLE)
+    fun `a series' picture waits for its cover's previews, and its made picture survives list updates`() = runTest {
+        val group = WallpaperItem(
+            5, null, false, isGroup = true,
+            cover = listOf(WallpaperItem(1, null, false, BuiltInWallpaper.BLACK_HOLE), WallpaperItem(2, "a", false)),
+        )
         val listed = reducer.reduce(WallpapersState(), WallpapersEvent.OnWallpapersChanged(listOf(group)))
+        assertEquals(emptyMap(), listed.seriesCovers())
 
         val loaded = reducer.reduce(listed, WallpapersEvent.OnBuiltInPreviewLoaded(BuiltInWallpaper.BLACK_HOLE, "previews/bh.png"))
+        assertEquals(mapOf(5 to listOf<String?>("previews/bh.png", "a")), loaded.seriesCovers())
 
-        assertEquals("previews/bh.png", loaded.items.single().picturePath)
+        val made = reducer.reduce(loaded, WallpapersEvent.OnSeriesPictureMade(5, "series/5.webp"))
+        assertEquals("series/5.webp", made.items.single().picturePath)
+
+        val updated = reducer.reduce(made, WallpapersEvent.OnWallpapersChanged(listOf(group.copy(isActive = true))))
+        assertEquals("series/5.webp", updated.items.single().picturePath)
+        assertEquals(made.seriesCovers(), updated.seriesCovers())
+    }
+
+    @Test
+    fun `a built-in that can't be rendered leaves its part of a series empty`() = runTest {
+        val group = WallpaperItem(5, null, false, isGroup = true, cover = listOf(WallpaperItem(1, null, false, BuiltInWallpaper.BLACK_HOLE)))
+        val listed = reducer.reduce(WallpapersState(), WallpapersEvent.OnWallpapersChanged(listOf(group)))
+
+        val loaded = reducer.reduce(listed, WallpapersEvent.OnBuiltInPreviewLoaded(BuiltInWallpaper.BLACK_HOLE, null))
+
+        assertEquals(mapOf(5 to listOf<String?>(null)), loaded.seriesCovers())
     }
 
     @Test

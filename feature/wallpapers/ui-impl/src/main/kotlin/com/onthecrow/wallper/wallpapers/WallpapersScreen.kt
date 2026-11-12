@@ -96,7 +96,8 @@ internal fun WallpapersScreen(
                 top = it.calculateTopPadding(),
                 bottom = it.calculateBottomPadding()
             ),
-            contentPadding = PaddingValues(8.dp),
+            // At the end the last row stops above the «+», not under it.
+            contentPadding = PaddingValues(start = 8.dp, top = 8.dp, end = 8.dp, bottom = ListEndPadding),
             columns = GridCells.Fixed(2),
             verticalArrangement = Arrangement.spacedBy(8.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -146,6 +147,9 @@ internal fun WallpapersScreen(
         )
     }
 }
+
+/** The «+» (56 dp) and its 16 dp margin, and the grid's own 8 dp gap above it. */
+private val ListEndPadding = 56.dp + 16.dp + 8.dp
 
 @Preview
 @Composable

@@ -10,6 +10,7 @@ import com.onthecrow.wallper.wallpapers.mapper.toDomain
 import com.onthecrow.wallper.wallpapers.mapper.toGroup
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import javax.inject.Inject
 
 internal class WallpapersRepository @Inject constructor(
@@ -48,4 +49,7 @@ internal class WallpapersRepository @Inject constructor(
         wallpaperDao.updateGroup(groupEntity(id, slideDuration, isActive), memberIds)
 
     suspend fun deleteEmptyGroups() = wallpaperDao.deleteEmptyGroups()
+
+    /** The ids of every group there is. */
+    suspend fun groupIds(): Set<Int> = wallpaperDao.observeAll().first().filter { it.isGroup }.map { it.id }.toSet()
 }

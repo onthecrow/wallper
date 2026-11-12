@@ -13,6 +13,8 @@ dependencies {
     implementation(projects.core.engine.api)
     implementation(projects.feature.settings.logicApi)
     implementation(projects.core.storage)
+    implementation(projects.core.coroutines)
+    implementation(libs.timber)
     testImplementation(libs.kotlinx.coroutines.test)
     // Migration tests: Room on a real SQLite, with the exported schemas read as JSON.
     testImplementation(libs.sqlite.bundled.jvm)

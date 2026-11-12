@@ -12,6 +12,7 @@ import com.onthecrow.wallper.wallpapers.WallpaperGroupDestination
 import com.onthecrow.wallper.wallpapers.domain.GetWallpaperUseCase
 import com.onthecrow.wallper.wallpapers.domain.ObserveWallpapersUseCase
 import com.onthecrow.wallper.wallpapers.domain.SaveWallpaperGroupUseCase
+import com.onthecrow.wallper.wallpapers.domain.SwipeHintMemory
 import com.onthecrow.wallper.wallpapers.domain.model.Wallpaper
 import com.onthecrow.wallper.wallpapers.mapper.toItem
 import dagger.assisted.Assisted
@@ -22,11 +23,13 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.take
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
@@ -39,6 +42,7 @@ internal class GroupEditorViewModel @AssistedInject constructor(
     private val saveWallpaperGroupUseCase: SaveWallpaperGroupUseCase,
     private val liveWallpaperController: LiveWallpaperController,
     private val builtInPreviews: BuiltInPreviews,
+    private val swipeHintMemory: SwipeHintMemory,
     appSettings: AppSettingsSource,
     private val navigator: Navigator,
     private val dispatchersProvider: DispatchersProvider,
@@ -77,6 +81,17 @@ internal class GroupEditorViewModel @AssistedInject constructor(
             .launchIn(viewModelScope)
 
         destination.groupId?.let(::loadGroup)
+
+        viewModelScope.launch(dispatchersProvider.io) {
+            onEvent(GroupEditorEvent.OnSwipeHintLoaded(swipeHintMemory.isDue()))
+        }
+        // A visit counts once the members show with the hint; adding more and coming back is the same visit.
+        state.map { it.step == GroupEditorStep.ARRANGE && it.showsSwipeHint == true }
+            .filter { it }
+            .take(1)
+            .onEach { swipeHintMemory.countShown() }
+            .flowOn(dispatchersProvider.io)
+            .launchIn(viewModelScope)
 
         // The reducer decides when a save starts, one at a time.
         state.map { it.save }.distinctUntilChanged().filterNotNull().onEach(::save).launchIn(viewModelScope)

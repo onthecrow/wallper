@@ -15,6 +15,7 @@ internal class GroupEditorReducer @Inject constructor() : Reducer<GroupEditorSta
                 val previews = state.builtInPreviews + (event.wallpaper to event.path)
                 state.copy(wallpapers = state.wallpapers.withPreviews(previews), builtInPreviews = previews)
             }
+            is GroupEditorEvent.OnSwipeHintLoaded -> state.copy(showsSwipeHint = event.shows)
             is GroupEditorEvent.OnGroupLoaded -> state.copy(
                 members = event.memberIds,
                 slideDuration = event.slideDuration,

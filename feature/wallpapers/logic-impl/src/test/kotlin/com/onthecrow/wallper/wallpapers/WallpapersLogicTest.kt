@@ -15,7 +15,9 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import com.onthecrow.wallper.wallpapers.series.SeriesPictures
 import kotlinx.coroutines.test.runTest
+import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -31,6 +33,7 @@ class WallpapersLogicTest {
     private val activations = WallpaperActivations()
     private val add = AddWallpaperUseCaseImpl(repository)
     private val update = UpdateWallpaperUseCaseImpl(storage, repository)
+    private val seriesPictures = SeriesPictures(createTempDirectory("series").toFile())
 
     private val media = NewWallpaper.Media(
         type = MediaType.VIDEO,
@@ -77,7 +80,7 @@ class WallpapersLogicTest {
 
         assertIs<Wallpaper.ProcessedVideo>(GetWallpaperUseCaseImpl(repository)(1))
 
-        DeleteWallpaperUseCaseImpl(storage, repository)(1)
+        DeleteWallpaperUseCaseImpl(storage, repository, seriesPictures)(1)
         assertEquals(setOf("originals/a", "originals/a_cropped.mp4", "thumbnails/a"), storage.deletedPaths.toSet())
     }
 
@@ -212,7 +215,7 @@ class WallpapersLogicTest {
     fun `delete removes the record and every file`() = runTest {
         add(media)
 
-        DeleteWallpaperUseCaseImpl(storage, repository)(1)
+        DeleteWallpaperUseCaseImpl(storage, repository, seriesPictures)(1)
 
         assertEquals(emptyList(), dao.rows.value)
         assertEquals(listOf("originals/a", "thumbnails/a"), storage.deletedPaths)
@@ -223,7 +226,7 @@ class WallpapersLogicTest {
         val builtIn = builtInEntity(id = 1, key = BuiltInWallpaper.BLACK_HOLE.key)
         dao.rows.value = listOf(builtIn)
 
-        DeleteWallpaperUseCaseImpl(storage, repository)(1)
+        DeleteWallpaperUseCaseImpl(storage, repository, seriesPictures)(1)
 
         assertEquals(listOf(builtIn), dao.rows.value)
         assertEquals(emptyList(), storage.deletedPaths)

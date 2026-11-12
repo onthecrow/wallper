@@ -20,6 +20,7 @@ import com.onthecrow.wallper.settings.domain.AppSettings
 import com.onthecrow.wallper.settings.domain.AppSettingsSource
 import com.onthecrow.wallper.wallpapers.domain.ActivateWallpaperUseCase
 import com.onthecrow.wallper.wallpapers.domain.DeleteWallpaperUseCase
+import com.onthecrow.wallper.wallpapers.domain.MakeSeriesPictureUseCase
 import com.onthecrow.wallper.wallpapers.domain.ObserveWallpapersUseCase
 import com.onthecrow.wallper.wallpapers.domain.model.Wallpaper
 import com.onthecrow.wallper.wallpapers.model.WallpaperItem
@@ -51,6 +52,7 @@ class WallpapersViewModelTest {
     private val deleted = mutableListOf<Int>()
     private val navigator = FakeNavigator()
     private val previews = FakeBuiltInPreviews()
+    private val seriesPictures = FakeSeriesPictures()
     private var mediaSupported = true
     private var builtInsSupported = true
     private val appSettings = MutableStateFlow(AppSettings())
@@ -82,6 +84,7 @@ class WallpapersViewModelTest {
             override fun wallpaperChanges(): Flow<Unit> = error("not used in these tests")
         },
         builtInPreviews = previews,
+        makeSeriesPictureUseCase = seriesPictures,
         appSettings = object : AppSettingsSource {
             override val settings = appSettings
             override fun update(transform: (AppSettings) -> AppSettings) = appSettings.update(transform)
@@ -91,20 +94,51 @@ class WallpapersViewModelTest {
     )
 
     @Test
-    fun `a group shows its first member's picture and edits open its members`() = runTest(dispatcher) {
+    fun `a series of one shows its member's picture and edits open its members`() = runTest(dispatcher) {
         val viewModel = createViewModel()
-        val group = Wallpaper.Group(
-            id = 7,
-            members = listOf(wallpaper(id = 1, type = MediaType.VIDEO)),
-            slideDuration = SlideDuration.DEFAULT,
-            isActive = true,
-        )
 
-        wallpapers.value = listOf(group)
+        wallpapers.value = listOf(group(id = 7, wallpaper(id = 1, type = MediaType.VIDEO)))
         viewModel.onEvent(WallpapersEvent.OnGroupEditClick(7))
 
-        assertEquals(listOf(WallpaperItem(7, "thumbnail-1", true, isGroup = true)), viewModel.state.value.items)
+        assertEquals(
+            listOf(WallpaperItem(7, "thumbnail-1", true, isGroup = true, cover = listOf(WallpaperItem(1, "thumbnail-1", false)))),
+            viewModel.state.value.items,
+        )
+        assertEquals(listOf(7 to listOf<String?>("thumbnail-1")), seriesPictures.requests)
         assertEquals(listOf<Destination>(WallpaperGroupDestination(7)), navigator.destinations)
+    }
+
+    @Test
+    fun `a series' picture is made of its first four members' once the built-ins' previews are in`() = runTest(dispatcher) {
+        wallpapers.value = listOf(group(id = 7, builtIn(id = 5), *(1..4).map { wallpaper(it, MediaType.VIDEO) }.toTypedArray()))
+        val viewModel = createViewModel()
+
+        assertTrue(seriesPictures.requests.isEmpty())
+        assertEquals(null, viewModel.state.value.items.single().picturePath)
+
+        previews.paths.emit("previews/black_hole_1.png")
+        assertEquals(
+            listOf(7 to listOf<String?>("previews/black_hole_1.png", "thumbnail-1", "thumbnail-2", "thumbnail-3")),
+            seriesPictures.requests,
+        )
+        assertEquals("series-7", viewModel.state.value.items.single().picturePath)
+
+        // Made again only when what it shows changes.
+        wallpapers.value = listOf(group(id = 7, builtIn(id = 5), *(1..4).map { wallpaper(it, MediaType.VIDEO) }.toTypedArray(), isActive = false))
+        assertEquals(1, seriesPictures.requests.size)
+        previews.paths.emit("previews/black_hole_2.png")
+        assertEquals(listOf("previews/black_hole_2.png", "thumbnail-1", "thumbnail-2", "thumbnail-3"), seriesPictures.requests.last().second)
+    }
+
+    @Test
+    fun `a built-in this device can't draw leaves its part of a series' picture empty`() = runTest(dispatcher) {
+        builtInsSupported = false
+        wallpapers.value = listOf(group(id = 7, builtIn(id = 5), wallpaper(id = 1, type = MediaType.VIDEO)))
+
+        createViewModel()
+
+        assertEquals(listOf(7 to listOf(null, "thumbnail-1")), seriesPictures.requests)
+        assertEquals(emptyList(), previews.requests)
     }
 
     @Test
@@ -290,6 +324,18 @@ class WallpapersViewModelTest {
 
     private fun builtIn(id: Int, isActive: Boolean = false) =
         Wallpaper.BuiltIn(id = id, wallpaper = BuiltInWallpaper.BLACK_HOLE, isActive = isActive)
+
+    private fun group(id: Int, vararg members: Wallpaper, isActive: Boolean = true) =
+        Wallpaper.Group(id = id, members = members.toList(), slideDuration = SlideDuration.DEFAULT, isActive = isActive)
+
+    /** A series of one shows its member's picture, as the real one does; others get `series-<id>`. */
+    private class FakeSeriesPictures : MakeSeriesPictureUseCase {
+        val requests = mutableListOf<Pair<Int, List<String?>>>()
+        override suspend fun invoke(groupId: Int, pictures: List<String?>): String? {
+            requests += groupId to pictures
+            return if (pictures.size == 1) pictures.single() else "series-$groupId"
+        }
+    }
 
     /** Renders nothing until the test sends a path to [paths]. */
     private class FakeBuiltInPreviews : BuiltInPreviews {

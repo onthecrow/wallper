@@ -15,16 +15,19 @@ import com.onthecrow.wallper.settings.SettingsDestination
 import com.onthecrow.wallper.settings.domain.AppSettingsSource
 import com.onthecrow.wallper.wallpapers.domain.ActivateWallpaperUseCase
 import com.onthecrow.wallper.wallpapers.domain.DeleteWallpaperUseCase
+import com.onthecrow.wallper.wallpapers.domain.MakeSeriesPictureUseCase
 import com.onthecrow.wallper.wallpapers.domain.ObserveWallpapersUseCase
 import com.onthecrow.wallper.wallpapers.mapper.toItem
 import com.onthecrow.wallper.wallpapers.model.WallpaperItem
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.mapLatest
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import javax.inject.Inject
@@ -38,6 +41,7 @@ internal class WallpapersViewModel @Inject constructor(
     private val isMediaSupportedUseCase: IsMediaSupportedUseCase,
     private val liveWallpaperController: LiveWallpaperController,
     private val builtInPreviews: BuiltInPreviews,
+    private val makeSeriesPictureUseCase: MakeSeriesPictureUseCase,
     private val appSettings: AppSettingsSource,
     private val navigator: Navigator,
     private val dispatchersProvider: DispatchersProvider,
@@ -55,7 +59,7 @@ internal class WallpapersViewModel @Inject constructor(
                 WallpapersEvent.OnAddSeriesClick -> navigator.navigate(WallpaperGroupDestination())
                 is WallpapersEvent.OnDeleteConfirm -> deleteWallpaper(event.id)
                 is WallpapersEvent.OnBuiltInSettingsClick -> navigator.navigate(event.wallpaper.settingsDestination())
-                is WallpapersEvent.OnWallpapersChanged -> event.items.mapNotNull { it.previewOf }.forEach(::followPreview)
+                is WallpapersEvent.OnWallpapersChanged -> event.items.flatMap { it.previewsShown }.forEach(::followPreview)
                 is WallpapersEvent.OnMediaPicked -> openEditor(event.uri)
                 WallpapersEvent.OnSettingsClick -> navigator.navigate(SettingsDestination)
                 else -> Unit
@@ -70,6 +74,8 @@ internal class WallpapersViewModel @Inject constructor(
             .catch { onEvent(WallpapersEvent.OnWallpapersLoadFailed(it.message.orEmpty())) }
             .flowOn(dispatchersProvider.io)
             .launchIn(viewModelScope)
+
+        followSeriesPictures()
     }
 
     /** A built-in this device can't draw never is; hidden built-ins are, while one is the active wallpaper. */
@@ -106,8 +112,31 @@ internal class WallpapersViewModel @Inject constructor(
      */
     private fun followPreview(wallpaper: BuiltInWallpaper) {
         if (!followedPreviews.add(wallpaper)) return
+        // Only a series can hold one: the list hides them. Its part of the series' picture stays empty.
+        if (!liveWallpaperController.isSupported(wallpaper)) {
+            onEvent(WallpapersEvent.OnBuiltInPreviewLoaded(wallpaper, null))
+            return
+        }
         builtInPreviews.previews(wallpaper)
             .onEach { path -> onEvent(WallpapersEvent.OnBuiltInPreviewLoaded(wallpaper, path)) }
+            .flowOn(dispatchersProvider.io)
+            .launchIn(viewModelScope)
+    }
+
+    /**
+     * Makes each series' picture once what it shows is known, again whenever that changes: its first members,
+     * their pictures, a built-in's new preview. Unchanged pictures are found made before, so a change elsewhere
+     * costs little.
+     */
+    @OptIn(ExperimentalCoroutinesApi::class)
+    private fun followSeriesPictures() {
+        state.map { it.seriesCovers() }
+            .distinctUntilChanged()
+            .mapLatest { covers ->
+                covers.forEach { (groupId, pictures) ->
+                    makeSeriesPictureUseCase(groupId, pictures)?.let { onEvent(WallpapersEvent.OnSeriesPictureMade(groupId, it)) }
+                }
+            }
             .flowOn(dispatchersProvider.io)
             .launchIn(viewModelScope)
     }

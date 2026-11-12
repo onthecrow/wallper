@@ -7,7 +7,8 @@ import javax.inject.Inject
 internal class WallpapersReducer @Inject constructor() : Reducer<WallpapersState, WallpapersEvent> {
     override suspend fun reduce(state: WallpapersState, event: WallpapersEvent): WallpapersState =
         when (event) {
-            is WallpapersEvent.OnWallpapersChanged -> state.copy(items = event.items.withPreviews(state.builtInPreviews))
+            is WallpapersEvent.OnWallpapersChanged ->
+                state.copy(items = event.items.withPreviews(state.builtInPreviews, state.seriesPictures))
             is WallpapersEvent.OnWallpapersLoadFailed -> state.copy(error = event.message)
             is WallpapersEvent.OnDeleteClick -> state.copy(deleteCandidate = event.id)
             is WallpapersEvent.OnDeleteConfirm,
@@ -18,7 +19,11 @@ internal class WallpapersReducer @Inject constructor() : Reducer<WallpapersState
             WallpapersEvent.OnAddSeriesClick -> state.copy(isAddDialogShown = false)
             is WallpapersEvent.OnBuiltInPreviewLoaded -> {
                 val previews = state.builtInPreviews + (event.wallpaper to event.path)
-                state.copy(items = state.items.withPreviews(previews), builtInPreviews = previews)
+                state.copy(items = state.items.withPreviews(previews, state.seriesPictures), builtInPreviews = previews)
+            }
+            is WallpapersEvent.OnSeriesPictureMade -> {
+                val pictures = state.seriesPictures + (event.groupId to event.path)
+                state.copy(items = state.items.withPreviews(state.builtInPreviews, pictures), seriesPictures = pictures)
             }
             else -> state
         }

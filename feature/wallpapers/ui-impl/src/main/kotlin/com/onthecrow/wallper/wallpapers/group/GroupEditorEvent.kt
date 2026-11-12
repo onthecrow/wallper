@@ -25,6 +25,7 @@ internal sealed interface GroupEditorEvent : Event {
     data class OnWallpapersChanged(val items: List<WallpaperItem>, val showsBuiltIns: Boolean) : GroupEditorEvent
     data class OnBuiltInPreviewLoaded(val wallpaper: BuiltInWallpaper, val path: String) : GroupEditorEvent
     data class OnGroupLoaded(val memberIds: List<Int>, val slideDuration: SlideDuration) : GroupEditorEvent
+    data class OnSwipeHintLoaded(val shows: Boolean) : GroupEditorEvent
 
     // One-off effects, handled by the screen
     data object OnSaveFailed : GroupEditorEvent

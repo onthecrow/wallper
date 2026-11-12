@@ -13,9 +13,12 @@ import com.onthecrow.wallper.wallpapers.data.WallpapersRepository
 import com.onthecrow.wallper.wallpapers.data.database.WallpaperEntity
 import com.onthecrow.wallper.wallpapers.domain.model.NewWallpaper
 import com.onthecrow.wallper.wallpapers.domain.model.Wallpaper
+import com.onthecrow.wallper.wallpapers.series.SeriesPictures
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
+import java.io.File
+import kotlin.io.path.createTempDirectory
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -32,7 +35,8 @@ class WallpaperGroupsTest {
     private val settings = FakeAppSettings()
     private val add = AddWallpaperUseCaseImpl(repository)
     private val saveGroup = SaveWallpaperGroupUseCaseImpl(repository, ActivateWallpaperUseCaseImpl(repository, activations), settings)
-    private val delete = DeleteWallpaperUseCaseImpl(storage, repository)
+    private val picturesDirectory = createTempDirectory("series").toFile()
+    private val delete = DeleteWallpaperUseCaseImpl(storage, repository, SeriesPictures(picturesDirectory))
 
     private val video = NewWallpaper.Media(
         type = MediaType.VIDEO,
@@ -125,6 +129,25 @@ class WallpaperGroupsTest {
 
         assertEquals(listOf(second), assertIs<Wallpaper.Group>(GetWallpaperUseCaseImpl(repository)(both)).members.map { it.id })
         assertNull(GetWallpaperUseCaseImpl(repository)(onlyFirst))
+    }
+
+    @Test
+    fun `the pictures of deleted groups go, those of the others stay`() = runTest {
+        val first = add(video)
+        val second = add(processed)
+        val both = saveGroup(null, listOf(first, second), SlideDuration.DEFAULT)
+        val onlyFirst = saveGroup(null, listOf(first), SlideDuration.DEFAULT)
+        val bothPicture = File(picturesDirectory, "${both}_1.webp").apply { writeText("x") }
+        val onlyFirstPicture = File(picturesDirectory, "${onlyFirst}_2.webp").apply { writeText("x") }
+
+        // The last member of one group, and so that group too.
+        delete(first)
+
+        assertTrue(bothPicture.exists())
+        assertTrue(!onlyFirstPicture.exists())
+
+        delete(both)
+        assertTrue(!bothPicture.exists())
     }
 
     @Test

@@ -18,6 +18,7 @@ import com.onthecrow.wallper.wallpapers.WallpaperGroupDestination
 import com.onthecrow.wallper.wallpapers.domain.GetWallpaperUseCase
 import com.onthecrow.wallper.wallpapers.domain.ObserveWallpapersUseCase
 import com.onthecrow.wallper.wallpapers.domain.SaveWallpaperGroupUseCase
+import com.onthecrow.wallper.wallpapers.domain.SwipeHintMemory
 import com.onthecrow.wallper.wallpapers.domain.model.Wallpaper
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.Dispatchers
@@ -54,6 +55,7 @@ class GroupEditorViewModelTest {
     private var backNavigations = 0
     private var builtInsSupported = true
     private val appSettings = MutableStateFlow(AppSettings())
+    private var hintShown = 0
 
     @BeforeTest
     fun setUp() = Dispatchers.setMain(dispatcher)
@@ -85,6 +87,10 @@ class GroupEditorViewModelTest {
         },
         builtInPreviews = object : BuiltInPreviews {
             override fun previews(wallpaper: BuiltInWallpaper): Flow<String> = emptyFlow()
+        },
+        swipeHintMemory = object : SwipeHintMemory {
+            override suspend fun isDue() = hintShown < SwipeHintMemory.SHOWS
+            override fun countShown() { hintShown++ }
         },
         appSettings = object : AppSettingsSource {
             override val settings = appSettings
@@ -125,6 +131,27 @@ class GroupEditorViewModelTest {
         assertEquals(listOf(2, 1), viewModel.state.value.members)
         assertEquals(SlideDuration(30_000), viewModel.state.value.slideDuration)
         assertEquals(GroupEditorStep.ARRANGE, viewModel.state.value.step)
+    }
+
+    @Test
+    fun `the swipe hint shows on the first visits of the members, each counted once`() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+        // Still picking: not a visit of the members yet.
+        assertEquals(0, hintShown)
+
+        viewModel.onEvent(GroupEditorEvent.OnWallpaperClick(1))
+        viewModel.onEvent(GroupEditorEvent.OnPickConfirm)
+        viewModel.onEvent(GroupEditorEvent.OnAddClick)
+        viewModel.onEvent(GroupEditorEvent.OnPickCancel)
+        assertEquals(true, viewModel.state.value.showsSwipeHint)
+        assertEquals(1, hintShown)
+
+        repeat(SwipeHintMemory.SHOWS - 1) { createViewModel(groupId = 4) }
+        assertEquals(SwipeHintMemory.SHOWS, hintShown)
+
+        val late = createViewModel(groupId = 4)
+        assertEquals(false, late.state.value.showsSwipeHint)
+        assertEquals(SwipeHintMemory.SHOWS, hintShown)
     }
 
     @Test

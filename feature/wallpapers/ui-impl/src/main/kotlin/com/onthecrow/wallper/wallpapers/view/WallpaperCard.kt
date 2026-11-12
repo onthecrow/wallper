@@ -1,8 +1,12 @@
 package com.onthecrow.wallper.wallpapers.view
 
 import androidx.annotation.StringRes
-import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -44,8 +48,8 @@ import com.onthecrow.wallper.wallpapers.ui.R
 import kotlin.math.roundToInt
 
 /**
- * A wallpaper of the list; a tap makes it the active one. Over its picture: whether it is active (top
- * left), its actions (top right) and what it is (bottom right).
+ * A wallpaper of the list; a tap makes it the active one. Over its picture: a mark if it is the active one
+ * (top left), its actions (top right) and what it is (bottom right).
  *
  * With [selected] it is a choice instead (a group's members): no actions and no active mark; a tap
  * toggles it, and a chosen one is tinted in the accent colour with a check in the middle.
@@ -98,12 +102,9 @@ internal fun WallpaperCard(
                         }
                     }
                 }
-                ActiveIndicator(
+                ActiveMark(
                     isActive = wallpaper.isActive,
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .cornerShade(Alignment.TopStart)
-                        .padding(12.dp),
+                    modifier = Modifier.align(Alignment.TopStart),
                 )
             }
             KindLabel(wallpaper)
@@ -113,11 +114,11 @@ internal fun WallpaperCard(
 
 /**
  * The wallpaper's picture, scaled to fill and cut evenly on the sides that don't fit. Until a built-in's
- * preview is rendered there is no picture, only the colour behind it.
+ * preview or a series' picture is made there is no picture, only the colour behind it.
  */
 @Composable
 internal fun WallpaperPicture(wallpaper: WallpaperItem, modifier: Modifier = Modifier) {
-    Box(modifier = modifier.then(if (wallpaper.previewOf != null) Modifier.background(BuiltInPlaceholderColor) else Modifier)) {
+    Box(modifier = modifier.then(if (wallpaper.isPictureMade) Modifier.background(BuiltInPlaceholderColor) else Modifier)) {
         wallpaper.picturePath?.let { picturePath ->
             AsyncImage(
                 modifier = Modifier.fillMaxSize(),
@@ -189,18 +190,25 @@ private fun BoxScope.SelectionMark(selected: Boolean) {
     )
 }
 
+/** Only the active wallpaper is marked; the mark and its corner's shade come and go together. */
 @Composable
-private fun ActiveIndicator(isActive: Boolean, modifier: Modifier = Modifier) {
-    val color by animateColorAsState(
-        targetValue = if (isActive) ActiveColor else InactiveColor,
-        label = "active indicator",
-    )
-    Icon(
-        painter = painterResource(if (isActive) R.drawable.ic_radio_checked else R.drawable.ic_radio_unchecked),
-        contentDescription = if (isActive) stringResource(R.string.active_wallpaper) else null,
-        modifier = modifier.size(24.dp),
-        tint = color,
-    )
+private fun ActiveMark(isActive: Boolean, modifier: Modifier = Modifier) {
+    AnimatedVisibility(
+        visible = isActive,
+        enter = fadeIn() + scaleIn(initialScale = 0.6f),
+        exit = fadeOut() + scaleOut(targetScale = 0.6f),
+        modifier = modifier,
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.ic_radio_checked),
+            contentDescription = stringResource(R.string.active_wallpaper),
+            modifier = Modifier
+                .cornerShade(Alignment.TopStart)
+                .padding(12.dp)
+                .size(24.dp),
+            tint = ActiveColor,
+        )
+    }
 }
 
 /** What the wallpaper is: a group, a built-in's kind, or how the user's media is kept, as it was or optimised. */
@@ -238,12 +246,11 @@ private fun WallpaperLabel(text: String, isOutlined: Boolean, modifier: Modifier
 private val BuiltInPlaceholderColor = Color(0xFF050507)
 
 /**
- * Material palette, muted: green 300 for the active wallpaper, grey 400 for the others and the actions,
+ * Material palette, muted: green 300 for the active wallpaper's mark, grey 400 for the actions,
  * grey 100 for the label and grey 900 for the text on the filled one.
  */
 private val ActiveColor = Color(0xFF81C784)
-private val InactiveColor = Color(0xFFBDBDBD)
-private val ActionColor = InactiveColor
+private val ActionColor = Color(0xFFBDBDBD)
 private val LabelColor = Color(0xFFF5F5F5)
 private val LabelOnFilledColor = Color(0xFF212121)
 
