@@ -68,10 +68,15 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
@@ -93,6 +98,8 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.emptyFlow
+import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.first
 
 /**
  * Makes or edits a series: the pick step (the list's cards, ticked ones tinted) and the arrange step (the
@@ -287,6 +294,8 @@ private fun ArrangeStep(state: GroupEditorState, listState: LazyListState, onEve
             slideDuration = state.slideDuration,
             memberCount = state.memberItems.size,
             canSave = state.canSave,
+            // An edited group's time is known once it is read.
+            centresChoice = state.isLoaded,
             cradle = {
                 addButton?.let { button ->
                     with(density) {
@@ -439,7 +448,8 @@ private fun MemberRow(member: WallpaperItem) {
 }
 
 /**
- * The time each member shows, then save; save waits for [GroupEditorState.MIN_MEMBERS]. Its top edge has
+ * The time each member shows ([DurationChips], the chosen one in the middle once [centresChoice]), then save;
+ * save waits for [GroupEditorState.MIN_MEMBERS]. Its top edge has
  * [cradle] cut into it, null for none. It is read while drawing, so the cradle follows the button through
  * every scroll without recomposing the panel.
  */
@@ -448,11 +458,13 @@ private fun ArrangePanel(
     slideDuration: SlideDuration,
     memberCount: Int,
     canSave: Boolean,
+    centresChoice: Boolean,
     cradle: () -> CradleGeometry?,
     onDurationPick: (SlideDuration) -> Unit,
     onSave: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val panelColor = MaterialTheme.colorScheme.surfaceContainerHigh
     Surface(
         modifier = modifier
             .fillMaxWidth()
@@ -463,7 +475,7 @@ private fun ArrangePanel(
                 clip = true
                 shadowElevation = PanelElevation.toPx()
             },
-        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        color = panelColor,
     ) {
         Column(modifier = Modifier.padding(top = PanelContentTop, bottom = 16.dp)) {
             Text(
@@ -471,21 +483,12 @@ private fun ArrangePanel(
                 style = MaterialTheme.typography.titleSmall,
                 modifier = Modifier.padding(horizontal = 20.dp),
             )
-            Row(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .horizontalScroll(rememberScrollState())
-                    .padding(horizontal = 16.dp),
-            ) {
-                SlideDuration.CHOICES.forEach { choice ->
-                    FilterChip(
-                        selected = choice == slideDuration,
-                        onClick = { onDurationPick(choice) },
-                        label = { Text(text = choice.label()) },
-                    )
-                }
-            }
+            DurationChips(
+                selected = slideDuration,
+                centresChoice = centresChoice,
+                edgeColor = panelColor,
+                onPick = onDurationPick,
+            )
             if (memberCount < GroupEditorState.MIN_MEMBERS) {
                 Text(
                     text = pluralStringResource(R.plurals.group_too_few, GroupEditorState.MIN_MEMBERS, GroupEditorState.MIN_MEMBERS),
@@ -598,6 +601,82 @@ private fun rememberAddButtonPlacement(listState: LazyListState): AddButtonPlace
     return placement
 }
 
+/**
+ * The times to pick from, in a row that scrolls. Once [centresChoice] turns true, the row scrolls the chosen
+ * one to its middle, as far as it goes: once, at the start, so that the user's own picks don't move it.
+ *
+ * Each end fades into [edgeColor], the panel's, where chips go on beyond it: the fade comes in over the first
+ * [EdgeFadeWidth] of scrolling, so there is none at an end the row has reached.
+ */
+@Composable
+private fun DurationChips(
+    selected: SlideDuration,
+    centresChoice: Boolean,
+    edgeColor: Color,
+    onPick: (SlideDuration) -> Unit,
+) {
+    val scroll = rememberScrollState()
+    val density = LocalDensity.current
+    var viewportWidth by remember { mutableIntStateOf(0) }
+    // The chosen chip and the middle of it in the row's content, once it is placed.
+    var placedChoice by remember { mutableStateOf<Pair<SlideDuration, Float>?>(null) }
+    LaunchedEffect(centresChoice) {
+        if (!centresChoice) return@LaunchedEffect
+        val middle = snapshotFlow { placedChoice }.filterNotNull().first { (choice, _) -> choice == selected }.second
+        val width = snapshotFlow { viewportWidth }.first { it > 0 }
+        // Beyond the ends scrollTo stops at them.
+        scroll.scrollTo((middle - width / 2f).roundToInt())
+    }
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .onSizeChanged { viewportWidth = it.width }
+            // Drawn over the chips, outside the scroll: read while drawing, it follows the scroll without
+            // recomposing.
+            .drawWithContent {
+                drawContent()
+                val fade = EdgeFadeWidth.toPx()
+                val start = (scroll.value / fade).coerceIn(0f, 1f)
+                val end = ((scroll.maxValue - scroll.value) / fade).coerceIn(0f, 1f)
+                if (start > 0f) {
+                    drawRect(
+                        brush = Brush.horizontalGradient(listOf(edgeColor, Color.Transparent), endX = fade),
+                        size = Size(fade, size.height),
+                        alpha = start,
+                    )
+                }
+                if (end > 0f) {
+                    drawRect(
+                        brush = Brush.horizontalGradient(listOf(Color.Transparent, edgeColor), startX = size.width - fade, endX = size.width),
+                        topLeft = Offset(size.width - fade, 0f),
+                        size = Size(fade, size.height),
+                        alpha = end,
+                    )
+                }
+            }
+            .horizontalScroll(scroll)
+            .padding(horizontal = ChipsPadding),
+    ) {
+        SlideDuration.CHOICES.forEach { choice ->
+            FilterChip(
+                selected = choice == selected,
+                onClick = { onPick(choice) },
+                label = { Text(text = choice.label()) },
+                modifier = if (choice == selected) {
+                    // Placed in the row inside its padding, which the scrolled content starts with.
+                    Modifier.onPlaced { chip ->
+                        val start = with(density) { ChipsPadding.toPx() } + chip.positionInParent().x
+                        placedChoice = choice to start + chip.size.width / 2f
+                    }
+                } else {
+                    Modifier
+                },
+            )
+        }
+    }
+}
+
 @Composable
 private fun SlideDuration.label(): String = when {
     isOnWake -> stringResource(R.string.group_duration_on_wake)
@@ -652,6 +731,12 @@ private val PanelContentTop = CradleDepth + 6.dp
 
 /** How far the list runs on behind the panel: a little below the cradle, to show through it and nowhere else. */
 private val ListReachIntoPanel = CradleDepth + 4.dp
+
+/** Before the first chip and after the last. */
+private val ChipsPadding = 16.dp
+
+/** How wide the chips' row fades at an end with more beyond it. */
+private val EdgeFadeWidth = 32.dp
 
 /** The shade over the list's end starts this far above the panel, above the pinned button. */
 private val ShadeHeight = 56.dp

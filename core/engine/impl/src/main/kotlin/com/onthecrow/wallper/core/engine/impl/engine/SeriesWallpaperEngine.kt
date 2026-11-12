@@ -21,7 +21,11 @@ import kotlin.time.TimeSource
 /**
  * A series: one of [slides] at a time, each through its own engine ([createSlide]), the next one after
  * [slideDuration] of the time the wallpaper is visible. With [SlideDuration.ON_WAKE] the next one comes at
- * each screen-off, so that it is there when the screen turns on: no switch on screen.
+ * each screen-off, so that it is there when the screen turns on: no switch on screen. Not at the broadcast
+ * itself: it comes as the screen starts to go off, and the wallpaper shows through the animation that
+ * follows. The switch waits until the service hides the wallpaper, or [HIDE_WAIT] at most for a device that
+ * doesn't (one keeping it «visible» under the always-on display), and only while the screen stays off
+ * ([isScreenOn]): a screen back on before keeps the slide for this wake.
  *
  * A switch releases the slide's engine, which lets go of the surface before it returns, and only then
  * creates the next one: a cut, like a wallpaper the user picks. A slide whose engine gives up is skipped
@@ -34,6 +38,7 @@ internal class SeriesWallpaperEngine(
     private val slides: List<WallpaperSpec>,
     private val slideDuration: SlideDuration,
     screenOffs: Flow<Unit>,
+    private val isScreenOn: () -> Boolean,
     scope: CoroutineScope,
     private val timeSource: TimeSource,
     private val host: EngineHost,
@@ -60,11 +65,15 @@ internal class SeriesWallpaperEngine(
     private var visibleSince: TimeMark? = timeSource.markNow()
     private var timer: Job? = null
 
+    /** The screen went off: the next slide waits for the wallpaper to hide. */
+    private var wakeSwitchDue = false
+    private var hideWait: Job? = null
+
     init {
         require(slides.isNotEmpty()) { "A series needs slides" }
         engine = createSlide(slides[index], SlideHost(index))
         if (slides.size > 1 && slideDuration.isOnWake) {
-            this.scope.launch { screenOffs.collect { next() } }
+            this.scope.launch { screenOffs.collect { onScreenOff() } }
         }
         startTimer()
     }
@@ -76,10 +85,13 @@ internal class SeriesWallpaperEngine(
         visibleSince?.let { shownBefore += it.elapsedNow() }
         visibleSince = null
         timer?.cancel()
+        switchForWake()
     }
 
     override fun resume() {
         engine.resume()
+        // Shown again before it was hidden with the screen off: this wake keeps its slide.
+        switchForWake()
         if (visible) return
         visible = true
         visibleSince = timeSource.markNow()
@@ -107,6 +119,7 @@ internal class SeriesWallpaperEngine(
 
     override fun release() {
         released = true
+        hideWait?.cancel()
         scope.cancel()
         engine.release()
     }
@@ -120,6 +133,28 @@ internal class SeriesWallpaperEngine(
             delay(left)
             next()
         }
+    }
+
+    private fun onScreenOff() {
+        wakeSwitchDue = true
+        hideWait?.cancel()
+        if (!visible) {
+            switchForWake()
+        } else {
+            hideWait = scope.launch {
+                delay(HIDE_WAIT)
+                switchForWake()
+            }
+        }
+    }
+
+    /** The switch the screen-off made due, if the screen is still off; otherwise it is dropped. */
+    private fun switchForWake() {
+        if (!wakeSwitchDue) return
+        wakeSwitchDue = false
+        hideWait?.cancel()
+        hideWait = null
+        if (!isScreenOn()) next()
     }
 
     private fun next() {
@@ -154,6 +189,11 @@ internal class SeriesWallpaperEngine(
         } else {
             show(next)
         }
+    }
+
+    companion object {
+        /** Longer than any screen-off animation: by then the screen is off or dozing, whatever the service says. */
+        val HIDE_WAIT = 2_000.milliseconds
     }
 
     /** What a slide's engine may ask: giving up skips the slide. Callable from any thread. */

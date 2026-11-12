@@ -1,12 +1,7 @@
 package com.onthecrow.wallper.wallpapers.view
 
 import androidx.annotation.StringRes
-import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -146,9 +141,11 @@ internal fun BoxScope.KindLabel(wallpaper: WallpaperItem) {
 /**
  * Shades the card's corner behind an element aligned there with [alignment], so that light content stays
  * readable on a bright picture: an elliptic gradient from the corner, [ShadeSpread] times the element's
- * size with its padding.
+ * size with its padding, drawn at [alpha].
  */
-private fun Modifier.cornerShade(alignment: Alignment): Modifier = drawBehind {
+private fun Modifier.cornerShade(alignment: Alignment, alpha: () -> Float = { 1f }): Modifier = drawBehind {
+    val shadeAlpha = alpha()
+    if (shadeAlpha <= 0f) return@drawBehind
     val corner = alignment.align(IntSize.Zero, IntSize(size.width.roundToInt(), size.height.roundToInt()), layoutDirection)
         .toOffset()
     val radiusX = size.width * ShadeSpread
@@ -159,6 +156,7 @@ private fun Modifier.cornerShade(alignment: Alignment): Modifier = drawBehind {
             brush = Brush.radialGradient(*ShadeStops, center = corner, radius = radiusX),
             radius = radiusX,
             center = corner,
+            alpha = shadeAlpha,
         )
     }
 }
@@ -190,22 +188,28 @@ private fun BoxScope.SelectionMark(selected: Boolean) {
     )
 }
 
-/** Only the active wallpaper is marked; the mark and its corner's shade come and go together. */
+/**
+ * Only the active wallpaper is marked; the mark and its corner's shade come and go together. The shade fades
+ * as it draws, not in a layer: a translucent layer would cut it off at the mark's bounds, a dark square.
+ */
 @Composable
 private fun ActiveMark(isActive: Boolean, modifier: Modifier = Modifier) {
-    AnimatedVisibility(
-        visible = isActive,
-        enter = fadeIn() + scaleIn(initialScale = 0.6f),
-        exit = fadeOut() + scaleOut(targetScale = 0.6f),
-        modifier = modifier,
+    val shown by animateFloatAsState(targetValue = if (isActive) 1f else 0f, label = "active mark")
+    Box(
+        modifier = modifier
+            .cornerShade(Alignment.TopStart, alpha = { shown })
+            .padding(12.dp),
     ) {
         Icon(
             painter = painterResource(R.drawable.ic_radio_checked),
-            contentDescription = stringResource(R.string.active_wallpaper),
+            contentDescription = if (isActive) stringResource(R.string.active_wallpaper) else null,
             modifier = Modifier
-                .cornerShade(Alignment.TopStart)
-                .padding(12.dp)
-                .size(24.dp),
+                .size(24.dp)
+                .graphicsLayer {
+                    alpha = shown
+                    scaleX = 0.6f + 0.4f * shown
+                    scaleY = 0.6f + 0.4f * shown
+                },
             tint = ActiveColor,
         )
     }

@@ -55,8 +55,7 @@ internal class WallpaperEngineFactory @Inject constructor(
                 screenOffs = screenOffs.events,
                 host = host,
             )
-            // TODO Images are not rendered yet and fall back to the placeholder.
-            MediaType.IMAGE -> PlaceholderWallpaperEngine(baseContext, surfaceHolder)
+            MediaType.IMAGE -> PictureWallpaperEngine(surfaceHolder = surfaceHolder, wallpaper = wallpaper, host = host)
         }
         is WallpaperSpec.Series -> {
             // A series never holds a series; a single slide needs none.
@@ -68,6 +67,7 @@ internal class WallpaperEngineFactory @Inject constructor(
                     slides = slides,
                     slideDuration = wallpaper.slideDuration,
                     screenOffs = screenOffs.events,
+                    isScreenOn = { screenOffs.isScreenOn },
                     scope = CoroutineScope(Dispatchers.Main.immediate),
                     timeSource = TimeSource.Monotonic,
                     host = host,

@@ -24,6 +24,7 @@ class SeriesWallpaperEngineTest {
     private val screenOffs = MutableSharedFlow<Unit>()
     private val engines = mutableListOf<FakeEngine>()
     private var placeholder: String? = null
+    private var screenOn = true
 
     private val host = object : EngineHost {
         override fun showPlaceholder(reason: String, error: Throwable?) {
@@ -35,6 +36,7 @@ class SeriesWallpaperEngineTest {
         slides = slides,
         slideDuration = duration,
         screenOffs = screenOffs,
+        isScreenOn = { screenOn },
         scope = backgroundScope + UnconfinedTestDispatcher(testScheduler),
         timeSource = testScheduler.timeSource,
         host = host,
@@ -42,6 +44,11 @@ class SeriesWallpaperEngineTest {
     )
 
     private val shown get() = engines.last()
+
+    private suspend fun screenOff() {
+        screenOn = false
+        screenOffs.emit(Unit)
+    }
 
     @Test
     fun `slides follow each other after their time, round the end`() = runTest {
@@ -79,12 +86,55 @@ class SeriesWallpaperEngineTest {
         assertEquals(1, engines.size)
 
         series.pause()
-        screenOffs.emit(Unit)
+        screenOff()
 
         assertEquals(slides[1], shown.slide)
         assertTrue(shown.paused)
+        screenOn = true
         series.resume()
         assertFalse(shown.paused)
+    }
+
+    @Test
+    fun `a wake's slide waits for the wallpaper to hide after the screen-off animation`() = runTest {
+        val series = series(SlideDuration.ON_WAKE)
+
+        screenOff()
+        advanceTimeBy(500)
+        assertEquals(slides[0], shown.slide)
+
+        series.pause()
+        assertEquals(slides[1], shown.slide)
+        assertTrue(shown.paused)
+    }
+
+    @Test
+    fun `a wallpaper never hidden at screen-off gets its next slide once the animation is surely over`() = runTest {
+        series(SlideDuration.ON_WAKE)
+
+        screenOff()
+        advanceTimeBy(SeriesWallpaperEngine.HIDE_WAIT.inWholeMilliseconds - 1)
+        assertEquals(slides[0], shown.slide)
+
+        advanceTimeBy(2)
+        assertEquals(slides[1], shown.slide)
+    }
+
+    @Test
+    fun `a screen back on before the wallpaper hid keeps the slide for this wake`() = runTest {
+        val series = series(SlideDuration.ON_WAKE)
+
+        screenOff()
+        screenOn = true
+        advanceTimeBy(SeriesWallpaperEngine.HIDE_WAIT.inWholeMilliseconds + 1)
+        // Hidden later, behind an app: still the same wake.
+        series.pause()
+        assertEquals(slides[0], shown.slide)
+        assertEquals(1, engines.size)
+
+        // The next screen-off switches again.
+        screenOff()
+        assertEquals(slides[1], shown.slide)
     }
 
     @Test
