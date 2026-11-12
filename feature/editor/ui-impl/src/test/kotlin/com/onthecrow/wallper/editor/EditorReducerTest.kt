@@ -39,6 +39,29 @@ class EditorReducerTest {
     }
 
     @Test
+    fun `reset brings back the whole video and the original`() = runTest {
+        val edited = prepared.copy(trim = ClipRange(2_000, 9_000), isOptimised = true)
+        assertTrue(edited.hasEdits)
+
+        val state = reducer.reduce(edited, EditorEvent.OnResetClick)
+
+        assertEquals(ClipRange(0, 16_000), state.trim)
+        assertFalse(state.isOptimised)
+        assertFalse(state.hasEdits)
+    }
+
+    @Test
+    fun `reset brings an edited wallpaper back to its saved trim`() = runTest {
+        val saved = media.copy(edited = EditedWallpaper(3, "thumbnail", crop, ClipRange(2_000, 9_000)))
+        val opened = reducer.reduce(EditorState(), EditorEvent.OnMediaPrepared(saved))
+        assertFalse(opened.hasEdits)
+
+        val state = reducer.reduce(opened.copy(trim = ClipRange(0, 16_000)), EditorEvent.OnResetClick)
+
+        assertEquals(ClipRange(2_000, 9_000), state.trim)
+    }
+
+    @Test
     fun `moved handles land in the trim`() = runTest {
         val state = reducer.reduce(EditorState(), EditorEvent.OnTrimChange(ClipRange(2_000, 9_000)))
 

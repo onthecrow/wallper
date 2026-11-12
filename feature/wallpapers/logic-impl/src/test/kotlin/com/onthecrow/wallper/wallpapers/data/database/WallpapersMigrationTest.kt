@@ -139,6 +139,49 @@ class WallpapersMigrationTest {
     }
 
     @Test
+    fun `migration 4 to 5 keeps the wallpapers unturned and stores a rotation`() = runTest {
+        createDatabase(version = 4) { connection ->
+            connection.execSQL(
+                """
+                INSERT INTO wallpapers (id, type, original_path, processed_path, thumbnail_path,
+                    crop_left, crop_top, crop_right, crop_bottom, clip_start_ms, clip_end_ms,
+                    media_width, media_height, media_rotation, media_duration_ms, is_active, built_in)
+                VALUES (1, 'VIDEO', 'originals/a', NULL, 'thumbnails/a',
+                    10, 20, 110, 220, 500, 1500, 1920, 1080, 90, 3000, 1, NULL)
+                """.trimIndent()
+            )
+        }
+        val media = WallpaperEntity(
+            id = 1,
+            type = MediaType.VIDEO,
+            originalPath = "originals/a",
+            processedPath = null,
+            thumbnailPath = "thumbnails/a",
+            cropLeft = 10,
+            cropTop = 20,
+            cropRight = 110,
+            cropBottom = 220,
+            clipStartMs = 500,
+            clipEndMs = 1500,
+            mediaWidth = 1920,
+            mediaHeight = 1080,
+            mediaRotation = 90,
+            mediaDurationMs = 3000,
+            isActive = true,
+        )
+
+        val rows = withDatabase { database ->
+            val dao = database.wallpaperDao()
+            dao.insert(media.copy(id = 0, originalPath = "originals/b", cropRotation = -12.5f, isActive = false))
+            dao.observeAll().first()
+        }
+
+        assertEquals(media, rows.single { it.id == 1 })
+        assertEquals(-12.5f, rows.single { it.originalPath == "originals/b" }.cropRotation)
+        assertBuiltInsSeeded(rows)
+    }
+
+    @Test
     fun `a fresh install gets the built-ins`() = runTest {
         val rows = withDatabase { it.wallpaperDao().observeAll().first() }
 

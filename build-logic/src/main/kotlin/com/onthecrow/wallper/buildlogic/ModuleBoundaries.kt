@@ -21,6 +21,7 @@ private val UI_FREE_MODULES = setOf(
     ":core:diagnostics",
     ":core:coroutines",
     ":core:storage",
+    ":core:haptics",
     ":core:gl",
     ":core:player",
     ":core:engine:api",

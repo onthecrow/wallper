@@ -1,4 +1,4 @@
-package com.onthecrow.wallper.editor.cropper
+package com.onthecrow.wallper.editor.preview
 
 import android.view.TextureView
 import androidx.compose.runtime.Composable

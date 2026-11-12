@@ -6,8 +6,8 @@ import androidx.annotation.OptIn
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.effect.Crop
-import androidx.media3.effect.MatrixTransformation
+import androidx.media3.common.util.Size
+import androidx.media3.effect.GlMatrixTransformation
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.Effects
@@ -31,6 +31,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import javax.inject.Inject
+import kotlin.math.roundToInt
 
 /** Media3 Transformer export. Transformer must be driven from the main looper, hence `flowOn(main)`. */
 internal class TransformerVideoExporter @Inject constructor(
@@ -106,10 +107,24 @@ internal class TransformerVideoExporter @Inject constructor(
             .build()
     }
 
+    /**
+     * Cuts [crop] out of frames and turns it upright. Transformer's decoder already turns frames upright, so
+     * the crop applies to the frame as shown, [frameWidth] x [frameHeight] in the media's metadata.
+     */
     @OptIn(UnstableApi::class)
-    private fun getVideoEffectsForVideo(ndcCoords: NDCCoords): List<MatrixTransformation> {
-        // Transformer's decoder already turns frames upright, so the crop applies to the frame as shown.
-        return listOf(Crop(ndcCoords.left, ndcCoords.right, ndcCoords.bottom, ndcCoords.top))
+    private class CropTransformation(
+        private val crop: CropRect,
+        private val frameWidth: Float,
+        private val frameHeight: Float,
+    ) : GlMatrixTransformation {
+        private val matrix = CropMatrix(crop, frameWidth, frameHeight).toGlArray()
+
+        override fun configure(inputWidth: Int, inputHeight: Int) = Size(
+            (crop.width * inputWidth / frameWidth).roundToInt(),
+            (crop.height * inputHeight / frameHeight).roundToInt(),
+        )
+
+        override fun getGlMatrixArray(presentationTimeUs: Long): FloatArray = matrix
     }
 
     @OptIn(UnstableApi::class)
@@ -135,9 +150,7 @@ internal class TransformerVideoExporter @Inject constructor(
             .setEffects(
                 Effects(
                     listOf(),
-                    getVideoEffectsForVideo(
-                        NDCCoords.fromRect(crop, videoMetadata.displayWidth, videoMetadata.displayHeight),
-                    )
+                    listOf(CropTransformation(crop, videoMetadata.displayWidth, videoMetadata.displayHeight)),
                 )
             )
             .build()
