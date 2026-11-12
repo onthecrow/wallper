@@ -16,5 +16,7 @@ internal class DeleteWallpaperUseCaseImpl @Inject constructor(
         if (wallpaper.builtIn != null) return
         wallpaper.files.forEach(mediaStorage::delete)
         wallpapersRepository.delete(wallpaper)
+        // Its rows in groups went with it: a group it was the last member of shows nothing now.
+        wallpapersRepository.deleteEmptyGroups()
     }
 }

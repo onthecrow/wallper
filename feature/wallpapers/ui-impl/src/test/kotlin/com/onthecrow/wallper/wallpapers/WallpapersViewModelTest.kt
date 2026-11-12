@@ -10,6 +10,7 @@ import com.onthecrow.wallper.core.model.ClipRange
 import com.onthecrow.wallper.core.model.CropRect
 import com.onthecrow.wallper.core.model.MediaInfo
 import com.onthecrow.wallper.core.model.MediaType
+import com.onthecrow.wallper.core.model.SlideDuration
 import com.onthecrow.wallper.core.navigation.Destination
 import com.onthecrow.wallper.core.navigation.Navigator
 import com.onthecrow.wallper.editor.EditorDestination
@@ -90,13 +91,41 @@ class WallpapersViewModelTest {
     )
 
     @Test
+    fun `a group shows its first member's picture and edits open its members`() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+        val group = Wallpaper.Group(
+            id = 7,
+            members = listOf(wallpaper(id = 1, type = MediaType.VIDEO)),
+            slideDuration = SlideDuration.DEFAULT,
+            isActive = true,
+        )
+
+        wallpapers.value = listOf(group)
+        viewModel.onEvent(WallpapersEvent.OnGroupEditClick(7))
+
+        assertEquals(listOf(WallpaperItem(7, "thumbnail-1", true, isGroup = true)), viewModel.state.value.items)
+        assertEquals(listOf<Destination>(WallpaperGroupDestination(7)), navigator.destinations)
+    }
+
+    @Test
+    fun `a new slideshow opens an empty group`() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+
+        viewModel.onEvent(WallpapersEvent.OnAddClick)
+        viewModel.onEvent(WallpapersEvent.OnAddSlideshowClick)
+
+        assertEquals(listOf<Destination>(WallpaperGroupDestination()), navigator.destinations)
+        assertEquals(false, viewModel.state.value.isAddDialogShown)
+    }
+
+    @Test
     fun `wallpapers are shown with the thumbnail for videos`() = runTest(dispatcher) {
         val viewModel = createViewModel()
 
         assertEquals(listOf(WallpaperItem(1, "thumbnail-1", false)), viewModel.state.value.items)
 
         wallpapers.value = listOf(wallpaper(id = 2, type = MediaType.IMAGE))
-        assertEquals(listOf(WallpaperItem(2, "original-2", false)), viewModel.state.value.items)
+        assertEquals(listOf(WallpaperItem(2, "original-2", false, isPhoto = true)), viewModel.state.value.items)
     }
 
     @Test

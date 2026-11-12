@@ -6,4 +6,29 @@
     <string name="optimised">Optimised</string>
     <string name="animation_3d">3D animation</string>
     <string name="active_wallpaper">Active wallpaper</string>
+    <string name="slideshow">Slideshow</string>
+    <string name="add_title">Add</string>
+    <string name="add_media">Video or photo</string>
+    <string name="add_media_description">One wallpaper from your gallery</string>
+    <string name="add_slideshow_description">Your wallpapers in turn</string>
+    <string name="delete_group_text">The wallpapers in it stay.</string>
+    <string name="back">Back</string>
+    <string name="group_pick_title">Choose wallpapers</string>
+    <string name="group_new_title">New slideshow</string>
+    <string name="group_edit_title">Slideshow</string>
+    <string name="group_add">Add wallpapers</string>
+    <string name="group_picked">Chosen</string>
+    <string name="group_save">Save</string>
+    <plurals name="group_too_few">
+        <item quantity="one">Add at least %1$d wallpaper</item>
+        <item quantity="other">Add at least %1$d wallpapers</item>
+    </plurals>
+    <string name="group_swipe_hint">Swipe a wallpaper aside to take it out</string>
+    <string name="group_duration_title">Next wallpaper after</string>
+    <string name="group_duration_seconds">%1$d s</string>
+    <string name="group_duration_minutes">%1$d min</string>
+    <string name="group_duration_hours">%1$d h</string>
+    <string name="group_duration_on_wake">Screen off</string>
+    <string name="group_save_failed">Can\'t save the slideshow</string>
+    <string name="kind_photo">Photo</string>
 </resources>

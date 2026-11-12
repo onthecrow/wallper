@@ -9,7 +9,10 @@ import com.onthecrow.wallper.core.engine.WallpaperSpec
 import com.onthecrow.wallper.core.engine.impl.BuiltInWallpapers
 import com.onthecrow.wallper.core.model.MediaType
 import com.onthecrow.wallper.core.player.WallperPlayerFactory
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import javax.inject.Inject
+import kotlin.time.TimeSource
 
 internal class WallpaperEngineFactory @Inject constructor(
     private val playerFactory: WallperPlayerFactory,
@@ -54,6 +57,23 @@ internal class WallpaperEngineFactory @Inject constructor(
             )
             // TODO Images are not rendered yet and fall back to the placeholder.
             MediaType.IMAGE -> PlaceholderWallpaperEngine(baseContext, surfaceHolder)
+        }
+        is WallpaperSpec.Slideshow -> {
+            // There are no slideshows in slideshows; a single slide needs no slideshow.
+            val slides = wallpaper.slides.filterNot { it is WallpaperSpec.Slideshow }
+            when (slides.size) {
+                0 -> PlaceholderWallpaperEngine(baseContext, surfaceHolder)
+                1 -> create(baseContext, surfaceHolder, slides.single(), isPreview, host)
+                else -> SlideshowWallpaperEngine(
+                    slides = slides,
+                    slideDuration = wallpaper.slideDuration,
+                    screenOffs = screenOffs.events,
+                    scope = CoroutineScope(Dispatchers.Main.immediate),
+                    timeSource = TimeSource.Monotonic,
+                    host = host,
+                    createSlide = { slide, slideHost -> create(baseContext, surfaceHolder, slide, isPreview, slideHost) },
+                )
+            }
         }
     }
 }

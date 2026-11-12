@@ -59,11 +59,32 @@ class WallpapersReducerTest {
     }
 
     @Test
+    fun `the plus asks what to add, and any answer closes the question`() = runTest {
+        val asked = reducer.reduce(WallpapersState(), WallpapersEvent.OnAddClick)
+        assertEquals(true, asked.isAddDialogShown)
+
+        listOf(WallpapersEvent.OnAddDismiss, WallpapersEvent.OnAddMediaClick, WallpapersEvent.OnAddSlideshowClick).forEach {
+            assertEquals(false, reducer.reduce(asked, it).isAddDialogShown)
+        }
+    }
+
+    @Test
+    fun `a group that starts with a built-in shows its preview`() = runTest {
+        val group = WallpaperItem(5, null, false, isGroup = true, coverBuiltIn = BuiltInWallpaper.BLACK_HOLE)
+        val listed = reducer.reduce(WallpapersState(), WallpapersEvent.OnWallpapersChanged(listOf(group)))
+
+        val loaded = reducer.reduce(listed, WallpapersEvent.OnBuiltInPreviewLoaded(BuiltInWallpaper.BLACK_HOLE, "previews/bh.png"))
+
+        assertEquals("previews/bh.png", loaded.items.single().picturePath)
+    }
+
+    @Test
     fun `user actions do not touch the state`() = runTest {
         val initial = WallpapersState()
 
         assertSame(initial, reducer.reduce(initial, WallpapersEvent.OnWallpaperClick(1)))
         assertSame(initial, reducer.reduce(initial, WallpapersEvent.OnEditClick(1)))
+        assertSame(initial, reducer.reduce(initial, WallpapersEvent.OnGroupEditClick(1)))
         assertSame(initial, reducer.reduce(initial, WallpapersEvent.OnMediaPicked("content://x")))
         assertSame(initial, reducer.reduce(initial, WallpapersEvent.OnBuiltInSettingsClick(BuiltInWallpaper.BLACK_HOLE)))
     }

@@ -11,4 +11,18 @@ internal data class WallpaperItem(
     val builtIn: BuiltInWallpaper? = null,
     /** The user's video kept only as an optimised export: it can't be edited, only deleted. */
     val isOptimised: Boolean = false,
-)
+    /** A picture rather than a video. */
+    val isPhoto: Boolean = false,
+    /** A group (a slideshow): its picture is its first member's. */
+    val isGroup: Boolean = false,
+    /** A group's first member when that is a built-in: the group's picture is its preview. */
+    val coverBuiltIn: BuiltInWallpaper? = null,
+) {
+    /** The built-in whose rendered preview is this item's picture, if any. */
+    val previewOf: BuiltInWallpaper? get() = builtIn ?: coverBuiltIn
+}
+
+/** A built-in's picture, and a group's that starts with one, is its preview once it is rendered. */
+internal fun List<WallpaperItem>.withPreviews(previews: Map<BuiltInWallpaper, String>) = map { item ->
+    item.previewOf?.let(previews::get)?.let { item.copy(picturePath = it) } ?: item
+}

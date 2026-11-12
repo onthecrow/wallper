@@ -4,11 +4,12 @@ import com.onthecrow.wallper.core.model.MediaType
 import com.onthecrow.wallper.wallpapers.domain.model.Wallpaper
 import com.onthecrow.wallper.wallpapers.model.WallpaperItem
 
-internal fun Wallpaper.toItem() = when (this) {
+internal fun Wallpaper.toItem(): WallpaperItem = when (this) {
     is Wallpaper.Media -> WallpaperItem(
         id = id,
         picturePath = if (type == MediaType.VIDEO) thumbnailPath else originalPath,
         isActive = isActive,
+        isPhoto = type == MediaType.IMAGE,
     )
     is Wallpaper.ProcessedVideo -> WallpaperItem(
         id = id,
@@ -23,4 +24,14 @@ internal fun Wallpaper.toItem() = when (this) {
         isActive = isActive,
         builtIn = wallpaper,
     )
+    is Wallpaper.Group -> {
+        val cover = members.firstOrNull()?.toItem()
+        WallpaperItem(
+            id = id,
+            picturePath = cover?.picturePath,
+            isActive = isActive,
+            isGroup = true,
+            coverBuiltIn = cover?.builtIn,
+        )
+    }
 }

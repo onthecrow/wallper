@@ -11,4 +11,6 @@ internal data class WallpapersState(
     val error: String = "",
     /** The wallpaper whose deletion waits for the user's confirmation. */
     val deleteCandidate: Int? = null,
+    /** The «+» asks whether to add one wallpaper or a slideshow. */
+    val isAddDialogShown: Boolean = false,
 ) : State

@@ -36,6 +36,7 @@ import com.onthecrow.wallper.core.designsystem.component.FAB
 import com.onthecrow.wallper.core.model.BuiltInWallpaper
 import com.onthecrow.wallper.wallpapers.model.WallpaperItem
 import com.onthecrow.wallper.wallpapers.ui.R
+import com.onthecrow.wallper.wallpapers.view.AddWallpaperDialog
 import com.onthecrow.wallper.wallpapers.view.WallpaperCard
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
@@ -86,7 +87,7 @@ internal fun WallpapersScreen(
         },
         floatingActionButton = {
             FAB(contentDescription = stringResource(R.string.add_wallpaper)) {
-                pickMedia.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
+                onEvent(WallpapersEvent.OnAddClick)
             }
         }
     ) {
@@ -107,10 +108,10 @@ internal fun WallpapersScreen(
                     onEditClick = {
                         val builtIn = wallpaper.builtIn
                         onEvent(
-                            if (builtIn != null) {
-                                WallpapersEvent.OnBuiltInSettingsClick(builtIn)
-                            } else {
-                                WallpapersEvent.OnEditClick(wallpaper.id)
+                            when {
+                                builtIn != null -> WallpapersEvent.OnBuiltInSettingsClick(builtIn)
+                                wallpaper.isGroup -> WallpapersEvent.OnGroupEditClick(wallpaper.id)
+                                else -> WallpapersEvent.OnEditClick(wallpaper.id)
                             }
                         )
                     },
@@ -125,9 +126,23 @@ internal fun WallpapersScreen(
     }
 
     state.deleteCandidate?.let { id ->
+        val isGroup = state.items.firstOrNull { it.id == id }?.isGroup == true
         DeleteWallpaperDialog(
             onConfirm = { onEvent(WallpapersEvent.OnDeleteConfirm(id)) },
             onDismiss = { onEvent(WallpapersEvent.OnDeleteDismiss) },
+            // A group keeps no files: only it goes.
+            text = if (isGroup) stringResource(R.string.delete_group_text) else stringResource(DesignR.string.delete_wallpaper_text),
+        )
+    }
+
+    if (state.isAddDialogShown) {
+        AddWallpaperDialog(
+            onMediaClick = {
+                onEvent(WallpapersEvent.OnAddMediaClick)
+                pickMedia.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
+            },
+            onSlideshowClick = { onEvent(WallpapersEvent.OnAddSlideshowClick) },
+            onDismiss = { onEvent(WallpapersEvent.OnAddDismiss) },
         )
     }
 }
@@ -141,6 +156,7 @@ private fun WallpapersScreenPreview() {
                 WallpaperItem(1, null, false, BuiltInWallpaper.BLACK_HOLE),
                 WallpaperItem(2, "", true),
                 WallpaperItem(3, "", false, isOptimised = true),
+                WallpaperItem(4, "", false, isGroup = true),
             ),
         ),
         eventFlow = emptyFlow(),

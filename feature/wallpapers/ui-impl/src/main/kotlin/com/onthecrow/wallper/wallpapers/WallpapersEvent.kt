@@ -8,6 +8,14 @@ internal sealed interface WallpapersEvent : Event {
     // User actions
     data class OnWallpaperClick(val id: Int) : WallpapersEvent
     data class OnEditClick(val id: Int) : WallpapersEvent
+    /** A group's edit: its members. */
+    data class OnGroupEditClick(val id: Int) : WallpapersEvent
+    /** The «+»: asks what to add. */
+    data object OnAddClick : WallpapersEvent
+    data object OnAddDismiss : WallpapersEvent
+    /** One wallpaper from the gallery: the screen opens the picker. */
+    data object OnAddMediaClick : WallpapersEvent
+    data object OnAddSlideshowClick : WallpapersEvent
     /** Asks first: the wallpaper's files go with it. */
     data class OnDeleteClick(val id: Int) : WallpapersEvent
     data class OnDeleteConfirm(val id: Int) : WallpapersEvent

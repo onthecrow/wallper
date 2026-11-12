@@ -9,6 +9,7 @@ import com.onthecrow.wallper.wallpapers.DeleteWallpaperUseCaseImpl
 import com.onthecrow.wallper.wallpapers.GetWallpaperUseCaseImpl
 import com.onthecrow.wallper.wallpapers.ObserveWallpaperStorageUseCaseImpl
 import com.onthecrow.wallper.wallpapers.ObserveWallpapersUseCaseImpl
+import com.onthecrow.wallper.wallpapers.SaveWallpaperGroupUseCaseImpl
 import com.onthecrow.wallper.wallpapers.UpdateWallpaperUseCaseImpl
 import com.onthecrow.wallper.wallpapers.data.database.WallpaperDao
 import com.onthecrow.wallper.wallpapers.data.database.WallpapersDatabase
@@ -18,6 +19,7 @@ import com.onthecrow.wallper.wallpapers.domain.DeleteWallpaperUseCase
 import com.onthecrow.wallper.wallpapers.domain.GetWallpaperUseCase
 import com.onthecrow.wallper.wallpapers.domain.ObserveWallpaperStorageUseCase
 import com.onthecrow.wallper.wallpapers.domain.ObserveWallpapersUseCase
+import com.onthecrow.wallper.wallpapers.domain.SaveWallpaperGroupUseCase
 import com.onthecrow.wallper.wallpapers.domain.UpdateWallpaperUseCase
 import dagger.Binds
 import dagger.Module
@@ -51,6 +53,9 @@ internal abstract class WallpapersLogicModule {
 
     @Binds
     abstract fun bindObserveWallpaperStorage(impl: ObserveWallpaperStorageUseCaseImpl): ObserveWallpaperStorageUseCase
+
+    @Binds
+    abstract fun bindSaveWallpaperGroup(impl: SaveWallpaperGroupUseCaseImpl): SaveWallpaperGroupUseCase
 
     @Binds
     abstract fun bindActiveWallpaperSource(impl: ActiveWallpaperSourceImpl): ActiveWallpaperSource
