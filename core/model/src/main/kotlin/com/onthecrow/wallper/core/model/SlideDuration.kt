@@ -1,7 +1,7 @@
 package com.onthecrow.wallper.core.model
 
 /**
- * How long each wallpaper of a slideshow stays on screen, in [ms] of the time it is visible; or, with
+ * How long each wallpaper of a series stays on screen, in [ms] of the time it is visible; or, with
  * [ON_WAKE], until the screen turns off: the next one is there when it turns on again.
  */
 @JvmInline

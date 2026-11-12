@@ -18,7 +18,7 @@ import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
-class SlideshowWallpaperEngineTest {
+class SeriesWallpaperEngineTest {
 
     private val slides = listOf("a", "b", "c").map { WallpaperSpec.ProcessedVideo(it, thumbnailPath = "") }
     private val screenOffs = MutableSharedFlow<Unit>()
@@ -31,7 +31,7 @@ class SlideshowWallpaperEngineTest {
         }
     }
 
-    private fun TestScope.slideshow(duration: SlideDuration = SlideDuration(60_000)) = SlideshowWallpaperEngine(
+    private fun TestScope.series(duration: SlideDuration = SlideDuration(60_000)) = SeriesWallpaperEngine(
         slides = slides,
         slideDuration = duration,
         screenOffs = screenOffs,
@@ -45,7 +45,7 @@ class SlideshowWallpaperEngineTest {
 
     @Test
     fun `slides follow each other after their time, round the end`() = runTest {
-        slideshow()
+        series()
         assertEquals(slides[0], shown.slide)
 
         advanceTimeBy(60_001)
@@ -59,12 +59,12 @@ class SlideshowWallpaperEngineTest {
 
     @Test
     fun `only visible time counts`() = runTest {
-        val slideshow = slideshow()
+        val series = series()
 
         advanceTimeBy(40_000)
-        slideshow.pause()
+        series.pause()
         advanceTimeBy(600_000)
-        slideshow.resume()
+        series.resume()
         advanceTimeBy(19_000)
         assertEquals(slides[0], shown.slide)
 
@@ -74,24 +74,24 @@ class SlideshowWallpaperEngineTest {
 
     @Test
     fun `on wake the next slide comes at each screen-off, paused until it shows`() = runTest {
-        val slideshow = slideshow(SlideDuration.ON_WAKE)
+        val series = series(SlideDuration.ON_WAKE)
         advanceTimeBy(3_600_000)
         assertEquals(1, engines.size)
 
-        slideshow.pause()
+        series.pause()
         screenOffs.emit(Unit)
 
         assertEquals(slides[1], shown.slide)
         assertTrue(shown.paused)
-        slideshow.resume()
+        series.resume()
         assertFalse(shown.paused)
     }
 
     @Test
     fun `a new slide gets the launcher's page and zoom`() = runTest {
-        val slideshow = slideshow()
-        slideshow.onOffsetsChanged(0.25f, 0.5f)
-        slideshow.onZoomChanged(0.3f)
+        val series = series()
+        series.onOffsetsChanged(0.25f, 0.5f)
+        series.onZoomChanged(0.3f)
 
         advanceTimeBy(60_001)
 
@@ -101,7 +101,7 @@ class SlideshowWallpaperEngineTest {
 
     @Test
     fun `a slide that gives up is skipped from then on`() = runTest {
-        slideshow()
+        series()
 
         engines[0].host.showPlaceholder("broken")
         assertEquals(slides[1], shown.slide)
@@ -114,7 +114,7 @@ class SlideshowWallpaperEngineTest {
 
     @Test
     fun `when every slide gives up, the service shows the placeholder`() = runTest {
-        slideshow()
+        series()
 
         repeat(3) { shown.host.showPlaceholder("broken") }
 
@@ -124,7 +124,7 @@ class SlideshowWallpaperEngineTest {
 
     @Test
     fun `a slide switched away from can't skip the one on screen`() = runTest {
-        slideshow()
+        series()
         advanceTimeBy(60_001)
 
         engines[0].host.showPlaceholder("late")
@@ -135,13 +135,13 @@ class SlideshowWallpaperEngineTest {
 
     @Test
     fun `released or without a surface, it switches no more`() = runTest {
-        val slideshow = slideshow()
-        slideshow.onSurfaceDestroyed()
+        val series = series()
+        series.onSurfaceDestroyed()
         advanceTimeBy(600_000)
         assertEquals(1, engines.size)
         assertTrue(engines[0].surfaceDestroyed)
 
-        slideshow.release()
+        series.release()
         assertTrue(engines[0].released)
     }
 

@@ -19,7 +19,7 @@ import kotlin.time.TimeMark
 import kotlin.time.TimeSource
 
 /**
- * A slideshow: one of [slides] at a time, each through its own engine ([createSlide]), the next one after
+ * A series: one of [slides] at a time, each through its own engine ([createSlide]), the next one after
  * [slideDuration] of the time the wallpaper is visible. With [SlideDuration.ON_WAKE] the next one comes at
  * each screen-off, so that it is there when the screen turns on: no switch on screen.
  *
@@ -30,7 +30,7 @@ import kotlin.time.TimeSource
  * Called on the main thread like every engine; [scope] must run there too. [timeSource] measures the
  * visible time.
  */
-internal class SlideshowWallpaperEngine(
+internal class SeriesWallpaperEngine(
     private val slides: List<WallpaperSpec>,
     private val slideDuration: SlideDuration,
     screenOffs: Flow<Unit>,
@@ -61,7 +61,7 @@ internal class SlideshowWallpaperEngine(
     private var timer: Job? = null
 
     init {
-        require(slides.isNotEmpty()) { "A slideshow needs slides" }
+        require(slides.isNotEmpty()) { "A series needs slides" }
         engine = createSlide(slides[index], SlideHost(index))
         if (slides.size > 1 && slideDuration.isOnWake) {
             this.scope.launch { screenOffs.collect { next() } }
@@ -111,7 +111,7 @@ internal class SlideshowWallpaperEngine(
         engine.release()
     }
 
-    /** Counts down what is left of the slide's time, while visible; a slideshow switching on wakes has none. */
+    /** Counts down what is left of the slide's time, while visible; a series switching on wakes has none. */
     private fun startTimer() {
         timer?.cancel()
         if (slides.size < 2 || slideDuration.isOnWake || !visible || !hasSurface || released) return

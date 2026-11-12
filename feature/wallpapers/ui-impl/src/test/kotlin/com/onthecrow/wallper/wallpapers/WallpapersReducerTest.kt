@@ -63,7 +63,7 @@ class WallpapersReducerTest {
         val asked = reducer.reduce(WallpapersState(), WallpapersEvent.OnAddClick)
         assertEquals(true, asked.isAddDialogShown)
 
-        listOf(WallpapersEvent.OnAddDismiss, WallpapersEvent.OnAddMediaClick, WallpapersEvent.OnAddSlideshowClick).forEach {
+        listOf(WallpapersEvent.OnAddDismiss, WallpapersEvent.OnAddMediaClick, WallpapersEvent.OnAddSeriesClick).forEach {
             assertEquals(false, reducer.reduce(asked, it).isAddDialogShown)
         }
     }

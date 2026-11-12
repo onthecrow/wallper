@@ -69,12 +69,12 @@ class WallpaperGroupsTest {
     }
 
     @Test
-    fun `the active group feeds the engine a slideshow of its members`() = runTest {
+    fun `the active group feeds the engine a series of its members`() = runTest {
         val first = add(video)
         val second = add(processed)
         saveGroup(null, listOf(first, second), SlideDuration.ON_WAKE)
 
-        val spec = assertIs<WallpaperSpec.Slideshow>(ActiveWallpaperSourceImpl(repository, activations).activeWallpaperFlow.first())
+        val spec = assertIs<WallpaperSpec.Series>(ActiveWallpaperSourceImpl(repository, activations).activeWallpaperFlow.first())
 
         assertEquals(SlideDuration.ON_WAKE, spec.slideDuration)
         assertEquals(WallpaperSpec.ProcessedVideo("originals/b.mp4", "thumbnails/b"), spec.slides[1])

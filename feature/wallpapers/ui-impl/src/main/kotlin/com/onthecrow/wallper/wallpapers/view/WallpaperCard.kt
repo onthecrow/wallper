@@ -70,20 +70,8 @@ internal fun WallpaperCard(
         },
         modifier = modifier,
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .then(if (wallpaper.builtIn != null) Modifier.background(BuiltInPlaceholderColor) else Modifier),
-        ) {
-            // No picture while a built-in's preview is rendering: the placeholder background shows instead.
-            wallpaper.picturePath?.let { picturePath ->
-                AsyncImage(
-                    modifier = Modifier.fillMaxSize(),
-                    model = picturePath,
-                    contentScale = ContentScale.Crop,
-                    contentDescription = null,
-                )
-            }
+        Box(modifier = Modifier.fillMaxSize()) {
+            WallpaperPicture(wallpaper, Modifier.matchParentSize())
             if (selected != null) {
                 SelectionMark(selected)
             } else {
@@ -118,16 +106,40 @@ internal fun WallpaperCard(
                         .padding(12.dp),
                 )
             }
-            WallpaperLabel(
-                text = stringResource(wallpaper.labelRes()),
-                isOutlined = wallpaper.isOptimised,
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .cornerShade(Alignment.BottomEnd)
-                    .padding(8.dp),
+            KindLabel(wallpaper)
+        }
+    }
+}
+
+/**
+ * The wallpaper's picture, scaled to fill and cut evenly on the sides that don't fit. Until a built-in's
+ * preview is rendered there is no picture, only the colour behind it.
+ */
+@Composable
+internal fun WallpaperPicture(wallpaper: WallpaperItem, modifier: Modifier = Modifier) {
+    Box(modifier = modifier.then(if (wallpaper.previewOf != null) Modifier.background(BuiltInPlaceholderColor) else Modifier)) {
+        wallpaper.picturePath?.let { picturePath ->
+            AsyncImage(
+                modifier = Modifier.fillMaxSize(),
+                model = picturePath,
+                contentScale = ContentScale.Crop,
+                contentDescription = null,
             )
         }
     }
+}
+
+/** What the wallpaper is ([labelRes]), bottom right of a card or a row, over the corner's shade. */
+@Composable
+internal fun BoxScope.KindLabel(wallpaper: WallpaperItem) {
+    WallpaperLabel(
+        text = stringResource(wallpaper.labelRes()),
+        isOutlined = wallpaper.isOptimised,
+        modifier = Modifier
+            .align(Alignment.BottomEnd)
+            .cornerShade(Alignment.BottomEnd)
+            .padding(8.dp),
+    )
 }
 
 /**
@@ -193,8 +205,8 @@ private fun ActiveIndicator(isActive: Boolean, modifier: Modifier = Modifier) {
 
 /** What the wallpaper is: a group, a built-in's kind, or how the user's media is kept, as it was or optimised. */
 @StringRes
-internal fun WallpaperItem.labelRes(): Int = when {
-    isGroup -> R.string.slideshow
+private fun WallpaperItem.labelRes(): Int = when {
+    isGroup -> R.string.series
     builtIn == BuiltInWallpaper.BLACK_HOLE -> R.string.animation_3d
     isOptimised -> R.string.optimised
     else -> R.string.original

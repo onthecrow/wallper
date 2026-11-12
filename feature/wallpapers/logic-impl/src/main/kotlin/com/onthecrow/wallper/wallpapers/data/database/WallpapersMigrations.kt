@@ -63,7 +63,7 @@ internal val MIGRATION_4_5 = object : Migration(4, 5) {
 }
 
 /**
- * v6: groups (slideshows). A group is a row of `wallpapers` with `slide_duration_ms`; its members are in
+ * v6: groups (series). A group is a row of `wallpapers` with `slide_duration_ms`; its members are in
  * `wallpaper_group_items`, which goes with either of its rows.
  */
 internal val MIGRATION_5_6 = object : Migration(5, 6) {

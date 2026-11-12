@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 
 /**
- * Feeds the wallpaper service from the wallpapers database: an active group is a slideshow of its members.
+ * Feeds the wallpaper service from the wallpapers database: an active group is a series of its members.
  * An active built-in unknown to this version gives null.
  */
 internal class ActiveWallpaperSourceImpl @Inject constructor(

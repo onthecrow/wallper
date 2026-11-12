@@ -272,15 +272,15 @@ class WallperWallpaperService : WallpaperService() {
             if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O_MR1) return
 
             computeColorsJob?.cancel()
-            // A slideshow's colours are its first slide's, for good: each change re-themes the phone (12+).
-            val colorSource = if (wallpaper is WallpaperSpec.Slideshow) wallpaper.slides.firstOrNull() else wallpaper
+            // A series takes its colours from its first slide, for good: each change re-themes the phone (12+).
+            val colorSource = if (wallpaper is WallpaperSpec.Series) wallpaper.slides.firstOrNull() else wallpaper
             computeColorsJob = engineScope.launch(Dispatchers.IO) {
                 computedColors = when (colorSource) {
                     is WallpaperSpec.BuiltIn -> builtIns[colorSource.wallpaper]?.colors()
                     is WallpaperSpec.Media -> decodeSmall(colorSource.thumbnailPath)?.let(::colorsOf)
                     is WallpaperSpec.ProcessedVideo -> decodeSmall(colorSource.thumbnailPath)?.let(::colorsOf)
                     // Not a slide: the factory leaves them out.
-                    is WallpaperSpec.Slideshow,
+                    is WallpaperSpec.Series,
                     null -> {
                         val frame = surfaceHolder?.surfaceFrame
                         val height = if (frame == null || frame.width() <= 0) COLORS_SIZE else COLORS_SIZE * frame.height() / frame.width()

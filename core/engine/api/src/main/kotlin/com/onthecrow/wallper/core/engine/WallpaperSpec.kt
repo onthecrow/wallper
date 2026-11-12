@@ -30,10 +30,10 @@ sealed interface WallpaperSpec {
     data class BuiltIn(val wallpaper: BuiltInWallpaper) : WallpaperSpec
 
     /**
-     * The user's group: [slides] in turn, each for [slideDuration]. A slide is never a slideshow itself. The
+     * The user's group: [slides] in turn, each for [slideDuration]. A slide is never a series itself. The
      * system's colours follow the first slide only: on Android 12+ each change re-themes the launcher and apps.
      */
-    data class Slideshow(
+    data class Series(
         val slides: List<WallpaperSpec>,
         val slideDuration: SlideDuration,
     ) : WallpaperSpec

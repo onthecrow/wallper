@@ -108,11 +108,11 @@ class WallpapersViewModelTest {
     }
 
     @Test
-    fun `a new slideshow opens an empty group`() = runTest(dispatcher) {
+    fun `a new series opens an empty group`() = runTest(dispatcher) {
         val viewModel = createViewModel()
 
         viewModel.onEvent(WallpapersEvent.OnAddClick)
-        viewModel.onEvent(WallpapersEvent.OnAddSlideshowClick)
+        viewModel.onEvent(WallpapersEvent.OnAddSeriesClick)
 
         assertEquals(listOf<Destination>(WallpaperGroupDestination()), navigator.destinations)
         assertEquals(false, viewModel.state.value.isAddDialogShown)
@@ -125,7 +125,7 @@ class WallpapersViewModelTest {
         assertEquals(listOf(WallpaperItem(1, "thumbnail-1", false)), viewModel.state.value.items)
 
         wallpapers.value = listOf(wallpaper(id = 2, type = MediaType.IMAGE))
-        assertEquals(listOf(WallpaperItem(2, "original-2", false, isPhoto = true)), viewModel.state.value.items)
+        assertEquals(listOf(WallpaperItem(2, "original-2", false)), viewModel.state.value.items)
     }
 
     @Test

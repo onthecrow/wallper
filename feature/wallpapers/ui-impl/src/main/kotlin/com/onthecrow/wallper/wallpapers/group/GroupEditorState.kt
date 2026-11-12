@@ -40,7 +40,7 @@ internal data class GroupEditorState(
     val canSave: Boolean get() = memberItems.size >= MIN_MEMBERS && save == null
 
     companion object {
-        /** A slideshow of one wallpaper would be that wallpaper. */
+        /** A series of one wallpaper would be that wallpaper. */
         const val MIN_MEMBERS = 2
 
         fun initial(groupId: Int?) = GroupEditorState(

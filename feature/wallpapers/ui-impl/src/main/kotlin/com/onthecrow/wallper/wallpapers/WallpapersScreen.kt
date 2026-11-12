@@ -141,7 +141,7 @@ internal fun WallpapersScreen(
                 onEvent(WallpapersEvent.OnAddMediaClick)
                 pickMedia.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))
             },
-            onSlideshowClick = { onEvent(WallpapersEvent.OnAddSlideshowClick) },
+            onSeriesClick = { onEvent(WallpapersEvent.OnAddSeriesClick) },
             onDismiss = { onEvent(WallpapersEvent.OnAddDismiss) },
         )
     }

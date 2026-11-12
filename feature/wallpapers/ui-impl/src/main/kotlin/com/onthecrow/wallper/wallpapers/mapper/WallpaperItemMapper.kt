@@ -9,7 +9,6 @@ internal fun Wallpaper.toItem(): WallpaperItem = when (this) {
         id = id,
         picturePath = if (type == MediaType.VIDEO) thumbnailPath else originalPath,
         isActive = isActive,
-        isPhoto = type == MediaType.IMAGE,
     )
     is Wallpaper.ProcessedVideo -> WallpaperItem(
         id = id,

@@ -15,7 +15,7 @@ internal sealed interface WallpapersEvent : Event {
     data object OnAddDismiss : WallpapersEvent
     /** One wallpaper from the gallery: the screen opens the picker. */
     data object OnAddMediaClick : WallpapersEvent
-    data object OnAddSlideshowClick : WallpapersEvent
+    data object OnAddSeriesClick : WallpapersEvent
     /** Asks first: the wallpaper's files go with it. */
     data class OnDeleteClick(val id: Int) : WallpapersEvent
     data class OnDeleteConfirm(val id: Int) : WallpapersEvent

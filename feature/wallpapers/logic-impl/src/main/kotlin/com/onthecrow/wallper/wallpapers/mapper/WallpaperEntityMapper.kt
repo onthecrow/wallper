@@ -28,7 +28,7 @@ internal fun List<WallpaperEntity>.toDomain(groupItems: List<WallpaperGroupItemE
     }
 }
 
-/** A group (a slideshow) rather than one wallpaper. */
+/** A group (a series) rather than one wallpaper. */
 internal val WallpaperEntity.isGroup: Boolean get() = slideDurationMs != null
 
 /** The group this row is, with its [members]. */
@@ -109,7 +109,7 @@ internal fun NewWallpaper.toEntity(id: Int = 0, isActive: Boolean = false) = whe
     )
 }
 
-/** A group's wallpaper is a slideshow of its members; a group in a group (there is none) would be left out. */
+/** A group's wallpaper is a series of its members; a group in a group (there is none) would be left out. */
 internal fun Wallpaper.toSpec(): WallpaperSpec = when (this) {
     is Wallpaper.Media -> WallpaperSpec.Media(
         type = type,
@@ -121,7 +121,7 @@ internal fun Wallpaper.toSpec(): WallpaperSpec = when (this) {
     )
     is Wallpaper.ProcessedVideo -> WallpaperSpec.ProcessedVideo(path = path, thumbnailPath = thumbnailPath)
     is Wallpaper.BuiltIn -> WallpaperSpec.BuiltIn(wallpaper)
-    is Wallpaper.Group -> WallpaperSpec.Slideshow(
+    is Wallpaper.Group -> WallpaperSpec.Series(
         slides = members.filterNot { it is Wallpaper.Group }.map { it.toSpec() },
         slideDuration = slideDuration,
     )

@@ -58,13 +58,13 @@ internal class WallpaperEngineFactory @Inject constructor(
             // TODO Images are not rendered yet and fall back to the placeholder.
             MediaType.IMAGE -> PlaceholderWallpaperEngine(baseContext, surfaceHolder)
         }
-        is WallpaperSpec.Slideshow -> {
-            // There are no slideshows in slideshows; a single slide needs no slideshow.
-            val slides = wallpaper.slides.filterNot { it is WallpaperSpec.Slideshow }
+        is WallpaperSpec.Series -> {
+            // A series never holds a series; a single slide needs none.
+            val slides = wallpaper.slides.filterNot { it is WallpaperSpec.Series }
             when (slides.size) {
                 0 -> PlaceholderWallpaperEngine(baseContext, surfaceHolder)
                 1 -> create(baseContext, surfaceHolder, slides.single(), isPreview, host)
-                else -> SlideshowWallpaperEngine(
+                else -> SeriesWallpaperEngine(
                     slides = slides,
                     slideDuration = wallpaper.slideDuration,
                     screenOffs = screenOffs.events,

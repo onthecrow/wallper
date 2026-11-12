@@ -11,9 +11,7 @@ internal data class WallpaperItem(
     val builtIn: BuiltInWallpaper? = null,
     /** The user's video kept only as an optimised export: it can't be edited, only deleted. */
     val isOptimised: Boolean = false,
-    /** A picture rather than a video. */
-    val isPhoto: Boolean = false,
-    /** A group (a slideshow): its picture is its first member's. */
+    /** A group (a series): its picture is its first member's. */
     val isGroup: Boolean = false,
     /** A group's first member when that is a built-in: the group's picture is its preview. */
     val coverBuiltIn: BuiltInWallpaper? = null,

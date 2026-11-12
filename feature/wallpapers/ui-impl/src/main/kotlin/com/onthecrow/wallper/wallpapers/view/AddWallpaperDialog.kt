@@ -16,11 +16,11 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import com.onthecrow.wallper.wallpapers.ui.R
 
-/** What the «+» adds: one wallpaper from the gallery, or a slideshow of the wallpapers there are. */
+/** What the «+» adds: one wallpaper from the gallery, or a series of the wallpapers there are. */
 @Composable
 internal fun AddWallpaperDialog(
     onMediaClick: () -> Unit,
-    onSlideshowClick: () -> Unit,
+    onSeriesClick: () -> Unit,
     onDismiss: () -> Unit,
 ) {
     AlertDialog(
@@ -40,9 +40,9 @@ internal fun AddWallpaperDialog(
                     onClick = onMediaClick,
                 )
                 AddOption(
-                    title = stringResource(R.string.slideshow),
-                    description = stringResource(R.string.add_slideshow_description),
-                    onClick = onSlideshowClick,
+                    title = stringResource(R.string.series),
+                    description = stringResource(R.string.add_series_description),
+                    onClick = onSeriesClick,
                 )
             }
         },
@@ -66,5 +66,5 @@ private fun AddOption(title: String, description: String, onClick: () -> Unit) {
 @Preview
 @Composable
 private fun AddWallpaperDialogPreview() {
-    AddWallpaperDialog(onMediaClick = {}, onSlideshowClick = {}, onDismiss = {})
+    AddWallpaperDialog(onMediaClick = {}, onSeriesClick = {}, onDismiss = {})
 }

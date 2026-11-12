@@ -14,7 +14,7 @@ import com.onthecrow.wallper.core.model.MediaType
  * clip and media columns hold zeros, like a built-in's. Rows from before v4 may have both paths; they are
  * processed videos that still keep the original.
  *
- * A group (a slideshow) has [slideDurationMs] and placeholders in the media columns, like a built-in; its
+ * A group (a series) has [slideDurationMs] and placeholders in the media columns, like a built-in; its
  * members are in [WallpaperGroupItemEntity].
  */
 @Entity(tableName = "wallpapers", indices = [Index(value = ["built_in"], unique = true)])

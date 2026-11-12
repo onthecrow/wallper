@@ -46,7 +46,7 @@ sealed interface Wallpaper {
     ) : Wallpaper
 
     /**
-     * A slideshow of other wallpapers, never of groups: each of [members], in their order, shows for
+     * A series of other wallpapers, never of groups: each of [members], in their order, shows for
      * [slideDuration]. Deleting it leaves them; deleting the last of them deletes it.
      */
     data class Group(
