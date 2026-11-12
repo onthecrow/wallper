@@ -13,6 +13,9 @@ import com.onthecrow.wallper.core.model.MediaType
  * A row of the user's media has [originalPath] or [processedPath]. A processed video plays as is: its crop,
  * clip and media columns hold zeros, like a built-in's. Rows from before v4 may have both paths; they are
  * processed videos that still keep the original.
+ *
+ * A group (a series) has [slideDurationMs] and placeholders in the media columns, like a built-in; its
+ * members are in [WallpaperGroupItemEntity].
  */
 @Entity(tableName = "wallpapers", indices = [Index(value = ["built_in"], unique = true)])
 internal data class WallpaperEntity(
@@ -41,6 +44,8 @@ internal data class WallpaperEntity(
      * The media columns of a built-in row hold placeholders, see [SeedBuiltInWallpapersCallback].
      */
     @ColumnInfo(name = "built_in") val builtIn: String? = null,
+    /** Set for a group only: how long each of its members shows ([com.onthecrow.wallper.core.model.SlideDuration]); since v6. */
+    @ColumnInfo(name = "slide_duration_ms") val slideDurationMs: Long? = null,
 )
 
 /** The files of the row in device-protected storage. Empty paths are placeholders: a built-in's, a picture's thumbnail. */

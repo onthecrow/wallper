@@ -8,9 +8,16 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import com.onthecrow.wallper.core.designsystem.R
 
-/** Deleting a wallpaper can't be undone: its files go with it. The list and the storage screen ask alike. */
+/**
+ * Deleting a wallpaper can't be undone: its files go with it. The list and the storage screen ask alike.
+ * [text] says what goes; by default, the wallpaper's copy of the media.
+ */
 @Composable
-fun DeleteWallpaperDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
+fun DeleteWallpaperDialog(
+    onConfirm: () -> Unit,
+    onDismiss: () -> Unit,
+    text: String = stringResource(R.string.delete_wallpaper_text),
+) {
     AlertDialog(
         onDismissRequest = onDismiss,
         confirmButton = {
@@ -24,7 +31,7 @@ fun DeleteWallpaperDialog(onConfirm: () -> Unit, onDismiss: () -> Unit) {
             }
         },
         title = { Text(text = stringResource(R.string.delete_wallpaper_title)) },
-        text = { Text(text = stringResource(R.string.delete_wallpaper_text)) },
+        text = { Text(text = text) },
     )
 }
 

@@ -8,6 +8,14 @@ internal sealed interface WallpapersEvent : Event {
     // User actions
     data class OnWallpaperClick(val id: Int) : WallpapersEvent
     data class OnEditClick(val id: Int) : WallpapersEvent
+    /** A group's edit: its members. */
+    data class OnGroupEditClick(val id: Int) : WallpapersEvent
+    /** The «+»: asks what to add. */
+    data object OnAddClick : WallpapersEvent
+    data object OnAddDismiss : WallpapersEvent
+    /** One wallpaper from the gallery: the screen opens the picker. */
+    data object OnAddMediaClick : WallpapersEvent
+    data object OnAddSeriesClick : WallpapersEvent
     /** Asks first: the wallpaper's files go with it. */
     data class OnDeleteClick(val id: Int) : WallpapersEvent
     data class OnDeleteConfirm(val id: Int) : WallpapersEvent
@@ -19,7 +27,9 @@ internal sealed interface WallpapersEvent : Event {
     // Internal events
     data class OnWallpapersChanged(val items: List<WallpaperItem>) : WallpapersEvent
     data class OnWallpapersLoadFailed(val message: String) : WallpapersEvent
-    data class OnBuiltInPreviewLoaded(val wallpaper: BuiltInWallpaper, val path: String) : WallpapersEvent
+    /** [path] is null for a built-in this device can't render: none will come. */
+    data class OnBuiltInPreviewLoaded(val wallpaper: BuiltInWallpaper, val path: String?) : WallpapersEvent
+    data class OnSeriesPictureMade(val groupId: Int, val path: String) : WallpapersEvent
 
     // One-off effects, handled by the screen
     data object OnUnsupportedMediaPicked : WallpapersEvent

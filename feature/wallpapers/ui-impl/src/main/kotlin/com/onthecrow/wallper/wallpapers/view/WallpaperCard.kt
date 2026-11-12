@@ -1,10 +1,11 @@
 package com.onthecrow.wallper.wallpapers.view
 
 import androidx.annotation.StringRes
-import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -24,6 +25,7 @@ import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -41,11 +43,14 @@ import com.onthecrow.wallper.wallpapers.ui.R
 import kotlin.math.roundToInt
 
 /**
- * A wallpaper of the list; a tap makes it the active one. Over its picture: whether it is active (top
- * left), its actions (top right) and what it is (bottom right).
+ * A wallpaper of the list; a tap makes it the active one. Over its picture: a mark if it is the active one
+ * (top left), its actions (top right) and what it is (bottom right).
  *
- * @param onEditClick the editor for media that keeps its original, the settings of a built-in.
- * @param onDeleteClick the user's media only: built-ins stay.
+ * With [selected] it is a choice instead (a group's members): no actions and no active mark; a tap
+ * toggles it, and a chosen one is tinted in the accent colour with a check in the middle.
+ *
+ * @param onEditClick the editor for media that keeps its original, a group's members, the settings of a built-in.
+ * @param onDeleteClick the user's media and groups only: built-ins stay.
  */
 @Composable
 internal fun WallpaperCard(
@@ -54,6 +59,7 @@ internal fun WallpaperCard(
     onEditClick: () -> Unit,
     onDeleteClick: () -> Unit,
     modifier: Modifier = Modifier,
+    selected: Boolean? = null,
 ) {
     val haptics = LocalHapticFeedback.current
     Card(
@@ -63,68 +69,83 @@ internal fun WallpaperCard(
         },
         modifier = modifier,
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .then(if (wallpaper.builtIn != null) Modifier.background(BuiltInPlaceholderColor) else Modifier),
-        ) {
-            // No picture while a built-in's preview is rendering: the placeholder background shows instead.
-            wallpaper.picturePath?.let { picturePath ->
-                AsyncImage(
-                    modifier = Modifier.fillMaxSize(),
-                    model = picturePath,
-                    contentScale = ContentScale.Crop,
-                    contentDescription = null,
+        Box(modifier = Modifier.fillMaxSize()) {
+            WallpaperPicture(wallpaper, Modifier.matchParentSize())
+            if (selected != null) {
+                SelectionMark(selected)
+            } else {
+                // Each element shades its corner behind it. The actions' shade reaches furthest: they come
+                // first, so that it falls on the picture only.
+                Row(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .cornerShade(Alignment.TopEnd),
+                ) {
+                    val iconColors = IconButtonDefaults.iconButtonColors(contentColor = ActionColor)
+                    // An optimised video keeps no original to edit.
+                    if (!wallpaper.isOptimised) {
+                        IconButton(onClick = onEditClick, colors = iconColors) {
+                            Icon(
+                                painter = painterResource(DesignR.drawable.ic_edit),
+                                contentDescription = stringResource(if (wallpaper.builtIn != null) R.string.settings else DesignR.string.edit),
+                            )
+                        }
+                    }
+                    if (wallpaper.builtIn == null) {
+                        IconButton(onClick = onDeleteClick, colors = iconColors) {
+                            Icon(painter = painterResource(DesignR.drawable.ic_delete), contentDescription = stringResource(DesignR.string.delete))
+                        }
+                    }
+                }
+                ActiveMark(
+                    isActive = wallpaper.isActive,
+                    modifier = Modifier.align(Alignment.TopStart),
                 )
             }
-            // Each element shades its corner behind it. The actions' shade reaches furthest: they come
-            // first, so that it falls on the picture only.
-            Row(
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .cornerShade(Alignment.TopEnd),
-            ) {
-                val iconColors = IconButtonDefaults.iconButtonColors(contentColor = ActionColor)
-                // An optimised video keeps no original to edit.
-                if (!wallpaper.isOptimised) {
-                    IconButton(onClick = onEditClick, colors = iconColors) {
-                        Icon(
-                            painter = painterResource(DesignR.drawable.ic_edit),
-                            contentDescription = stringResource(if (wallpaper.builtIn != null) R.string.settings else DesignR.string.edit),
-                        )
-                    }
-                }
-                if (wallpaper.builtIn == null) {
-                    IconButton(onClick = onDeleteClick, colors = iconColors) {
-                        Icon(painter = painterResource(DesignR.drawable.ic_delete), contentDescription = stringResource(DesignR.string.delete))
-                    }
-                }
-            }
-            ActiveIndicator(
-                isActive = wallpaper.isActive,
-                modifier = Modifier
-                    .align(Alignment.TopStart)
-                    .cornerShade(Alignment.TopStart)
-                    .padding(12.dp),
-            )
-            WallpaperLabel(
-                text = stringResource(wallpaper.labelRes()),
-                isOutlined = wallpaper.isOptimised,
-                modifier = Modifier
-                    .align(Alignment.BottomEnd)
-                    .cornerShade(Alignment.BottomEnd)
-                    .padding(8.dp),
-            )
+            KindLabel(wallpaper)
         }
     }
 }
 
 /**
+ * The wallpaper's picture, scaled to fill and cut evenly on the sides that don't fit. Until a built-in's
+ * preview or a series' picture is made there is no picture, only the colour behind it.
+ */
+@Composable
+internal fun WallpaperPicture(wallpaper: WallpaperItem, modifier: Modifier = Modifier) {
+    Box(modifier = modifier.then(if (wallpaper.isPictureMade) Modifier.background(BuiltInPlaceholderColor) else Modifier)) {
+        wallpaper.picturePath?.let { picturePath ->
+            AsyncImage(
+                modifier = Modifier.fillMaxSize(),
+                model = picturePath,
+                contentScale = ContentScale.Crop,
+                contentDescription = null,
+            )
+        }
+    }
+}
+
+/** What the wallpaper is ([labelRes]), bottom right of a card or a row, over the corner's shade. */
+@Composable
+internal fun BoxScope.KindLabel(wallpaper: WallpaperItem) {
+    WallpaperLabel(
+        text = stringResource(wallpaper.labelRes()),
+        isOutlined = wallpaper.isOptimised,
+        modifier = Modifier
+            .align(Alignment.BottomEnd)
+            .cornerShade(Alignment.BottomEnd)
+            .padding(8.dp),
+    )
+}
+
+/**
  * Shades the card's corner behind an element aligned there with [alignment], so that light content stays
  * readable on a bright picture: an elliptic gradient from the corner, [ShadeSpread] times the element's
- * size with its padding.
+ * size with its padding, drawn at [alpha].
  */
-private fun Modifier.cornerShade(alignment: Alignment): Modifier = drawBehind {
+private fun Modifier.cornerShade(alignment: Alignment, alpha: () -> Float = { 1f }): Modifier = drawBehind {
+    val shadeAlpha = alpha()
+    if (shadeAlpha <= 0f) return@drawBehind
     val corner = alignment.align(IntSize.Zero, IntSize(size.width.roundToInt(), size.height.roundToInt()), layoutDirection)
         .toOffset()
     val radiusX = size.width * ShadeSpread
@@ -135,29 +156,72 @@ private fun Modifier.cornerShade(alignment: Alignment): Modifier = drawBehind {
             brush = Brush.radialGradient(*ShadeStops, center = corner, radius = radiusX),
             radius = radiusX,
             center = corner,
+            alpha = shadeAlpha,
         )
     }
 }
 
+/** A chosen card: the accent colour over the picture and a check in the middle; both fade in and out. */
 @Composable
-private fun ActiveIndicator(isActive: Boolean, modifier: Modifier = Modifier) {
-    val color by animateColorAsState(
-        targetValue = if (isActive) ActiveColor else InactiveColor,
-        label = "active indicator",
+private fun BoxScope.SelectionMark(selected: Boolean) {
+    val alpha by animateFloatAsState(targetValue = if (selected) 1f else 0f, label = "selection")
+    Box(
+        modifier = Modifier
+            .matchParentSize()
+            .graphicsLayer { this.alpha = alpha }
+            .background(MaterialTheme.colorScheme.primary.copy(alpha = SelectionTintAlpha)),
     )
     Icon(
-        painter = painterResource(if (isActive) R.drawable.ic_radio_checked else R.drawable.ic_radio_unchecked),
-        contentDescription = if (isActive) stringResource(R.string.active_wallpaper) else null,
-        modifier = modifier.size(24.dp),
-        tint = color,
+        painter = painterResource(R.drawable.ic_check),
+        contentDescription = if (selected) stringResource(R.string.group_picked) else null,
+        modifier = Modifier
+            .align(Alignment.Center)
+            .graphicsLayer {
+                this.alpha = alpha
+                scaleX = 0.6f + 0.4f * alpha
+                scaleY = 0.6f + 0.4f * alpha
+            }
+            .size(56.dp)
+            .background(MaterialTheme.colorScheme.primary, CircleShape)
+            .padding(12.dp),
+        tint = MaterialTheme.colorScheme.onPrimary,
     )
 }
 
-/** What the wallpaper is: a built-in's kind, or how the user's media is kept, as it was or optimised. */
+/**
+ * Only the active wallpaper is marked; the mark and its corner's shade come and go together. The shade fades
+ * as it draws, not in a layer: a translucent layer would cut it off at the mark's bounds, a dark square.
+ */
+@Composable
+private fun ActiveMark(isActive: Boolean, modifier: Modifier = Modifier) {
+    val shown by animateFloatAsState(targetValue = if (isActive) 1f else 0f, label = "active mark")
+    Box(
+        modifier = modifier
+            .cornerShade(Alignment.TopStart, alpha = { shown })
+            .padding(12.dp),
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.ic_radio_checked),
+            contentDescription = if (isActive) stringResource(R.string.active_wallpaper) else null,
+            modifier = Modifier
+                .size(24.dp)
+                .graphicsLayer {
+                    alpha = shown
+                    scaleX = 0.6f + 0.4f * shown
+                    scaleY = 0.6f + 0.4f * shown
+                },
+            tint = ActiveColor,
+        )
+    }
+}
+
+/** What the wallpaper is: a group, a built-in's kind, or how the user's media is kept, as it was or optimised. */
 @StringRes
-private fun WallpaperItem.labelRes(): Int = when (builtIn) {
-    BuiltInWallpaper.BLACK_HOLE -> R.string.animation_3d
-    null -> if (isOptimised) R.string.optimised else R.string.original
+private fun WallpaperItem.labelRes(): Int = when {
+    isGroup -> R.string.series
+    builtIn == BuiltInWallpaper.BLACK_HOLE -> R.string.animation_3d
+    isOptimised -> R.string.optimised
+    else -> R.string.original
 }
 
 /**
@@ -186,14 +250,16 @@ private fun WallpaperLabel(text: String, isOutlined: Boolean, modifier: Modifier
 private val BuiltInPlaceholderColor = Color(0xFF050507)
 
 /**
- * Material palette, muted: green 300 for the active wallpaper, grey 400 for the others and the actions,
+ * Material palette, muted: green 300 for the active wallpaper's mark, grey 400 for the actions,
  * grey 100 for the label and grey 900 for the text on the filled one.
  */
 private val ActiveColor = Color(0xFF81C784)
-private val InactiveColor = Color(0xFFBDBDBD)
-private val ActionColor = InactiveColor
+private val ActionColor = Color(0xFFBDBDBD)
 private val LabelColor = Color(0xFFF5F5F5)
 private val LabelOnFilledColor = Color(0xFF212121)
+
+/** How much of the accent colour covers a chosen card. */
+private const val SelectionTintAlpha = 0.45f
 
 /** How far a corner's shade reaches, in sizes of the element there, and how it fades. */
 private const val ShadeSpread = 2f
@@ -211,6 +277,18 @@ private fun WallpaperCardPreview() {
         onClick = {},
         onEditClick = {},
         onDeleteClick = {},
+    )
+}
+
+@Preview(widthDp = 200, heightDp = 200)
+@Composable
+private fun SelectedWallpaperCardPreview() {
+    WallpaperCard(
+        wallpaper = WallpaperItem(0, null, isActive = false),
+        onClick = {},
+        onEditClick = {},
+        onDeleteClick = {},
+        selected = true,
     )
 }
 

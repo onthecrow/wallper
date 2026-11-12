@@ -7,17 +7,24 @@ import com.onthecrow.wallper.wallpapers.ActiveWallpaperSourceImpl
 import com.onthecrow.wallper.wallpapers.AddWallpaperUseCaseImpl
 import com.onthecrow.wallper.wallpapers.DeleteWallpaperUseCaseImpl
 import com.onthecrow.wallper.wallpapers.GetWallpaperUseCaseImpl
+import com.onthecrow.wallper.wallpapers.MakeSeriesPictureUseCaseImpl
 import com.onthecrow.wallper.wallpapers.ObserveWallpaperStorageUseCaseImpl
 import com.onthecrow.wallper.wallpapers.ObserveWallpapersUseCaseImpl
+import com.onthecrow.wallper.wallpapers.SaveWallpaperGroupUseCaseImpl
+import com.onthecrow.wallper.wallpapers.SwipeHintMemoryImpl
 import com.onthecrow.wallper.wallpapers.UpdateWallpaperUseCaseImpl
 import com.onthecrow.wallper.wallpapers.data.database.WallpaperDao
 import com.onthecrow.wallper.wallpapers.data.database.WallpapersDatabase
+import com.onthecrow.wallper.wallpapers.series.SeriesPictures
 import com.onthecrow.wallper.wallpapers.domain.ActivateWallpaperUseCase
 import com.onthecrow.wallper.wallpapers.domain.AddWallpaperUseCase
 import com.onthecrow.wallper.wallpapers.domain.DeleteWallpaperUseCase
 import com.onthecrow.wallper.wallpapers.domain.GetWallpaperUseCase
+import com.onthecrow.wallper.wallpapers.domain.MakeSeriesPictureUseCase
 import com.onthecrow.wallper.wallpapers.domain.ObserveWallpaperStorageUseCase
 import com.onthecrow.wallper.wallpapers.domain.ObserveWallpapersUseCase
+import com.onthecrow.wallper.wallpapers.domain.SaveWallpaperGroupUseCase
+import com.onthecrow.wallper.wallpapers.domain.SwipeHintMemory
 import com.onthecrow.wallper.wallpapers.domain.UpdateWallpaperUseCase
 import dagger.Binds
 import dagger.Module
@@ -25,6 +32,7 @@ import dagger.Provides
 import dagger.hilt.InstallIn
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import java.io.File
 import javax.inject.Singleton
 
 @Module
@@ -53,7 +61,16 @@ internal abstract class WallpapersLogicModule {
     abstract fun bindObserveWallpaperStorage(impl: ObserveWallpaperStorageUseCaseImpl): ObserveWallpaperStorageUseCase
 
     @Binds
+    abstract fun bindSaveWallpaperGroup(impl: SaveWallpaperGroupUseCaseImpl): SaveWallpaperGroupUseCase
+
+    @Binds
     abstract fun bindActiveWallpaperSource(impl: ActiveWallpaperSourceImpl): ActiveWallpaperSource
+
+    @Binds
+    abstract fun bindMakeSeriesPicture(impl: MakeSeriesPictureUseCaseImpl): MakeSeriesPictureUseCase
+
+    @Binds
+    abstract fun bindSwipeHintMemory(impl: SwipeHintMemoryImpl): SwipeHintMemory
 
     companion object {
 
@@ -65,5 +82,11 @@ internal abstract class WallpapersLogicModule {
 
         @Provides
         fun provideWallpaperDao(database: WallpapersDatabase): WallpaperDao = database.wallpaperDao()
+
+        /** Beside the black hole's previews, in device-protected storage like everything the list shows. */
+        @Provides
+        @Singleton
+        fun provideSeriesPictures(@ApplicationContext context: Context): SeriesPictures =
+            SeriesPictures(File(context.createDeviceProtectedStorageContext().filesDir, "previews/series"))
     }
 }

@@ -25,5 +25,6 @@ dependencies {
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.hilt.lifecycle.viewmodel.compose)
     implementation(libs.coil)
+    implementation(libs.timber)
     testImplementation(libs.kotlinx.coroutines.test)
 }
