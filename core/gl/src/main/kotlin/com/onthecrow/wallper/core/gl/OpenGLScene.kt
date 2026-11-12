@@ -45,8 +45,8 @@ internal class OpenGLScene(
         }
     """.trimIndent()
 
-    private val uvCoords = UVCoords.fromRect(mediaInfo.displayWidth, mediaInfo.displayHeight, rect)
-    private val verticesData = getVerticesData(uvCoords)
+    private val verticesData = getVerticesData(UVCoords.fromRect(mediaInfo.displayWidth, mediaInfo.displayHeight, rect))
+    private val pageScroll = PageScroll(mediaInfo.displayWidth, mediaInfo.displayHeight, rect)
 
     init {
         GLES20.glViewport(0, 0, sceneWidth, sceneHeight)
@@ -111,8 +111,8 @@ internal class OpenGLScene(
         GLES20.glUseProgram(programId)
         checkGlError("glUseProgram")
 
-        val shiftU = pageOffset?.let { PageScroll.shiftU(uvCoords.topLeft.u, uvCoords.topRight.u, it) } ?: 0f
-        GLES20.glUniform2f(uUvShiftHandle, shiftU, 0f)
+        val shift = pageOffset?.let(pageScroll::shift)
+        GLES20.glUniform2f(uUvShiftHandle, shift?.u ?: 0f, shift?.v ?: 0f)
 
         texture.draw(
             aPositionHandle = aPositionHandle,

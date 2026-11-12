@@ -3,6 +3,7 @@
 package com.onthecrow.wallper.editor
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -16,9 +17,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -28,6 +29,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
@@ -38,14 +40,13 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
@@ -56,20 +57,20 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.window.layout.WindowMetricsCalculator
 import com.onthecrow.wallper.core.designsystem.component.trimbar.TrimBar
 import com.onthecrow.wallper.core.model.ClipRange
-import com.onthecrow.wallper.core.model.CropRect
 import com.onthecrow.wallper.core.model.MediaType
-import com.onthecrow.wallper.editor.cropper.ImageCropper
-import com.onthecrow.wallper.editor.cropper.settings.CropDefaults
+import com.onthecrow.wallper.editor.crop.CropEditor
+import com.onthecrow.wallper.editor.crop.rememberCropState
 import com.onthecrow.wallper.editor.domain.model.ExportStatus
 import com.onthecrow.wallper.editor.preview.EditorPlayer
+import com.onthecrow.wallper.editor.preview.PictureImage
 import com.onthecrow.wallper.editor.preview.PlaybackEffect
+import com.onthecrow.wallper.editor.preview.VideoSurface
 import com.onthecrow.wallper.editor.preview.rememberEditorPlayer
 import com.onthecrow.wallper.editor.preview.rememberVideoFrames
 import com.onthecrow.wallper.editor.ui.R
 import com.onthecrow.wallper.editor.view.ErrorDialog
 import com.onthecrow.wallper.editor.view.OptimisedToggle
 import com.onthecrow.wallper.editor.view.ProcessingInfoDialog
-import timber.log.Timber
 
 @Composable
 internal fun EditorScreen(
@@ -78,6 +79,7 @@ internal fun EditorScreen(
     modifier: Modifier = Modifier,
 ) {
     val screenAspectRatio = rememberScreenAspectRatio()
+    val scope = rememberCoroutineScope()
 
     Scaffold(modifier = modifier) {
         Box {
@@ -90,10 +92,17 @@ internal fun EditorScreen(
                     ),
                 verticalArrangement = Arrangement.Bottom,
             ) {
-                val rect = remember { mutableStateOf(Rect(0f, 0f, 0f, 0f)) }
                 val media = state.media
+                // The preview shows the media upright, so the crop works in those pixels too.
+                val cropState = media?.let {
+                    rememberCropState(
+                        mediaSize = IntSize(it.mediaInfo.displayWidth, it.mediaInfo.displayHeight),
+                        screenAspectRatio = screenAspectRatio,
+                        initialCrop = it.edited?.crop,
+                    )
+                }
 
-                if (media != null) {
+                if (media != null && cropState != null) {
                     // A picture has nothing to play or trim.
                     val player = if (media.type == MediaType.VIDEO) {
                         rememberEditorPlayer(media.path, onError = { onEvent(EditorEvent.OnPreviewFailed(it)) })
@@ -113,60 +122,57 @@ internal fun EditorScreen(
                         )
                     }
 
-                    // The preview shows the video rotated upright, so the crop works in those pixels too.
-                    val videoSize = IntSize(media.mediaInfo.displayWidth, media.mediaInfo.displayHeight)
-                    val videoAspectRatio = videoSize.width.toFloat() / videoSize.height.toFloat()
+                    CropEditor(
+                        state = cropState,
+                        onSnap = { onEvent(EditorEvent.OnCropSnapped) },
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth(),
+                    ) {
+                        if (player != null) {
+                            VideoSurface(player, Modifier.fillMaxSize())
+                        } else {
+                            PictureImage(media.path, Modifier.fillMaxSize())
+                        }
+                    }
+
+                    // The reset button sits on the right of the playback buttons; a picture has only the button.
                     Box(
                         modifier = Modifier
-                            .padding(32.dp)
-                            .weight(1f)
-                            .aspectRatio(videoAspectRatio)
-                            .align(Alignment.CenterHorizontally)
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp)
+                            .heightIn(min = 48.dp),
                     ) {
-
-                        val handleSize: Float = LocalDensity.current.run { 20.dp.toPx() }
-
-                        val cropProperties by remember {
-                            mutableStateOf(
-                                CropDefaults.properties(
-                                    overlayRatio = 1f,
-                                    aspectRatio = screenAspectRatio,
-                                    fixedAspectRatio = true,
-                                    handleSize = handleSize
-                                )
+                        if (player != null) {
+                            val durationMs = media.mediaInfo.durationMs
+                            PlaybackControls(
+                                player = player,
+                                // Without a known length there is nothing to trim.
+                                trim = state.trim.takeIf { durationMs > 0 },
+                                isPlaying = state.isPlaying,
+                                onPlayPauseClick = { onEvent(EditorEvent.OnPlayPauseClick) },
+                                onSetTrimStartClick = { onEvent(EditorEvent.OnSetTrimStartClick(player.positionMs)) },
+                                onSetTrimEndClick = { onEvent(EditorEvent.OnSetTrimEndClick(player.positionMs)) },
+                                modifier = Modifier.align(Alignment.Center),
                             )
                         }
-                        val cropStyle by remember { mutableStateOf(CropDefaults.style()) }
-
-                        ImageCropper(
-                            modifier = Modifier
-                                .fillMaxSize(),
-                            player = player,
-                            videoSize = videoSize,
-                            initialCropRect = media.edited?.crop?.toRect(),
-                            cropStyle = cropStyle,
-                            cropProperties = cropProperties,
-                            cropRect = { cropRect ->
-                                Timber.d("cropRect: $cropRect")
-                                rect.value = cropRect
+                        ResetButton(
+                            visible = state.hasEdits || cropState.isChanged,
+                            onClick = {
+                                cropState.reset(scope)
+                                onEvent(EditorEvent.OnResetClick)
                             },
+                            modifier = Modifier
+                                .align(Alignment.CenterEnd)
+                                .padding(end = 16.dp),
                         )
                     }
 
                     if (player != null) {
                         val durationMs = media.mediaInfo.durationMs
-                        PlaybackControls(
-                            player = player,
-                            // Without a known length there is nothing to trim.
-                            trim = state.trim.takeIf { durationMs > 0 },
-                            isPlaying = state.isPlaying,
-                            onPlayPauseClick = { onEvent(EditorEvent.OnPlayPauseClick) },
-                            onSetTrimStartClick = { onEvent(EditorEvent.OnSetTrimStartClick(player.positionMs)) },
-                            onSetTrimEndClick = { onEvent(EditorEvent.OnSetTrimEndClick(player.positionMs)) },
-                            modifier = Modifier.padding(bottom = 12.dp),
-                        )
                         // Without a known length there is nothing to trim: the export keeps the whole video.
                         if (durationMs > 0) {
+                            val videoAspectRatio = media.mediaInfo.displayWidth.toFloat() / media.mediaInfo.displayHeight
                             val frames = rememberVideoFrames(media.path, durationMs, videoAspectRatio, paused = isExporting)
                             TrimBar(
                                 durationMs = durationMs,
@@ -207,7 +213,7 @@ internal fun EditorScreen(
                             onInfoClick = { onEvent(EditorEvent.OnProcessingInfoClick) },
                         )
                     }
-                    Button(onClick = { onEvent(EditorEvent.OnSaveClick(rect.value.toCropRect())) }) {
+                    Button(onClick = { cropState?.let { onEvent(EditorEvent.OnSaveClick(it.crop())) } }) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Image(
                                 painter = painterResource(id = R.drawable.ic_save_outline),
@@ -300,6 +306,24 @@ private fun PlaybackControls(
     }
 }
 
+/** Undoes every change: crop, trim and the original / optimised choice. Appears once there is one. */
+@Composable
+private fun ResetButton(visible: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    AnimatedVisibility(
+        visible = visible,
+        modifier = modifier,
+        enter = fadeIn() + scaleIn(initialScale = 0.5f),
+        exit = fadeOut() + scaleOut(targetScale = 0.5f),
+    ) {
+        IconButton(onClick = onClick) {
+            Icon(
+                painter = painterResource(R.drawable.ic_reset),
+                contentDescription = stringResource(R.string.editor_reset),
+            )
+        }
+    }
+}
+
 /** Fades between its enabled and disabled colours instead of switching. */
 @Composable
 private fun SetTrimBoundaryButton(
@@ -368,10 +392,6 @@ private fun rememberScreenAspectRatio(): Float {
         bounds.width().toFloat() / bounds.height().toFloat()
     }
 }
-
-private fun Rect.toCropRect() = CropRect(left.toInt(), top.toInt(), right.toInt(), bottom.toInt())
-
-private fun CropRect.toRect() = Rect(left.toFloat(), top.toFloat(), right.toFloat(), bottom.toFloat())
 
 @Preview
 @Composable

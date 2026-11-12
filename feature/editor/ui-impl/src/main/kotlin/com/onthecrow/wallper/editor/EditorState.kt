@@ -29,7 +29,14 @@ internal data class EditorState(
     /** The save under way, from its start until it fails; the editor closes once it succeeds. */
     val save: SaveRequest? = null,
     val exportStatus: ExportStatus? = null,
-) : State
+) : State {
+    /** Whether the trim or the original / optimised choice differs from what the editor opened with. */
+    val hasEdits: Boolean get() = media != null && (trim != media.initialTrim || isOptimised)
+}
+
+/** A new wallpaper keeps the whole video until the user moves a handle; an edited one starts from its trim. */
+internal val PreparedMedia.initialTrim: ClipRange
+    get() = edited?.clip ?: ClipRange(startMs = 0, endMs = mediaInfo.durationMs)
 
 /**
  * The trim with its start moved in to [positionMs]; null unless the playhead is inside the kept part, past its

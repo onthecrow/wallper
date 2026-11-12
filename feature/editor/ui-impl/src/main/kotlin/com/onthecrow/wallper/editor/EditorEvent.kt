@@ -22,6 +22,10 @@ internal sealed interface EditorEvent : Event {
     /** Back or a tap outside the explanation: a switch to optimised that waits for it doesn't happen. */
     data object OnProcessingInfoDismiss : EditorEvent
     data object OnErrorDismiss : EditorEvent
+    /** Back to the trim and the choice the editor opened with; the crop resets itself in the screen. */
+    data object OnResetClick : EditorEvent
+    /** The picture snapped level, or its centre to the frame's middle: a tick. */
+    data object OnCropSnapped : EditorEvent
 
     // Internal events
     data class OnProcessingInfoSeenLoaded(val isSeen: Boolean) : EditorEvent
