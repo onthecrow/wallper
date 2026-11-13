@@ -3,6 +3,7 @@ package com.onthecrow.wallper.core.designsystem.theme
 import android.app.Activity
 import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.ColorScheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.dynamicDarkColorScheme
@@ -37,31 +38,29 @@ private val LightColorScheme = lightColorScheme(
     */
 )
 
+/**
+ * @param systemBarsDarkTheme the theme of the system bars; the outgoing one while a [ThemeRevealHost] still
+ * covers part of the screen with it.
+ */
 @Composable
 fun WallperTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     // Dynamic color is available on Android 12+
     dynamicColor: Boolean = true,
+    systemBarsDarkTheme: Boolean = darkTheme,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = when {
-        dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
-            val context = LocalContext.current
-            if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
-        }
-
-        darkTheme -> DarkColorScheme
-        else -> LightColorScheme
-    }
+    val colorScheme = colorScheme(darkTheme, dynamicColor)
+    val barsColorScheme = if (systemBarsDarkTheme == darkTheme) colorScheme else colorScheme(systemBarsDarkTheme, dynamicColor)
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
             with ((view.context as Activity).window) {
-                statusBarColor = colorScheme.background.toArgb()
-                navigationBarColor = colorScheme.background.toArgb()
+                statusBarColor = barsColorScheme.background.toArgb()
+                navigationBarColor = barsColorScheme.background.toArgb()
                 with (WindowCompat.getInsetsController(this, view)) {
-                    isAppearanceLightStatusBars = !darkTheme
-                    isAppearanceLightNavigationBars = !darkTheme
+                    isAppearanceLightStatusBars = !systemBarsDarkTheme
+                    isAppearanceLightNavigationBars = !systemBarsDarkTheme
                 }
             }
         }
@@ -72,4 +71,15 @@ fun WallperTheme(
         typography = Typography,
         content = content
     )
+}
+
+@Composable
+private fun colorScheme(darkTheme: Boolean, dynamicColor: Boolean): ColorScheme = when {
+    dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
+        val context = LocalContext.current
+        if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+    }
+
+    darkTheme -> DarkColorScheme
+    else -> LightColorScheme
 }
