@@ -7,6 +7,7 @@ import android.text.format.Formatter
 import android.widget.Toast
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -54,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.app.ShareCompat
 import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import com.onthecrow.wallper.core.designsystem.theme.LocalThemeRevealState
 import com.onthecrow.wallper.core.model.VideoPlayback
 import com.onthecrow.wallper.settings.domain.AppSettings
 import com.onthecrow.wallper.settings.domain.ThemeMode
@@ -160,6 +162,8 @@ internal fun SettingsScreen(
         }
     }
 
+    val themeReveal = LocalThemeRevealState.current
+    val isSystemInDarkTheme = isSystemInDarkTheme()
     when (state.dialog) {
         SettingsDialog.PLAYBACK -> ChoiceDialog(
             title = stringResource(R.string.settings_playback),
@@ -167,7 +171,7 @@ internal fun SettingsScreen(
             selected = state.settings.videoPlayback,
             label = { stringResource(it.labelRes) },
             description = { stringResource(it.descriptionRes) },
-            onSelect = { onEvent(SettingsEvent.OnPlaybackSelect(it)) },
+            onSelect = { playback, _ -> onEvent(SettingsEvent.OnPlaybackSelect(playback)) },
             onDismiss = { onEvent(SettingsEvent.OnDialogDismiss) },
         )
         SettingsDialog.THEME -> ChoiceDialog(
@@ -176,7 +180,16 @@ internal fun SettingsScreen(
             selected = state.settings.theme,
             label = { stringResource(it.labelRes) },
             description = { null },
-            onSelect = { onEvent(SettingsEvent.OnThemeSelect(it)) },
+            onSelect = { theme, pressOnScreen ->
+                // The same event closes the dialog and stores the theme (synchronously): the dialog is gone in
+                // the frame that brings the new theme, and isn't redrawn in it on its way out.
+                themeReveal.reveal(
+                    originOnScreen = pressOnScreen,
+                    toDarkTheme = theme.isDark(isSystemInDarkTheme),
+                ) {
+                    onEvent(SettingsEvent.OnThemeSelect(theme))
+                }
+            },
             onDismiss = { onEvent(SettingsEvent.OnDialogDismiss) },
         )
         null -> Unit
