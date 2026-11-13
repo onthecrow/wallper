@@ -51,5 +51,12 @@ data class AppSettings(
 enum class ThemeMode {
     SYSTEM,
     LIGHT,
-    DARK,
+    DARK;
+
+    /** Whether the app is dark in this mode while the system's theme is dark or not. */
+    fun isDark(isSystemInDarkTheme: Boolean): Boolean = when (this) {
+        SYSTEM -> isSystemInDarkTheme
+        LIGHT -> false
+        DARK -> true
+    }
 }
