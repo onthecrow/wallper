@@ -11,6 +11,7 @@ import android.os.SystemClock
 import android.view.SurfaceHolder
 import com.onthecrow.wallper.core.diagnostics.Diagnostics
 import com.onthecrow.wallper.core.gl.guard.RenderGuard
+import com.onthecrow.wallper.core.gl.guard.RenderStall
 import com.onthecrow.wallper.core.gl.guard.RenderRepairs
 import timber.log.Timber
 
@@ -23,17 +24,29 @@ import timber.log.Timber
  * [lastLoopAtMs] (in [nowMs] time, elapsedRealtime by default) lets the owner notice a thread that hangs
  * inside a driver call, which no in-thread check can.
  *
+ * A thread may start before it has the window ([prepareOffWindow]): it then renders into a pbuffer, so
+ * that everything is made and the first picture drawn by the time the window comes; the same context
+ * moves onto it.
+ *
  * @param glesVersion 2 or 3. If the device can't create such a context, [onInitFailed] is called and the
  * thread ends.
+ * @param gated a frame is shown only once the renderer has its picture ([GLWallpaperRenderer.hasPicture]):
+ * until then the window keeps whatever was there, the wallpaper before this one. A gated thread that
+ * can't get the window while no frames are expected tells [renderGuardListener] at once: nobody else would
+ * notice.
+ * @param onFirstPicture called once, on this thread, after the first frame with the picture: shown, or
+ * drawn off the window.
  */
 class WallpaperGLThread(
     private val surfaceHolder: SurfaceHolder,
     private val renderer: GLWallpaperRenderer,
     private val continuous: Boolean = false,
-    renderGuardListener: RenderGuard.Listener? = null,
+    private val renderGuardListener: RenderGuard.Listener? = null,
     private val nowMs: () -> Long = SystemClock::elapsedRealtime,
     private val glesVersion: Int = 2,
     private val onInitFailed: ((Throwable) -> Unit)? = null,
+    private val gated: Boolean = false,
+    private val onFirstPicture: (() -> Unit)? = null,
 ) : Thread("WallpaperGLThread") {
 
     @Volatile
@@ -54,11 +67,18 @@ class WallpaperGLThread(
     @Volatile
     private var renderRequested = false
 
+    /** Before the window: frames go to a pbuffer and none is shown. */
+    @Volatile
+    private var offWindow = false
+
     private val lock = Object()
 
     // Guarded by lock
     private val tasks = ArrayDeque<() -> Unit>()
     private var framesExpected = false
+
+    /** The next frame is shown even while paused. */
+    private var presentRequested = false
 
     /** When the render loop last ran. Stops moving if the thread hangs or dies. */
     @Volatile
@@ -82,6 +102,18 @@ class WallpaperGLThread(
     /** Creating the EGL surface failed; don't retry in a loop, wait for a repair. */
     private var surfaceBroken = false
 
+    /** The EGL surface is the window's, not the pbuffer a thread prepares on. */
+    private var onWindowSurface = false
+
+    /** No config with pbuffers, or making one failed: the thread waits for the window instead. */
+    private var pbufferBroken = false
+    private var configHasPbuffers = false
+
+    /** The render guard hears of failures now: frames are expected. */
+    private var guardArmed = false
+
+    private var firstPictureReported = false
+
     /**
      * Frames swapped to the window so far. The owner's heartbeat gives the first frame after a shader
      * (re)compilation more time: it counts the frames presented since then.
@@ -100,6 +132,7 @@ class WallpaperGLThread(
     fun onSurfaceCreatedOrChanged(width: Int, height: Int) {
         synchronized(lock) {
             hasSurface = true
+            offWindow = false
             surfaceWidth = width
             surfaceHeight = height
             pendingSizeChange = true
@@ -125,6 +158,34 @@ class WallpaperGLThread(
                 }
                 lock.wait(remaining)
             }
+        }
+    }
+
+    /**
+     * Before the engine has the window: the thread draws [width] x [height] frames into a pbuffer and shows
+     * none, until [onSurfaceCreatedOrChanged] brings the window. A frame asked for is drawn even while
+     * paused: nothing of it is seen. Call it before the thread starts, so that it picks a config with
+     * pbuffers; a device without one just waits for the window.
+     */
+    fun prepareOffWindow(width: Int, height: Int) {
+        synchronized(lock) {
+            offWindow = true
+            surfaceWidth = width
+            surfaceHeight = height
+            pendingSizeChange = true
+            renderRequested = true
+            lock.notifyAll()
+        }
+    }
+
+    /**
+     * The next frame asked for is shown even while paused: a wallpaper that gets the window while hidden
+     * still puts its picture there. It stays asked until a frame is really shown.
+     */
+    fun presentOnce() {
+        synchronized(lock) {
+            presentRequested = true
+            lock.notifyAll()
         }
     }
 
@@ -190,7 +251,10 @@ class WallpaperGLThread(
 
             while (true) {
                 val work = awaitWork() ?: break
-                if (work.needsSurface && !createEglSurface()) continue
+                if (work.newSurface != null) {
+                    if (work.newSurface == NewSurface.WINDOW) createEglSurface() else createPbufferSurface()
+                    continue
+                }
                 work.tasks.forEach { task ->
                     runCatching(task).onFailure { Timber.tag(TAG).e(it, "GL task failed") }
                 }
@@ -209,38 +273,49 @@ class WallpaperGLThread(
         }
     }
 
-    private class Work(val tasks: List<() -> Unit>, val draw: Boolean, val needsSurface: Boolean)
+    private enum class NewSurface { WINDOW, PBUFFER }
+
+    /** @param newSurface the EGL surface to make first; the tasks and the frame wait for the next turn then. */
+    private class Work(val tasks: List<() -> Unit>, val draw: Boolean, val newSurface: NewSurface? = null)
 
     /** Waits until there is something to do, or until the render guard or the heartbeat is due. */
     private fun awaitWork(): Work? {
         synchronized(lock) {
             while (running) {
                 lastLoopAtMs = nowMs()
-                val guardArmed = framesExpected && !paused && hasSurface
+                guardArmed = framesExpected && !paused && hasSurface
                 renderGuard?.setExpected(guardArmed)
 
-                if (!hasSurface && hasEglSurface()) {
+                if (!hasSurface && hasWindowSurface()) {
                     destroyEglSurface()
                     surfaceCreatedDelivered = false
                     lock.notifyAll() // onSurfaceDestroyed may be waiting for this
                 }
 
-                val canRender = hasSurface && surfaceWidth > 0 && surfaceHeight > 0 && !surfaceBroken
-                val needsSurface = canRender && !hasEglSurface()
-                val drawDue = canRender && !paused && (continuous || renderRequested)
+                val hasSize = surfaceWidth > 0 && surfaceHeight > 0
+                val onWindow = hasSurface && hasSize && !surfaceBroken
+                val onPbuffer = offWindow && !hasSurface && hasSize && !pbufferBroken
+                // Nothing is taken in the turn that makes the surface: if that fails, a task taken would be lost.
+                if (onWindow && !hasWindowSurface()) return Work(emptyList(), draw = false, NewSurface.WINDOW)
+                if (onPbuffer && !hasEglSurface()) return Work(emptyList(), draw = false, NewSurface.PBUFFER)
+
+                val canRender = onWindow || onPbuffer
+                // Off the window nothing is seen, so a pause holds no frame back.
+                val mayDraw = onPbuffer || !paused || presentRequested
+                val drawDue = canRender && mayDraw && (continuous || renderRequested)
                 val tasksDue = canRender && tasks.isNotEmpty()
-                if (needsSurface || drawDue || tasksDue) {
+                if (drawDue || tasksDue) {
                     // When dirty: this frame answers the request.
                     if (drawDue && !continuous) renderRequested = false
                     val drained = if (tasksDue) tasks.toList().also { tasks.clear() } else emptyList()
-                    return Work(drained, drawDue, needsSurface)
+                    return Work(drained, drawDue)
                 }
 
                 val guard = renderGuard
                 if (guard != null && guardArmed) {
                     // Wake up for the guard and the heartbeat even when nothing is drawn.
                     lock.wait(guard.nextCheckInMs().coerceAtMost(HEARTBEAT_MS))
-                    return Work(emptyList(), draw = false, needsSurface = false)
+                    return Work(emptyList(), draw = false)
                 }
                 lock.wait()
             }
@@ -268,6 +343,16 @@ class WallpaperGLThread(
 
             // One frame
             val isNewFrame = renderer.onDrawFrame()
+            val hasPicture = renderer.hasPicture
+
+            if (!onWindowSurface) {
+                // Nothing to show: only have the driver do now what the first frame on screen would wait for.
+                GLES20.glFinish()
+                if (hasPicture) reportFirstPicture()
+                return
+            }
+            // Without its picture the frame is empty: the window keeps what it shows.
+            if (gated && !hasPicture) return
 
             // Show it
             if (!EGL14.eglSwapBuffers(display, surface)) {
@@ -277,12 +362,20 @@ class WallpaperGLThread(
                 return
             }
             presentedFrames++
+            synchronized(lock) { presentRequested = false }
             if (isNewFrame) renderGuard?.onFramePresented()
+            if (hasPicture) reportFirstPicture()
         } catch (t: Throwable) {
             val guard = renderGuard ?: throw t
             Timber.tag(TAG).e(t, "Frame failed")
             guard.onDrawFailed()
         }
+    }
+
+    private fun reportFirstPicture() {
+        if (firstPictureReported) return
+        firstPictureReported = true
+        onFirstPicture?.invoke()
     }
 
     /** Repairs requested by the render guard; called from [RenderGuard.check] on this thread. */
@@ -316,6 +409,8 @@ class WallpaperGLThread(
     // ----------------- EGL -----------------
 
     private fun hasEglSurface() = eglSurface != null && eglSurface != EGL14.EGL_NO_SURFACE
+
+    private fun hasWindowSurface() = hasEglSurface() && onWindowSurface
 
     private fun initEgl() {
         eglDisplay = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY)
@@ -365,11 +460,43 @@ class WallpaperGLThread(
             Timber.tag(TAG).w("Failed to create or bind window surface: 0x%x", error)
             if (newSurface != null && newSurface != EGL14.EGL_NO_SURFACE) EGL14.eglDestroySurface(display, newSurface)
             surfaceBroken = true
-            renderGuard?.onSwapFailed(error)
+            // The guard is deaf while no frames are expected, and a wallpaper that waits for its turn on
+            // the window would then wait for good.
+            if (gated && !guardArmed) {
+                renderGuardListener?.onRenderUnrecoverable(RenderStall.SurfaceLost)
+            } else {
+                renderGuard?.onSwapFailed(error)
+            }
             return false
         }
         eglSurface = newSurface
+        onWindowSurface = true
         eglSurfaceAlive = true
+        pendingSizeChange = true
+        reportGpu()
+        return true
+    }
+
+    /** A 1 x 1 pbuffer to have the context current on before there is a window. False where there are none. */
+    private fun createPbufferSurface(): Boolean {
+        val display = eglDisplay
+        val config = eglConfig
+        if (display == null || config == null || !configHasPbuffers) {
+            pbufferBroken = true
+            return false
+        }
+        val attribs = intArrayOf(EGL14.EGL_WIDTH, 1, EGL14.EGL_HEIGHT, 1, EGL14.EGL_NONE)
+        val newSurface = EGL14.eglCreatePbufferSurface(display, config, attribs, 0)
+        if (newSurface == null || newSurface == EGL14.EGL_NO_SURFACE ||
+            !EGL14.eglMakeCurrent(display, newSurface, newSurface, eglContext)
+        ) {
+            Timber.tag(TAG).w("No pbuffer to prepare on, waiting for the window: 0x%x", EGL14.eglGetError())
+            if (newSurface != null && newSurface != EGL14.EGL_NO_SURFACE) EGL14.eglDestroySurface(display, newSurface)
+            pbufferBroken = true
+            return false
+        }
+        eglSurface = newSurface
+        onWindowSurface = false
         pendingSizeChange = true
         reportGpu()
         return true
@@ -397,6 +524,7 @@ class WallpaperGLThread(
             EGL14.eglDestroySurface(display, surface)
         }
         eglSurface = EGL14.EGL_NO_SURFACE
+        onWindowSurface = false
         eglSurfaceAlive = false
     }
 
@@ -414,9 +542,17 @@ class WallpaperGLThread(
         eglConfig = null
     }
 
+    /** A thread that starts off the window asks for a config good for a pbuffer too, and does without if there is none. */
     private fun chooseEglConfig(display: EGLDisplay): EGLConfig {
+        val withPbuffers = if (offWindow) findEglConfig(display, EGL14.EGL_WINDOW_BIT or EGL14.EGL_PBUFFER_BIT) else null
+        configHasPbuffers = withPbuffers != null
+        return withPbuffers ?: findEglConfig(display, EGL14.EGL_WINDOW_BIT) ?: throw RuntimeException("No configs match")
+    }
+
+    private fun findEglConfig(display: EGLDisplay, surfaceTypes: Int): EGLConfig? {
         val attribList = intArrayOf(
             EGL14.EGL_RENDERABLE_TYPE, if (glesVersion >= 3) EGLExt.EGL_OPENGL_ES3_BIT_KHR else EGL14.EGL_OPENGL_ES2_BIT,
+            EGL14.EGL_SURFACE_TYPE, surfaceTypes,
             EGL14.EGL_RED_SIZE, 8,
             EGL14.EGL_GREEN_SIZE, 8,
             EGL14.EGL_BLUE_SIZE, 8,
@@ -438,9 +574,7 @@ class WallpaperGLThread(
         }
 
         val configsCount = numConfigs[0]
-        if (configsCount <= 0) {
-            throw RuntimeException("No configs match")
-        }
+        if (configsCount <= 0) return null
 
         val configs = arrayOfNulls<EGLConfig>(configsCount)
         EGL14.eglChooseConfig(
@@ -450,7 +584,7 @@ class WallpaperGLThread(
             numConfigs, 0,
         )
 
-        return configs[0]!!
+        return configs[0]
     }
 
     private companion object {

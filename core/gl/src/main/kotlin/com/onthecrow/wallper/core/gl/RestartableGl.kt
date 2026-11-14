@@ -29,6 +29,9 @@ import java.util.concurrent.TimeUnit
  * A thread is replaced only after it has really exited. One stuck in the driver keeps its EGL surface on
  * the window, and a second one there fails; the engine gives up instead ([onGiveUp], with the reason).
  *
+ * Made off the window ([onWindow] false), its threads prepare without it until [attach]: the window is
+ * someone else's until then, a series' slide on screen.
+ *
  * @param beforeRestart runs on [handler] before the old thread is stopped, e.g. to detach a video decoder.
  * @param afterRestart runs on [handler] once the new thread is started.
  * @param newSession builds a thread and its renderer, not started yet.
@@ -39,6 +42,7 @@ class RestartableGl<S : RestartableGl.Session>(
     private val onGiveUp: (reason: String, error: Throwable?) -> Unit,
     private val beforeRestart: () -> Unit = {},
     private val afterRestart: () -> Unit = {},
+    private val onWindow: Boolean = true,
     private val newSession: () -> S,
 ) {
     /** One GL thread with whatever its renderer needs. */
@@ -57,6 +61,10 @@ class RestartableGl<S : RestartableGl.Session>(
 
     @Volatile
     private var visible = true
+
+    /** The threads draw on the window; false until [attach] for one made off it. */
+    @Volatile
+    private var attached = onWindow
 
     private val framesExpected = MutableStateFlow(false)
 
@@ -104,7 +112,16 @@ class RestartableGl<S : RestartableGl.Session>(
     fun onSurfaceChanged(newWidth: Int, newHeight: Int) {
         width = newWidth
         height = newHeight
-        session?.thread?.onSurfaceCreatedOrChanged(newWidth, newHeight)
+        session?.thread?.let(::giveSurface)
+    }
+
+    /**
+     * The window is this one's from now on: the thread moves onto it and shows its picture there, even
+     * while hidden. Whoever had the window must have let go of it.
+     */
+    fun attach() {
+        attached = true
+        session?.thread?.let(::giveSurface)
     }
 
     /** Blocks up to [waitMs] until the EGL surface is gone: the system may free the window right after. */
@@ -172,13 +189,20 @@ class RestartableGl<S : RestartableGl.Session>(
 
     private fun giveUp(reason: String) = onGiveUp(reason, null)
 
+    /** The window, or the room to prepare off it. One that took the window over shows its first picture hidden or not. */
+    private fun giveSurface(thread: WallpaperGLThread) {
+        if (!attached) return thread.prepareOffWindow(width, height)
+        thread.onSurfaceCreatedOrChanged(width, height)
+        if (!onWindow) thread.presentOnce()
+    }
+
     private fun startSession(next: S) {
         session = next
         slowFromFrame = 0
         armedSinceMs = if (framesExpected.value) SystemClock.elapsedRealtime() else null
         // The latest state, read after the session changed: an update racing with this reaches one or the other.
         val thread = next.thread
-        thread.onSurfaceCreatedOrChanged(width, height)
+        giveSurface(thread)
         if (!visible) thread.onPauseRendering()
         thread.setFramesExpected(framesExpected.value)
         thread.start()

@@ -18,6 +18,10 @@ internal class BlackHoleGlRenderer(
     private val latest = AtomicReference<FrameState?>(null)
     private var failureReported = false
 
+    /** The last frame drew the black hole: without its shaders or lens tables a frame is black. */
+    override var hasPicture = false
+        private set
+
     /** Any thread. Request a render afterwards. */
     fun submit(frame: FrameState) = latest.set(frame)
 
@@ -28,6 +32,7 @@ internal class BlackHoleGlRenderer(
     override fun onDrawFrame(): Boolean {
         val frame = latest.get() ?: return false
         val drawn = renderer.render(frame, SystemClock.elapsedRealtimeNanos())
+        hasPicture = drawn
         val failure = renderer.failure
         if (failure != null && !failureReported) {
             failureReported = true
@@ -37,7 +42,10 @@ internal class BlackHoleGlRenderer(
     }
 
 
-    override fun onContextLost() = renderer.onContextLost()
+    override fun onContextLost() {
+        hasPicture = false
+        renderer.onContextLost()
+    }
 
     override fun dispose() = renderer.release()
 }

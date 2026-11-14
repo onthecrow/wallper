@@ -13,6 +13,7 @@ import java.io.IOException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer
+import java.util.concurrent.atomic.AtomicReference
 
 /**
  * Draws a still picture cropped like a video: the crop's corners as texture coordinates ([UVCoords], turned
@@ -26,6 +27,9 @@ import java.nio.FloatBuffer
  *
  * @param frameWidth the picture's width as stored, [frameHeight] its height; [crop] is in its pixels.
  * @param screenWidth the surface's size until the GL thread reports it, [screenHeight] too.
+ * @param decodeOn runs the decoding it is given somewhere else than the GL thread, which may be drawing
+ * another wallpaper meanwhile, and asks for a frame afterwards: that frame makes the texture. Null decodes
+ * on the GL thread, inside the frame. A context lost later is always redecoded there.
  */
 class PictureWallpaperRenderer(
     private val path: String,
@@ -35,6 +39,7 @@ class PictureWallpaperRenderer(
     private var screenWidth: Int,
     private var screenHeight: Int,
     private val onFailed: (Throwable?) -> Unit,
+    private val decodeOn: ((decode: () -> Unit) -> Unit)? = null,
 ) : GLWallpaperRenderer() {
 
     /**
@@ -52,6 +57,16 @@ class PictureWallpaperRenderer(
     private var program = 0
     private var textureId = 0
     private var failed = false
+
+    /** Where the first decoding runs; null once its result is taken: a lost context is redecoded in the frame. */
+    private var decodeElsewhere = decodeOn
+    private var awaitingDecode = false
+
+    /** What [decodeOn] decoded, on its way from that thread to the frame that makes the texture of it. */
+    private val decoded = AtomicReference<Decoded?>(null)
+
+    /** The picture is a texture: before that a draw shows nothing. */
+    override val hasPicture: Boolean get() = textureId != 0
 
     override fun onSurfaceCreated() {
         GLES20.glDisable(GLES20.GL_DEPTH_TEST)
@@ -105,6 +120,7 @@ class PictureWallpaperRenderer(
     }
 
     override fun dispose() {
+        decoded.getAndSet(null)?.bitmap?.recycle()
         if (textureId != 0) GLES20.glDeleteTextures(1, intArrayOf(textureId), 0)
         textureId = 0
         if (program != 0) GLES20.glDeleteProgram(program)
@@ -112,18 +128,10 @@ class PictureWallpaperRenderer(
     }
 
     private fun loadTexture() {
-        val maxTextureSize = IntArray(1).also { GLES20.glGetIntegerv(GLES20.GL_MAX_TEXTURE_SIZE, it, 0) }[0]
-        val bitmap = try {
-            decode(region.sampleSize(crop, screenWidth, screenHeight, maxTextureSize.coerceAtLeast(MIN_TEXTURE_SIZE)))
-        } catch (e: Exception) {
-            fail(e)
-            return
-        } catch (e: OutOfMemoryError) {
-            fail(e)
-            return
-        }
+        val result = decodedPicture() ?: return
+        val bitmap = result.bitmap
         if (bitmap == null) {
-            fail(null)
+            fail(result.error)
             return
         }
         val ids = IntArray(1).also { GLES20.glGenTextures(1, it, 0) }
@@ -136,6 +144,28 @@ class PictureWallpaperRenderer(
         GLUtils.texImage2D(GLES20.GL_TEXTURE_2D, 0, bitmap, 0)
         Timber.d("Picture texture %d x %d", bitmap.width, bitmap.height)
         bitmap.recycle()
+    }
+
+    /** The decoded picture, or null while [decodeOn] still has it: the frames until then draw nothing. */
+    private fun decodedPicture(): Decoded? {
+        val maxTextureSize = IntArray(1).also { GLES20.glGetIntegerv(GLES20.GL_MAX_TEXTURE_SIZE, it, 0) }[0]
+        val sample = region.sampleSize(crop, screenWidth, screenHeight, maxTextureSize.coerceAtLeast(MIN_TEXTURE_SIZE))
+        val elsewhere = decodeElsewhere ?: return decodeSafely(sample)
+        if (!awaitingDecode) {
+            awaitingDecode = true
+            elsewhere { decoded.set(decodeSafely(sample)) }
+            return null
+        }
+        return decoded.getAndSet(null)?.also { decodeElsewhere = null }
+    }
+
+    /** The bitmap, or why there is none; never throws. Any thread. */
+    private fun decodeSafely(sample: Int): Decoded = try {
+        Decoded(decode(sample), error = null)
+    } catch (e: Exception) {
+        Decoded(bitmap = null, e)
+    } catch (e: OutOfMemoryError) {
+        Decoded(bitmap = null, e)
     }
 
     private fun fail(error: Throwable?) {
@@ -178,6 +208,9 @@ class PictureWallpaperRenderer(
         if (part !== whole) whole.recycle()
         return part
     }
+
+    /** A decoding's result: the bitmap, or nothing with the [error] if there was one. */
+    private class Decoded(val bitmap: Bitmap?, val error: Throwable?)
 
     private companion object {
         /** X, Y, U, V for each corner. */
