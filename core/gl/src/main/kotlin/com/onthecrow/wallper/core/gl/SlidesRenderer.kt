@@ -12,9 +12,13 @@ import timber.log.Timber
  * A renderer that throws is given up on alone, the others go on. GL thread only.
  *
  * @param resetState puts the context back to how a new one starts, for a surface of the size given.
+ * @param width the surface's size until the GL thread reports it, [height] too: a slide may warm up before
+ * the first frame, which is when the thread does.
  */
 internal class SlidesRenderer(
     private val resetState: (width: Int, height: Int) -> Unit,
+    private var width: Int,
+    private var height: Int,
 ) : GLWallpaperRenderer() {
 
     /**
@@ -46,8 +50,6 @@ internal class SlidesRenderer(
 
     /** Counts the contexts: a slide made in an older one has nothing left. */
     private var context = 0
-    private var width = 0
-    private var height = 0
 
     /** The slide on screen has its picture: until then the frames are empty, and the window keeps what it shows. */
     override val hasPicture: Boolean

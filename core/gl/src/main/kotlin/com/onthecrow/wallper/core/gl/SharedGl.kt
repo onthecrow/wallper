@@ -34,7 +34,7 @@ class SharedGl(
     private var shown: Link<*>? = null
 
     private inner class Session : RestartableGl.Session {
-        val slides = SlidesRenderer(GlState::reset)
+        val slides = SlidesRenderer(GlState::reset, holder.surfaceFrame.width(), holder.surfaceFrame.height())
         override val thread = WallpaperGLThread(
             surfaceHolder = holder,
             renderer = slides,

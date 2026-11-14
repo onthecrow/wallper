@@ -10,7 +10,7 @@ class SlidesRendererTest {
 
     /** What the slides' renderers and the state reset were asked, in order. */
     private val journal = mutableListOf<String>()
-    private val slides = SlidesRenderer { _, _ -> journal += "reset" }.apply { onSurfaceChanged(1080, 2400) }
+    private val slides = SlidesRenderer({ _, _ -> journal += "reset" }, width = 1080, height = 2400)
 
     private val a = FakeRenderer("a")
     private val b = FakeRenderer("b")
