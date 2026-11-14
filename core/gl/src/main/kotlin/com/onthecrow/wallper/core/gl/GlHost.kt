@@ -25,7 +25,7 @@ interface GlClient<R : GLWallpaperRenderer> {
      */
     fun newRenderer(): R
 
-    /** On the handler, before a broken GL thread is stopped: e.g. take the video decoder off its texture. */
+    /** Before a broken GL thread is stopped: e.g. take the video decoder off its texture. Any thread. */
     fun beforeRestart() {}
 
     /** On the handler, once [newRenderer]'s renderer runs on a new GL thread. */

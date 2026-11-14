@@ -9,6 +9,10 @@ import com.onthecrow.wallper.core.engine.WallpaperEngine
 import com.onthecrow.wallper.core.engine.WallpaperSpec
 import com.onthecrow.wallper.core.engine.impl.BuiltInWallpapers
 import com.onthecrow.wallper.core.gl.OwnGl
+import com.onthecrow.wallper.core.gl.SharedGl
+import com.onthecrow.wallper.core.model.ClipRange
+import com.onthecrow.wallper.core.model.CropRect
+import com.onthecrow.wallper.core.model.MediaInfo
 import com.onthecrow.wallper.core.model.MediaType
 import com.onthecrow.wallper.core.model.SeriesSwitch
 import com.onthecrow.wallper.core.player.WallperPlayerFactory
@@ -65,7 +69,7 @@ internal class WallpaperEngineFactory @Inject constructor(
                         host = host,
                         newStage = { hostOf ->
                             val switch = if (isPreview) SeriesSwitch.CUT else seriesSwitch
-                            stage(switch, baseContext, surfaceHolder, slides, isPreview, hostOf, scope)
+                            stage(switch, baseContext, surfaceHolder, slides, isPreview, host, hostOf, scope)
                         },
                     )
                 }
@@ -73,19 +77,39 @@ internal class WallpaperEngineFactory @Inject constructor(
         }
     }
 
-    /** How a series' slides get onto the screen. */
+    /**
+     * How a series' slides get onto the screen.
+     *
+     * @param host the series' own: it hears when the series as a whole can't go on.
+     * @param hostOf the host of each slide: a slide that gives up is skipped.
+     */
     private fun stage(
         switch: SeriesSwitch,
         baseContext: Context,
         surfaceHolder: () -> SurfaceHolder,
         slides: List<WallpaperSpec>,
         isPreview: Boolean,
+        host: EngineHost,
         hostOf: (slide: Int) -> EngineHost,
         scope: CoroutineScope,
     ): SlideStage = when (switch) {
-        // The shared GL thread comes next; until then it cuts.
-        SeriesSwitch.CUT, SeriesSwitch.SHARED_GL -> CutStage(slides, hostOf) { slide, slideHost ->
+        SeriesSwitch.CUT -> CutStage(slides, hostOf) { slide, slideHost ->
             create(baseContext, surfaceHolder, slide, isPreview, slideHost)
+        }
+        // Every slide's renderer on one GL thread that keeps the window: a change is its next frame.
+        SeriesSwitch.SHARED_GL -> {
+            val gl = SharedGl(surfaceHolder(), glesVersionOf(slides), host::showPlaceholder)
+            WarmStage(
+                slides = slides,
+                hostOf = hostOf,
+                scope = scope,
+                handsOverWindow = false,
+                window = SharedGlWindow(gl),
+            ) { slide, slideHost, onReady ->
+                // An optimised video goes through GL here too: nothing but GL draws on this window.
+                val drawn = if (slide is WallpaperSpec.ProcessedVideo) slide.asWholeFrame() else slide
+                slide(baseContext, surfaceHolder, drawn, isPreview, slideHost, SlideStart(gl, onReady))
+            }
         }
         // Every slide on a GL thread of its own, which starts without the window: the slide on screen has it.
         SeriesSwitch.WARM_ENGINES -> WarmStage(
@@ -124,6 +148,29 @@ internal class WallpaperEngineFactory @Inject constructor(
         is WallpaperSpec.ProcessedVideo, is WallpaperSpec.Series -> null
     }
 
+    /**
+     * The highest OpenGL ES version a slide's renderer asks for: 3 only with a built-in that needs it, so
+     * that a series of videos and pictures keeps the context they have outside one.
+     */
+    private fun glesVersionOf(slides: List<WallpaperSpec>): Int = slides
+        .filterIsInstance<WallpaperSpec.BuiltIn>()
+        .mapNotNull { slide -> builtIns[slide.wallpaper]?.takeIf { it.isSupported() }?.glesVersion }
+        .maxOrNull()
+        ?: DEFAULT_GLES_VERSION
+
+    /**
+     * An optimised video as the GL engine takes one: its whole frame, a frame of one by one cropped to all
+     * of it, over the whole screen, never panned, played from end to end.
+     */
+    private fun WallpaperSpec.ProcessedVideo.asWholeFrame() = WallpaperSpec.Media(
+        type = MediaType.VIDEO,
+        sourcePath = path,
+        thumbnailPath = thumbnailPath,
+        crop = CropRect(left = 0, top = 0, right = 1, bottom = 1),
+        clip = ClipRange(startMs = 0, endMs = 0),
+        mediaInfo = MediaInfo(width = 1, height = 1, rotation = 0, durationMs = 0),
+    )
+
     private fun originalVideo(
         surfaceHolder: () -> SurfaceHolder,
         wallpaper: WallpaperSpec.Media,
@@ -155,4 +202,9 @@ internal class WallpaperEngineFactory @Inject constructor(
         host = host,
         onReady = onReady,
     )
+
+    private companion object {
+        /** What the video and picture renderers are written for. */
+        const val DEFAULT_GLES_VERSION = 2
+    }
 }
