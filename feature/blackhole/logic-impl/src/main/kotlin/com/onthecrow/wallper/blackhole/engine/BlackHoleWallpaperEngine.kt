@@ -38,8 +38,9 @@ import com.onthecrow.wallper.blackhole.renderer.BlackHoleRenderer
 import com.onthecrow.wallper.core.diagnostics.Diagnostics
 import com.onthecrow.wallper.core.engine.EngineHost
 import com.onthecrow.wallper.core.engine.WallpaperEngine
-import com.onthecrow.wallper.core.gl.RestartableGl
-import com.onthecrow.wallper.core.gl.WallpaperGLThread
+import com.onthecrow.wallper.core.gl.GlClient
+import com.onthecrow.wallper.core.gl.GlLink
+import com.onthecrow.wallper.core.gl.OwnGl
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -142,18 +143,7 @@ internal class BlackHoleWallpaperEngine(
         null
     }
 
-    private val gl = RestartableGl(
-        holder = holder,
-        handler = handler,
-        onGiveUp = host::showPlaceholder,
-        afterRestart = {
-            // A new renderer starts without tables; nothing keeps a CPU copy of them.
-            reloadTables()
-            stillDrawn = false
-            wake()
-        },
-        newSession = { Gl(currentLevel()) },
-    )
+    private val gl: GlLink<BlackHoleGlRenderer> = OwnGl(holder).open(handler, Renderers())
 
     init {
         Timber.tag(TAG).d("created, preview=$isPreview")
@@ -264,9 +254,8 @@ internal class BlackHoleWallpaperEngine(
             applyQuality()
             updateGpuTiming()
         }
-        val current = gl.current
         val nextParams = params
-        current.thread.post { current.renderer.setParams(nextParams) }
+        gl.post { it.renderer.setParams(nextParams) }
         updateGyro()
         loadTables()
         stillDrawn = false
@@ -309,8 +298,7 @@ internal class BlackHoleWallpaperEngine(
     /** The GPU timer runs only while Auto measures: its queries cost a little on every frame. */
     private fun updateGpuTiming() {
         val timing = isMeasuringGpu()
-        val current = gl.current
-        current.thread.post { current.renderer.onGpuTimeMs = if (timing) gpuTimeCallback else null }
+        gl.post { it.renderer.onGpuTimeMs = if (timing) gpuTimeCallback else null }
     }
 
     private fun onNoGpuTimer() {
@@ -324,10 +312,9 @@ internal class BlackHoleWallpaperEngine(
     private fun applyQuality() {
         val level = currentLevel()
         reportQuality(level)
-        val current = gl.current
         // New shader defines: the next frame compiles them.
         gl.expectSlowFrame()
-        current.thread.post { current.renderer.setQuality(level) }
+        gl.post { it.renderer.setQuality(level) }
         loadTables()
     }
 
@@ -356,8 +343,7 @@ internal class BlackHoleWallpaperEngine(
         tablesJob?.cancel()
         tablesJob = scope.launch {
             val loaded = tablesRepository.get(key)
-            val current = gl.current
-            current.thread.post { current.renderer.setTables(loaded) }
+            gl.post { it.renderer.setTables(loaded) }
             stillDrawn = false
             wake()
         }
@@ -417,9 +403,8 @@ internal class BlackHoleWallpaperEngine(
     }
 
     private fun draw(frameNanos: Long) {
-        val current = gl.current
-        current.glRenderer.submit(scene.frame(frameNanos))
-        current.thread.requestRender()
+        gl.renderer.submit(scene.frame(frameNanos))
+        gl.requestRender()
         lastDrawnNanos = frameNanos
         drawnGyroPitchDeg = gyro.targetPitchDeg
         drawnGyroYawDeg = gyro.targetYawDeg
@@ -494,23 +479,31 @@ internal class BlackHoleWallpaperEngine(
         }
     }
 
-    /** One GL thread with its own renderer: a restart never shares GL state with an abandoned thread. */
-    private inner class Gl(level: QualityLevel) : RestartableGl.Session {
-        val renderer = BlackHoleRenderer(context.assets).apply {
-            setQuality(level)
-            setParams(params)
-            onTablesLost = { handler.post { if (gl.isCurrent(this@Gl)) reloadTables() } }
-            onGpuTimeMs = if (isMeasuringGpu()) gpuTimeCallback else null
-            onNoGpuTimer = { handler.post { onNoGpuTimer() } }
+    /** What the GL side asks of this engine: a renderer of its own for each GL thread, as the engine is set now. */
+    private inner class Renderers : GlClient<BlackHoleGlRenderer> {
+        override val glesVersion = 3
+
+        override fun newRenderer(): BlackHoleGlRenderer {
+            lateinit var glRenderer: BlackHoleGlRenderer
+            val renderer = BlackHoleRenderer(context.assets).apply {
+                setQuality(currentLevel())
+                setParams(params)
+                onTablesLost = { handler.post { if (gl.isCurrent(glRenderer)) reloadTables() } }
+                onGpuTimeMs = if (isMeasuringGpu()) gpuTimeCallback else null
+                onNoGpuTimer = { handler.post { onNoGpuTimer() } }
+            }
+            glRenderer = BlackHoleGlRenderer(renderer) { error -> gl.fail(glRenderer, error) }
+            return glRenderer
         }
-        val glRenderer = BlackHoleGlRenderer(renderer) { error -> gl.fail(this@Gl, error) }
-        override val thread: WallpaperGLThread = WallpaperGLThread(
-            surfaceHolder = holder,
-            renderer = glRenderer,
-            renderGuardListener = { stall -> gl.restart(this@Gl, "unrecoverable $stall") },
-            glesVersion = 3,
-            onInitFailed = { error -> gl.fail(this@Gl, error) },
-        )
+
+        override fun afterRestart() {
+            // A new renderer starts without tables; nothing keeps a CPU copy of them.
+            reloadTables()
+            stillDrawn = false
+            wake()
+        }
+
+        override fun onGiveUp(reason: String, error: Throwable?) = host.showPlaceholder(reason, error)
     }
 
     private companion object {

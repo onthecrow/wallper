@@ -8,10 +8,11 @@ import com.onthecrow.wallper.core.engine.EngineHost
 import com.onthecrow.wallper.core.engine.WallpaperSettings
 import com.onthecrow.wallper.core.engine.WallpaperEngine
 import com.onthecrow.wallper.core.engine.WallpaperSpec
-import com.onthecrow.wallper.core.gl.RestartableGl
+import com.onthecrow.wallper.core.gl.GlClient
+import com.onthecrow.wallper.core.gl.GlLink
+import com.onthecrow.wallper.core.gl.OwnGl
 import com.onthecrow.wallper.core.gl.VideoRenderParams
 import com.onthecrow.wallper.core.gl.VideoWallpaperRenderer
-import com.onthecrow.wallper.core.gl.WallpaperGLThread
 import com.onthecrow.wallper.core.player.PlayerMedia
 import com.onthecrow.wallper.core.player.WallperPlayerFactory
 import com.onthecrow.wallper.core.player.WallperPlayerState
@@ -33,7 +34,7 @@ import timber.log.Timber
  *
  * Only binds the two sides together: the renderer's video surface goes to the player. Each side recovers
  * on its own. The player replaces its decoder behind that surface; the GL side repairs EGL inside the GL
- * thread, and a broken or hung GL thread is recreated here without touching the player. The crop pans
+ * thread, and a broken or hung GL thread is recreated by its [GlLink] without touching the player. The crop pans
  * with the launcher's pages ([VideoWallpaperRenderer.pageOffset]); with the user's setting off the
  * service reports no pages.
  */
@@ -77,14 +78,7 @@ internal class GLWallpaperEngine(
     @Volatile
     private var pageOffset: Float? = null
 
-    // Waits until the decoder lets go of the old texture, which the old GL thread releases on exit.
-    private val gl = RestartableGl(
-        holder = holder,
-        handler = callbackHandler,
-        onGiveUp = host::showPlaceholder,
-        beforeRestart = { player.setVideoSurface(null) },
-        newSession = { Gl() },
-    )
+    private val gl: GlLink<VideoWallpaperRenderer> = OwnGl(holder).open(callbackHandler, Renderers())
 
     @Volatile
     private var released = false
@@ -100,9 +94,9 @@ internal class GLWallpaperEngine(
         scope.launch {
             launcherOffset.collect { offset ->
                 pageOffset = offset
-                gl.current.renderer.pageOffset = offset
+                gl.renderer.pageOffset = offset
                 // A paused video gets no new frames to draw the move with.
-                gl.current.thread.requestRender()
+                gl.requestRender()
             }
         }
     }
@@ -118,7 +112,7 @@ internal class GLWallpaperEngine(
         Timber.d("resumed")
         visible.value = true
         gl.setVisible(true)
-        gl.current.thread.requestRender()
+        gl.requestRender()
         playback.setVisible(true)
     }
 
@@ -139,25 +133,29 @@ internal class GLWallpaperEngine(
         callbackThread.quitSafely()
     }
 
-    /** One GL thread with its renderer. Recreated as a whole when GL can't be repaired in place. */
-    private inner class Gl : RestartableGl.Session {
-        val renderer = VideoWallpaperRenderer(
-            renderParams = renderParams,
-            callbackHandler = callbackHandler,
-            listener = object : VideoWallpaperRenderer.Listener {
-                override fun onFrameAvailable() = thread.requestRender()
+    /** What the GL side asks of this engine: a renderer for each GL thread, and the decoder off a broken one. */
+    private inner class Renderers : GlClient<VideoWallpaperRenderer> {
 
-                override fun onVideoSurfaceCreated(surface: Surface) {
-                    if (gl.isCurrent(this@Gl) && !released) player.setVideoSurface(surface)
-                }
-            },
-        ).apply { pageOffset = this@GLWallpaperEngine.pageOffset }
+        override fun newRenderer(): VideoWallpaperRenderer {
+            lateinit var renderer: VideoWallpaperRenderer
+            renderer = VideoWallpaperRenderer(
+                renderParams = renderParams,
+                callbackHandler = callbackHandler,
+                listener = object : VideoWallpaperRenderer.Listener {
+                    override fun onFrameAvailable() = gl.requestRender()
 
-        override val thread: WallpaperGLThread = WallpaperGLThread(
-            surfaceHolder = holder,
-            renderer = renderer,
-            renderGuardListener = { stall -> gl.restart(this@Gl, "unrecoverable $stall") },
-        )
+                    override fun onVideoSurfaceCreated(surface: Surface) {
+                        if (gl.isCurrent(renderer) && !released) player.setVideoSurface(surface)
+                    }
+                },
+            ).apply { pageOffset = this@GLWallpaperEngine.pageOffset }
+            return renderer
+        }
+
+        // Waits until the decoder lets go of the old texture, which the old GL thread releases on exit.
+        override fun beforeRestart() = player.setVideoSurface(null)
+
+        override fun onGiveUp(reason: String, error: Throwable?) = host.showPlaceholder(reason, error)
     }
 
     private companion object {
