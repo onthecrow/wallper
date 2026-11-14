@@ -1,5 +1,6 @@
 package com.onthecrow.wallper.settings.domain
 
+import com.onthecrow.wallper.core.model.SeriesSwitch
 import com.onthecrow.wallper.core.model.VideoPlayback
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -18,6 +19,7 @@ class AppSettingsTest {
             pauseVideoToSaveBattery = false,
             theme = ThemeMode.DARK,
             dynamicColor = false,
+            seriesSwitch = SeriesSwitch.SHARED_GL,
         )
 
         assertEquals(settings, AppSettings.decode(settings.encode()))
@@ -25,7 +27,9 @@ class AppSettingsTest {
 
     @Test
     fun `what this version doesn't know is skipped`() {
-        val settings = AppSettings.decode("""{"theme":"SEPIA","fromTheFuture":1,"activateNewWallpapers":false}""")
+        val settings = AppSettings.decode(
+            """{"theme":"SEPIA","seriesSwitch":"DISSOLVE","fromTheFuture":1,"activateNewWallpapers":false}""",
+        )
 
         assertEquals(AppSettings(activateNewWallpapers = false), settings)
     }

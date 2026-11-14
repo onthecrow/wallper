@@ -1,5 +1,6 @@
 package com.onthecrow.wallper.settings
 
+import com.onthecrow.wallper.core.model.SeriesSwitch
 import com.onthecrow.wallper.core.model.VideoPlayback
 import com.onthecrow.wallper.settings.domain.AppSettings
 import com.onthecrow.wallper.settings.domain.ThemeMode
@@ -36,6 +37,10 @@ class SettingsReducerTest {
         assertEquals(SettingsDialog.THEME, theme.dialog)
         assertNull(reducer.reduce(theme, SettingsEvent.OnThemeSelect(ThemeMode.DARK)).dialog)
         assertNull(reducer.reduce(theme, SettingsEvent.OnDialogDismiss).dialog)
+
+        val seriesSwitch = reducer.reduce(SettingsState(), SettingsEvent.OnSeriesSwitchClick)
+        assertEquals(SettingsDialog.SERIES_SWITCH, seriesSwitch.dialog)
+        assertNull(reducer.reduce(seriesSwitch, SettingsEvent.OnSeriesSwitchSelect(SeriesSwitch.SHARED_GL)).dialog)
     }
 
     @Test

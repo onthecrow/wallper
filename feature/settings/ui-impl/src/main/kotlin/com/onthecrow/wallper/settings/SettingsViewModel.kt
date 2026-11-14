@@ -8,6 +8,7 @@ import com.onthecrow.wallper.core.navigation.Navigator
 import com.onthecrow.wallper.settings.domain.AppSettings
 import com.onthecrow.wallper.settings.domain.AppSettingsSource
 import com.onthecrow.wallper.settings.domain.CreateReportUseCase
+import com.onthecrow.wallper.settings.domain.DebugBuild
 import com.onthecrow.wallper.wallpapers.domain.ObserveWallpaperStorageUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.CancellationException
@@ -41,7 +42,11 @@ internal class SettingsViewModel @Inject constructor(
     private val createReportUseCase: CreateReportUseCase,
     private val navigator: Navigator,
     dispatchersProvider: DispatchersProvider,
-) : BaseViewModel<SettingsEvent, SettingsState, SettingsReducer>(SettingsState(), reducer) {
+    debugBuild: DebugBuild,
+) : BaseViewModel<SettingsEvent, SettingsState, SettingsReducer>(
+    SettingsState(isDebugBuild = debugBuild.isDebuggable()),
+    reducer,
+) {
 
     private val checkRequests = MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
 
@@ -66,6 +71,7 @@ internal class SettingsViewModel @Inject constructor(
                 is SettingsEvent.OnThemeSelect -> update { it.copy(theme = event.theme) }
                 is SettingsEvent.OnDynamicColorChange -> update { it.copy(dynamicColor = event.enabled) }
                 is SettingsEvent.OnShareUsageAndCrashDataChange -> update { it.copy(shareUsageAndCrashData = event.enabled) }
+                is SettingsEvent.OnSeriesSwitchSelect -> update { it.copy(seriesSwitch = event.switch) }
                 else -> Unit
             }
         }.launchIn(viewModelScope)

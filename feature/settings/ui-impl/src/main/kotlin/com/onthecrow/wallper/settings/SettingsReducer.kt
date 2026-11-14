@@ -12,8 +12,10 @@ internal class SettingsReducer @Inject constructor() : Reducer<SettingsState, Se
             is SettingsEvent.OnStorageCounted -> state.copy(storageBytes = event.bytes)
             SettingsEvent.OnPlaybackClick -> state.copy(dialog = SettingsDialog.PLAYBACK)
             SettingsEvent.OnThemeClick -> state.copy(dialog = SettingsDialog.THEME)
+            SettingsEvent.OnSeriesSwitchClick -> state.copy(dialog = SettingsDialog.SERIES_SWITCH)
             is SettingsEvent.OnPlaybackSelect,
             is SettingsEvent.OnThemeSelect,
+            is SettingsEvent.OnSeriesSwitchSelect,
             SettingsEvent.OnDialogDismiss -> state.copy(dialog = null)
             SettingsEvent.OnSendReportClick -> state.copy(isReportInProgress = true)
             is SettingsEvent.ShareReport,
