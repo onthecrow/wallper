@@ -5,6 +5,7 @@ import android.os.HandlerThread
 import android.view.Surface
 import android.view.SurfaceHolder
 import com.onthecrow.wallper.core.engine.EngineHost
+import com.onthecrow.wallper.core.engine.SlideStart
 import com.onthecrow.wallper.core.engine.WallpaperSettings
 import com.onthecrow.wallper.core.engine.WallpaperEngine
 import com.onthecrow.wallper.core.engine.WallpaperSpec
@@ -37,6 +38,9 @@ import timber.log.Timber
  * thread, and a broken or hung GL thread is recreated by its [GlLink] without touching the player. The crop pans
  * with the launcher's pages ([VideoWallpaperRenderer.pageOffset]); with the user's setting off the
  * service reports no pages.
+ *
+ * As a series' [slide] it starts hidden, on the GL host it is given and on a single decoder: the paused
+ * player puts the clip's first frame into the texture, and once that is drawn the slide is ready to [show].
  */
 internal class GLWallpaperEngine(
     surfaceHolder: () -> SurfaceHolder,
@@ -46,6 +50,7 @@ internal class GLWallpaperEngine(
     savingPower: Flow<Boolean>,
     screenOffs: Flow<Unit>,
     private val host: EngineHost,
+    private val slide: SlideStart? = null,
 ) : WallpaperEngine() {
 
     private val holder = surfaceHolder()
@@ -57,6 +62,7 @@ internal class GLWallpaperEngine(
 
     private val player = playerFactory.create(
         PlayerMedia(wallpaper.sourcePath, wallpaper.clip.startMs, wallpaper.clip.endMsOrNull),
+        keepsStandby = slide == null,
     )
 
     /** Frame callbacks and this class's coroutines, off the main thread. */
@@ -64,12 +70,12 @@ internal class GLWallpaperEngine(
     private val callbackHandler = Handler(callbackThread.looper)
     private val scope = CoroutineScope(SupervisorJob() + callbackHandler.asCoroutineDispatcher("WallpaperFrames"))
 
-    private val visible = MutableStateFlow(true)
+    private val visible = MutableStateFlow(slide == null)
     private val framesExpected = combine(visible, player.state) { isVisible, state ->
         isVisible && state == WallperPlayerState.Playing
     }.stateIn(scope, SharingStarted.Eagerly, false)
 
-    private val playback = VideoPlaybackControl(player, settings, savingPower, screenOffs, scope)
+    private val playback = VideoPlaybackControl(player, settings, savingPower, screenOffs, scope, visible.value)
 
     /** The launcher's page offset, null without pages. */
     private val launcherOffset = MutableStateFlow<Float?>(null)
@@ -78,7 +84,7 @@ internal class GLWallpaperEngine(
     @Volatile
     private var pageOffset: Float? = null
 
-    private val gl: GlLink<VideoWallpaperRenderer> = OwnGl(holder).open(callbackHandler, Renderers())
+    private val gl: GlLink<VideoWallpaperRenderer> = (slide?.gl ?: OwnGl(holder)).open(callbackHandler, Renderers())
 
     @Volatile
     private var released = false
@@ -115,6 +121,8 @@ internal class GLWallpaperEngine(
         gl.requestRender()
         playback.setVisible(true)
     }
+
+    override fun show() = gl.show()
 
     override fun onOffsetsChanged(xOffset: Float, xOffsetStep: Float) {
         launcherOffset.value = xOffset.takeIf { xOffsetStep > 0f }
@@ -154,6 +162,10 @@ internal class GLWallpaperEngine(
 
         // Waits until the decoder lets go of the old texture, which the old GL thread releases on exit.
         override fun beforeRestart() = player.setVideoSurface(null)
+
+        override fun onFirstPicture() {
+            slide?.onReady?.invoke()
+        }
 
         override fun onGiveUp(reason: String, error: Throwable?) = host.showPlaceholder(reason, error)
     }

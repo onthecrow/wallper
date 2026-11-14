@@ -37,6 +37,7 @@ import com.onthecrow.wallper.blackhole.renderer.BlackHoleGlRenderer
 import com.onthecrow.wallper.blackhole.renderer.BlackHoleRenderer
 import com.onthecrow.wallper.core.diagnostics.Diagnostics
 import com.onthecrow.wallper.core.engine.EngineHost
+import com.onthecrow.wallper.core.engine.SlideStart
 import com.onthecrow.wallper.core.engine.WallpaperEngine
 import com.onthecrow.wallper.core.gl.GlClient
 import com.onthecrow.wallper.core.gl.GlLink
@@ -59,6 +60,10 @@ import kotlin.math.abs
  * Hidden, it does no work at all: no frames, no gyroscope, no GL heartbeat, and new lens tables wait
  * until it shows again. Only listeners that cost nothing until they fire stay registered.
  *
+ * As a series' [slide] it starts hidden, on the GL host it is given, and warms up: it loads its lens tables
+ * and draws off screen until the first frame with the picture, which builds the shaders. From then on it
+ * is ready to [show], and it appears whole, without the fade from black.
+ *
  * Everything except the [WallpaperEngine] overrides runs on the callback thread.
  */
 internal class BlackHoleWallpaperEngine(
@@ -69,6 +74,7 @@ internal class BlackHoleWallpaperEngine(
     private val settingsStore: BlackHoleSettingsStore,
     private val tablesRepository: LensTablesRepository,
     private val autoQuality: AutoQualityMemory,
+    private val slide: SlideStart? = null,
 ) : WallpaperEngine() {
 
     private val holder = surfaceHolder()
@@ -99,7 +105,10 @@ internal class BlackHoleWallpaperEngine(
     private val rotationQuaternion = FloatArray(4)
     private var tablesKey: LensTableKey? = null
     private var tablesJob: Job? = null
-    private var visible = true
+    private var visible = slide == null
+
+    /** A slide made off screen, until its first picture: hidden, yet it loads its tables and draws for it. */
+    private var warming = slide != null
     private var powerSave = powerManager?.isPowerSaveMode == true
     private var thermal = ThermalLevel.NORMAL
     private var lastDrawnNanos = Long.MIN_VALUE
@@ -143,7 +152,7 @@ internal class BlackHoleWallpaperEngine(
         null
     }
 
-    private val gl: GlLink<BlackHoleGlRenderer> = OwnGl(holder).open(handler, Renderers())
+    private val gl: GlLink<BlackHoleGlRenderer> = (slide?.gl ?: OwnGl(holder)).open(handler, Renderers())
 
     init {
         Timber.tag(TAG).d("created, preview=$isPreview")
@@ -159,7 +168,7 @@ internal class BlackHoleWallpaperEngine(
                 powerManager?.addThermalStatusListener({ handler.post(it) }, listener)
                 powerManager?.currentThermalStatus?.let(::onThermalStatus)
             }
-            onVisible(true)
+            if (warming) warmUp() else onVisible(true)
         }
         scope.launch { settingsStore.settings.collect(::onSettings) }
     }
@@ -170,6 +179,14 @@ internal class BlackHoleWallpaperEngine(
 
     override fun resume() {
         handler.post { onVisible(true) }
+    }
+
+    override fun show() {
+        handler.post {
+            // The frame warmed up with is as old as the warm-up: the disk would jump to where it is now.
+            draw(System.nanoTime())
+            gl.show()
+        }
     }
 
     override fun onSurfaceChanged(width: Int, height: Int) {
@@ -210,6 +227,8 @@ internal class BlackHoleWallpaperEngine(
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 powerManager?.removeThermalStatusListener(thermalListener as PowerManager.OnThermalStatusChangedListener)
             }
+            // The window goes on to the next slide, which may never say what rate it wants.
+            if (slide != null) applyFrameRate(NO_FRAME_RATE)
         }
         // Runs after the teardown above on the callback thread, and waits for both.
         gl.release(STOP_TIMEOUT_MS)
@@ -336,7 +355,7 @@ internal class BlackHoleWallpaperEngine(
      * next frame: a hidden wallpaper leaves that to [onVisible]. The GPU keeps the old ones until then.
      */
     private fun loadTables() {
-        if (!visible) return
+        if (!visible && !warming) return
         val key = lensTableKey(params, currentLevel())
         if (key == tablesKey) return
         tablesKey = key
@@ -345,8 +364,16 @@ internal class BlackHoleWallpaperEngine(
             val loaded = tablesRepository.get(key)
             gl.post { it.renderer.setTables(loaded) }
             stillDrawn = false
-            wake()
+            // Hidden, no frame is coming: a slide that warms up draws the one that has its picture.
+            if (visible) wake() else if (warming) draw(System.nanoTime())
         }
+    }
+
+    /** A slide made off screen: no frame loop and no gyroscope yet, only what the first picture needs. */
+    private fun warmUp() {
+        loadTables()
+        // Without the tables this frame is black, but it builds the shaders meanwhile.
+        draw(System.nanoTime())
     }
 
     private fun reloadTables() {
@@ -486,6 +513,8 @@ internal class BlackHoleWallpaperEngine(
         override fun newRenderer(): BlackHoleGlRenderer {
             lateinit var glRenderer: BlackHoleGlRenderer
             val renderer = BlackHoleRenderer(context.assets).apply {
+                // A slide takes over from another picture: it comes whole, not out of black.
+                fadeIn = slide == null
                 setQuality(currentLevel())
                 setParams(params)
                 onTablesLost = { handler.post { if (gl.isCurrent(glRenderer)) reloadTables() } }
@@ -503,6 +532,11 @@ internal class BlackHoleWallpaperEngine(
             wake()
         }
 
+        override fun onFirstPicture() {
+            warming = false
+            slide?.onReady?.invoke()
+        }
+
         override fun onGiveUp(reason: String, error: Throwable?) = host.showPlaceholder(reason, error)
     }
 
@@ -514,5 +548,8 @@ internal class BlackHoleWallpaperEngine(
         const val STILL_WAKE_DEG = 0.03
         const val STOP_TIMEOUT_MS = 1_500L
         const val SURFACE_DESTROY_WAIT_MS = 1_000L
+
+        /** `Surface.setFrameRate`'s «no preference». */
+        const val NO_FRAME_RATE = 0
     }
 }
