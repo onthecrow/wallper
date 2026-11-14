@@ -64,14 +64,18 @@ internal class WallpaperEngineFactory @Inject constructor(
                 0 -> PlaceholderWallpaperEngine(baseContext, surfaceHolder)
                 1 -> create(baseContext, surfaceHolder, slides.single(), isPreview, host)
                 else -> SeriesWallpaperEngine(
-                    slides = slides,
+                    slideCount = slides.size,
                     slideDuration = wallpaper.slideDuration,
                     screenOffs = screenOffs.events,
                     isScreenOn = { screenOffs.isScreenOn },
                     scope = CoroutineScope(Dispatchers.Main.immediate),
                     timeSource = TimeSource.Monotonic,
                     host = host,
-                    createSlide = { slide, slideHost -> create(baseContext, surfaceHolder, slide, isPreview, slideHost) },
+                    newStage = { hostOf ->
+                        CutStage(slides, hostOf) { slide, slideHost ->
+                            create(baseContext, surfaceHolder, slide, isPreview, slideHost)
+                        }
+                    },
                 )
             }
         }
