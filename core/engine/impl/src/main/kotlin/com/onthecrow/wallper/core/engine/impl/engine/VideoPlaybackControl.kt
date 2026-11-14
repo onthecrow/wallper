@@ -18,6 +18,8 @@ import kotlinx.coroutines.launch
  * look at the phone. Coming back to it from an app or from Battery Saver isn't one: the video goes on.
  *
  * Decides on [scope]'s thread; [setVisible] may come from any thread.
+ *
+ * @param startsVisible whether the wallpaper shows from the start; a slide prepared off screen doesn't.
  */
 internal class VideoPlaybackControl(
     private val player: WallperPlayer,
@@ -25,10 +27,11 @@ internal class VideoPlaybackControl(
     savingPower: Flow<Boolean>,
     screenOffs: Flow<Unit>,
     scope: CoroutineScope,
+    startsVisible: Boolean = true,
 ) {
     private data class Command(val play: Boolean, val wake: Int, val playback: VideoPlayback)
 
-    private val visible = MutableStateFlow(true)
+    private val visible = MutableStateFlow(startsVisible)
 
     /** The wake the player last played in. A fresh player is at the clip start already. */
     private var playedWake = 0

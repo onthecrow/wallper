@@ -26,8 +26,9 @@ class VideoPlaybackControlTest {
     private val savingPower = MutableStateFlow(false)
     private val screenOffs = MutableSharedFlow<Unit>()
 
-    private fun TestScope.control() =
-        VideoPlaybackControl(player, settings, savingPower, screenOffs, backgroundScope + UnconfinedTestDispatcher(testScheduler))
+    private fun TestScope.control(startsVisible: Boolean = true) = VideoPlaybackControl(
+        player, settings, savingPower, screenOffs, backgroundScope + UnconfinedTestDispatcher(testScheduler), startsVisible,
+    )
 
     @Test
     fun `plays while visible and pauses while hidden`() = runTest {
@@ -35,6 +36,15 @@ class VideoPlaybackControlTest {
         assertTrue(player.playing)
 
         control.setVisible(false)
+        assertFalse(player.playing)
+
+        control.setVisible(true)
+        assertTrue(player.playing)
+    }
+
+    @Test
+    fun `a slide that starts hidden doesn't play until it shows`() = runTest {
+        val control = control(startsVisible = false)
         assertFalse(player.playing)
 
         control.setVisible(true)
@@ -143,6 +153,7 @@ class VideoPlaybackControlTest {
         override fun seekToStart() {
             seeksToStart++
         }
+        override suspend fun awaitPrepared(timeoutMs: Long) = true
         override fun release() = Unit
     }
 }

@@ -6,6 +6,7 @@ import androidx.media3.common.PlaybackException
 import com.onthecrow.wallper.core.player.FailureCause
 import com.onthecrow.wallper.core.player.StallCause
 import com.onthecrow.wallper.core.player.WallperPlayerState
+import kotlinx.coroutines.async
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.TestScope
@@ -25,8 +26,8 @@ class EngineSupervisorTest {
     private val screen = newSurface()
     private val playWhenReady = MutableStateFlow(true)
 
-    private fun TestScope.start(factory: FakeEngineFactory): EngineSupervisor {
-        val supervisor = EngineSupervisor(factory, clock = { testScheduler.currentTime })
+    private fun TestScope.start(factory: FakeEngineFactory, keepsStandby: Boolean = true): EngineSupervisor {
+        val supervisor = EngineSupervisor(factory, clock = { testScheduler.currentTime }, keepsStandby = keepsStandby)
         supervisor.setSurface(screen)
         backgroundScope.launch { supervisor.run(playWhenReady) }
         runCurrent()
@@ -308,6 +309,74 @@ class EngineSupervisorTest {
         assertFalse(stalled.loops)
         assertFalse(standby.loops)
         assertFalse(factory.created[2].loops)
+    }
+
+    @Test
+    fun `without a kept standby there is one engine until a stall needs another`() = runTest {
+        val factory = FakeEngineFactory()
+        val supervisor = start(factory, keepsStandby = false)
+        val stalled = factory.created.single()
+        advanceTimeBy(2_000)
+
+        stalled.healthy = false
+        advanceTimeBy(1_000)
+
+        val (_, replacement) = factory.created
+        assertEquals(2, factory.created.size)
+        assertTrue(stalled.released)
+        assertTrue(replacement.playing)
+        assertSame(screen, replacement.surface)
+        assertEquals(WallperPlayerState.Playing, supervisor.state.value)
+    }
+
+    @Test
+    fun `without a kept standby the engine switched to isn't taken for a spare at the next stall`() = runTest {
+        val factory = FakeEngineFactory()
+        val supervisor = start(factory, keepsStandby = false)
+        advanceTimeBy(2_000)
+        factory.created[0].healthy = false
+        advanceTimeBy(1_000)
+        val second = factory.created[1]
+        advanceTimeBy(2_000)
+
+        second.healthy = false
+        advanceTimeBy(3_000)
+
+        val third = factory.created[2]
+        assertEquals(3, factory.created.size)
+        assertTrue(second.released)
+        assertTrue(third.playing)
+        assertFalse(third.released)
+        assertEquals(WallperPlayerState.Playing, supervisor.state.value)
+    }
+
+    @Test
+    fun `prepared means the active engine has its first frame`() = runTest {
+        playWhenReady.value = false
+        val factory = FakeEngineFactory { isReady.value = false }
+        val supervisor = start(factory)
+        val active = factory.created.first()
+
+        val prepared = async { supervisor.awaitPrepared(timeoutMs = 5_000) }
+        advanceTimeBy(1_000)
+        assertFalse(prepared.isCompleted)
+
+        active.isReady.value = true
+        assertTrue(prepared.await())
+    }
+
+    @Test
+    fun `an engine that fails or takes too long isn't prepared`() = runTest {
+        playWhenReady.value = false
+        val factory = FakeEngineFactory { isReady.value = false }
+        val supervisor = start(factory)
+
+        val slow = async { supervisor.awaitPrepared(timeoutMs = 5_000) }
+        advanceTimeBy(5_001)
+        assertFalse(slow.await())
+
+        factory.created.first().error.value = PlaybackException.ERROR_CODE_DECODING_FAILED
+        assertFalse(supervisor.awaitPrepared(timeoutMs = 5_000))
     }
 
     private fun newSurface() = Surface(SurfaceTexture(0))
