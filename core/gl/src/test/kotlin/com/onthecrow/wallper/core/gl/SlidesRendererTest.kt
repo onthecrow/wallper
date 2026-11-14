@@ -190,6 +190,19 @@ class SlidesRendererTest {
     }
 
     @Test
+    fun `a request to draw a removed slide that comes late draws nothing`() {
+        slides.warm(slideB)
+        slides.remove(slideB)
+        journal.clear()
+
+        slides.warm(slideB)
+        slides.show(slideB)
+        slides.onDrawFrame()
+
+        assertEquals(emptyList(), journal)
+    }
+
+    @Test
     fun `a slide that never drew has nothing to dispose of`() {
         slides.remove(slideB)
 

@@ -92,6 +92,22 @@ class SeriesWallpaperEngineTest {
     }
 
     @Test
+    fun `a slide whose time ran out as the wallpaper hid changes once it shows, and no more while hidden`() = runTest {
+        val series = series()
+        // The clock is at the slide's end, and its timer hasn't run yet.
+        advanceTimeBy(60_000)
+        series.pause()
+
+        series.resume()
+        assertEquals(slides[1], shown.slide)
+
+        series.pause()
+        advanceTimeBy(600_000)
+        assertEquals(slides[1], shown.slide)
+        assertEquals(2, engines.size)
+    }
+
+    @Test
     fun `on wake the next slide comes at each screen-off, paused until it shows`() = runTest {
         val series = series(SlideDuration.ON_WAKE)
         advanceTimeBy(3_600_000)

@@ -35,7 +35,9 @@ internal class SlidesRenderer(
         /** The context its GL objects were made in. */
         internal var context = NO_CONTEXT
         internal var hadPicture = false
-        internal var failed = false
+
+        /** Drawn no more: it failed or was removed. A request to draw it that comes late changes nothing. */
+        internal var dropped = false
 
         /** Frames in a row that threw while it was the one on screen. */
         internal var failedFrames = 0
@@ -92,7 +94,7 @@ internal class SlidesRenderer(
      */
     fun warm(slide: Slide): Boolean {
         if (slide === shown) return false
-        if (slide.failed) return true
+        if (slide.dropped) return true
         try {
             draw(slide)
         } catch (t: Throwable) {
@@ -103,11 +105,12 @@ internal class SlidesRenderer(
 
     /** From the next frame on, [slide] is the one on screen. */
     fun show(slide: Slide) {
-        shown = slide.takeUnless { it.failed }
+        shown = slide.takeUnless { it.dropped }
     }
 
     /** [slide] is drawn no more; its GL objects go. */
     fun remove(slide: Slide) {
+        slide.dropped = true
         if (shown === slide) shown = null
         dispose(slide)
     }
@@ -153,8 +156,8 @@ internal class SlidesRenderer(
     }
 
     private fun fail(slide: Slide, error: Throwable) {
-        if (slide.failed) return
-        slide.failed = true
+        if (slide.dropped) return
+        slide.dropped = true
         if (shown === slide) shown = null
         dispose(slide)
         slide.onFailed(error)

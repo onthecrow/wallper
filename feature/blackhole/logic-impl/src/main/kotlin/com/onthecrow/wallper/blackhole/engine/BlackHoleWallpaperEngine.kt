@@ -127,6 +127,10 @@ internal class BlackHoleWallpaperEngine(
     private var appliedFrameRate = -1
     @Volatile
     private var released = false
+
+    /** A slide's window went on to the next slide: its frame rate is that one's to ask for. */
+    @Volatile
+    private var windowHandedOver = false
     private val choreographer: Choreographer by lazy { Choreographer.getInstance() } // the callback looper's
     private val frameCallback = Choreographer.FrameCallback(::onVsync)
 
@@ -200,6 +204,11 @@ internal class BlackHoleWallpaperEngine(
     // The system frees the window right after this returns: wait for the EGL surface to go.
     override fun onSurfaceDestroyed() {
         gl.onSurfaceDestroyed(SURFACE_DESTROY_WAIT_MS)
+        if (slide != null) {
+            // Now, not when this engine is released: by then the next slide may have asked for its own rate.
+            windowHandedOver = true
+            setFrameRate(NO_FRAME_RATE)
+        }
     }
 
     override fun onOffsetsChanged(xOffset: Float, xOffsetStep: Float) {
@@ -227,7 +236,7 @@ internal class BlackHoleWallpaperEngine(
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 powerManager?.removeThermalStatusListener(thermalListener as PowerManager.OnThermalStatusChangedListener)
             }
-            // The window goes on to the next slide, which may never say what rate it wants.
+            // Slides that share a GL thread hand no window over: the next one may never say what rate it wants.
             if (slide != null) applyFrameRate(NO_FRAME_RATE)
         }
         // Runs after the teardown above on the callback thread, and waits for both.
@@ -452,8 +461,14 @@ internal class BlackHoleWallpaperEngine(
     )
 
     private fun applyFrameRate(target: Int) {
-        if (target == appliedFrameRate || Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
+        if (target == appliedFrameRate || windowHandedOver) return
         appliedFrameRate = target
+        setFrameRate(target)
+    }
+
+    /** Any thread. */
+    private fun setFrameRate(target: Int) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
         runCatching {
             holder.surface.setFrameRate(target.toFloat(), Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
         }

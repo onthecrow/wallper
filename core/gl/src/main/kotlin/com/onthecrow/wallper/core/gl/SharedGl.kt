@@ -88,11 +88,14 @@ class SharedGl(
         private inner class Running(val renderer: R, val session: Session) {
             val slide = SlidesRenderer.Slide(
                 renderer = renderer,
-                onFirstPicture = { clientHandler.post { if (running === this) client.onFirstPicture() } },
+                onFirstPicture = {
+                    clientHandler.post { if (running === this && role != Role.RELEASED) client.onFirstPicture() }
+                },
                 onFailed = { error -> client.onGiveUp("The slide's renderer failed", error) },
             )
         }
 
+        /** Kept after [release] too: an engine's own thread may still read [renderer] for a moment. */
         @Volatile
         private var running: Running? = null
 
@@ -109,7 +112,9 @@ class SharedGl(
             run(client.newRenderer())
         }
 
-        override fun isCurrent(renderer: R): Boolean = running?.renderer === renderer
+        /** False from the moment its GL thread is replaced, not only once the new renderer is made. */
+        override fun isCurrent(renderer: R): Boolean =
+            running?.let { it.renderer === renderer && gl.isCurrent(it.session) } == true
 
         override fun requestRender() {
             val now = running ?: return
@@ -121,7 +126,7 @@ class SharedGl(
         }
 
         override fun post(task: (R) -> Unit) {
-            val now = running ?: return
+            val now = running?.takeIf { role != Role.RELEASED } ?: return
             now.session.thread.post { task(now.renderer) }
         }
 
@@ -144,6 +149,8 @@ class SharedGl(
         }
 
         override fun show() {
+            // An engine may ask from its own thread after the series has let it go.
+            if (role == Role.RELEASED) return
             role = Role.SHOWN
             shown = this
             gl.setFramesExpected(framesExpected)
@@ -159,7 +166,6 @@ class SharedGl(
                 gl.setFramesExpected(false)
             }
             val last = running ?: return
-            running = null
             last.session.thread.post { last.session.slides.remove(last.slide) }
         }
 
@@ -176,8 +182,13 @@ class SharedGl(
 
         /** Puts [renderer] on the GL thread there is now, in the place this link has: on screen or warming up. */
         private fun run(renderer: R) {
+            val previous = running
             val next = Running(renderer, gl.current)
             running = next
+            // A start that overlapped a restart leaves two renderers of this link on one thread: the first is nobody's.
+            if (previous != null && previous.session === next.session) {
+                previous.session.thread.post { previous.session.slides.remove(previous.slide) }
+            }
             when (role) {
                 Role.SHOWN -> present(next)
                 Role.WARMING -> warm(next)

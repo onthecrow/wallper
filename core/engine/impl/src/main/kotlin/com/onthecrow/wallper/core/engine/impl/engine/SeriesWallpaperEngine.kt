@@ -4,6 +4,7 @@ import com.onthecrow.wallper.core.engine.EngineHost
 import com.onthecrow.wallper.core.engine.WallpaperEngine
 import com.onthecrow.wallper.core.model.SlideDuration
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.CoroutineStart
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
@@ -126,13 +127,18 @@ internal class SeriesWallpaperEngine(
      */
     private fun startTimer() {
         timer?.cancel()
+        timer = null
         if (slideCount < 2 || slideDuration.isOnWake || !visible || !hasSurface || released) return
-        timer = scope.launch {
+        // Known as the timer before it runs: with no time left it switches at once, in place, and the
+        // timer that switch starts must not be taken for this one afterwards.
+        val job = scope.launch(start = CoroutineStart.LAZY) {
             delay(timeLeft() - stage.lead)
             nextPlayable(after = index)?.takeIf { it != index }?.let { stage.prepare(it) }
             delay(timeLeft())
             next()
         }
+        timer = job
+        job.start()
     }
 
     /** What is left of the visible time of the slide on screen. */

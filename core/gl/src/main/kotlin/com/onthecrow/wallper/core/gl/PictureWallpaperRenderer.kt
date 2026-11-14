@@ -65,6 +65,9 @@ class PictureWallpaperRenderer(
     /** What [decodeOn] decoded, on its way from that thread to the frame that makes the texture of it. */
     private val decoded = AtomicReference<Decoded?>(null)
 
+    @Volatile
+    private var disposed = false
+
     /** The picture is a texture: before that a draw shows nothing. */
     override val hasPicture: Boolean get() = textureId != 0
 
@@ -120,6 +123,7 @@ class PictureWallpaperRenderer(
     }
 
     override fun dispose() {
+        disposed = true
         decoded.getAndSet(null)?.bitmap?.recycle()
         if (textureId != 0) GLES20.glDeleteTextures(1, intArrayOf(textureId), 0)
         textureId = 0
@@ -153,7 +157,11 @@ class PictureWallpaperRenderer(
         val elsewhere = decodeElsewhere ?: return decodeSafely(sample)
         if (!awaitingDecode) {
             awaitingDecode = true
-            elsewhere { decoded.set(decodeSafely(sample)) }
+            elsewhere {
+                decoded.set(decodeSafely(sample))
+                // Disposed of meanwhile: no frame will come for it.
+                if (disposed) decoded.getAndSet(null)?.bitmap?.recycle()
+            }
             return null
         }
         return decoded.getAndSet(null)?.also { decodeElsewhere = null }
