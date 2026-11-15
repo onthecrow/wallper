@@ -19,7 +19,7 @@ class AppSettingsTest {
             pauseVideoToSaveBattery = false,
             theme = ThemeMode.DARK,
             dynamicColor = false,
-            seriesSwitch = SeriesSwitch.SHARED_GL,
+            seriesSwitch = SeriesSwitch.WARM_ENGINES,
         )
 
         assertEquals(settings, AppSettings.decode(settings.encode()))
