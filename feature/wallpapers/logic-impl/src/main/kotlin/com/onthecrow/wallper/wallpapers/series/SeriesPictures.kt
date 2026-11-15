@@ -63,7 +63,7 @@ internal class SeriesPictures(private val directory: File) {
         update("$FORMAT_VERSION $SIZE".toByteArray())
         parts.forEach { part ->
             val stamp = part.picture?.let { File(it).run { "$it:${length()}:${lastModified()}" } } ?: "-"
-            val tint = part.tint?.let { ":tint${it.argb}" }.orEmpty()
+            val tint = part.tint?.let { ":x${it.argb}" }.orEmpty()
             update(" $stamp$tint".toByteArray())
         }
     }.value
@@ -71,7 +71,7 @@ internal class SeriesPictures(private val directory: File) {
     /**
      * Draws the pictures one over the next, each over everything right of its left line: the parts meet without
      * a seam, the line's smoothing over the part before. A picture fills its part's box, scaled to cover it and
-     * cut evenly on the sides, as on the list's cards, and has its member's tint over it.
+     * cut evenly on the sides, as on the list's cards, and is seen through its member's tint.
      */
     private fun render(parts: List<SeriesPart>, file: File): Boolean {
         val layout = SeriesPictureLayout(parts.size, SIZE.toFloat(), SIZE.toFloat())
@@ -97,8 +97,16 @@ internal class SeriesPictures(private val directory: File) {
                     }
                     canvas.drawPath(area, Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply { this.shader = shader })
                     picture.recycle()
-                    // Over the same area: the next part covers both where it begins.
-                    part.tint?.let { tint -> canvas.drawPath(area, Paint(Paint.ANTI_ALIAS_FLAG).apply { color = tint.argb }) }
+                    // Over the same area, multiplying it: the next part covers both where it begins.
+                    part.tint?.let { tint ->
+                        canvas.drawPath(
+                            area,
+                            Paint(Paint.ANTI_ALIAS_FLAG).apply {
+                                color = tint.multiplierArgb
+                                xfermode = PorterDuffXfermode(PorterDuff.Mode.MULTIPLY)
+                            },
+                        )
+                    }
                 }
             }
             directory.mkdirs()

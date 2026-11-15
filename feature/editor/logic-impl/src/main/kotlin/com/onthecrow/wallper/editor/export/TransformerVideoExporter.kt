@@ -131,8 +131,8 @@ internal class TransformerVideoExporter @Inject constructor(
     }
 
     /**
-     * Lays [tint] over every frame. An SDR video is processed in its own gamma values, so the frames come
-     * out as the wallpaper's renderers and the editor's preview draw the tint. Media3 folds it into the
+     * Puts [tint] into every frame. An SDR video is processed in its own gamma values, so the frames come
+     * out as the wallpaper's renderers and the editor's preview show the tint. Media3 folds it into the
      * crop's shader: no pass of its own.
      */
     @OptIn(UnstableApi::class)

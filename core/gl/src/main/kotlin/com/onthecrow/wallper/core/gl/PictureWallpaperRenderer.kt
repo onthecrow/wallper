@@ -31,7 +31,7 @@ import java.util.concurrent.atomic.AtomicReference
  * @param decodeOn runs the decoding it is given somewhere else than the GL thread, which may be drawing
  * another wallpaper meanwhile, and asks for a frame afterwards: that frame makes the texture. Null decodes
  * on the GL thread, inside the frame. A context lost later is always redecoded there.
- * @param tint laid over the picture as it is drawn ([TintUniform]): the texture stays the picture itself.
+ * @param tint what the picture is seen through as it is drawn ([TintUniform]): the texture stays the picture itself.
  */
 class PictureWallpaperRenderer(
     private val path: String,
@@ -258,7 +258,7 @@ class PictureWallpaperRenderer(
 
             void main() {
                 vec4 color = texture2D(sTexture, vTextureCoord);
-                gl_FragColor = ${TintUniform.MIX};
+                gl_FragColor = ${TintUniform.APPLIED};
             }
         """
 

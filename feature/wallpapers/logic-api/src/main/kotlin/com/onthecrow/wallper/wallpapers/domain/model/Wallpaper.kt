@@ -26,7 +26,7 @@ sealed interface Wallpaper {
         val clip: ClipRange,
         val mediaInfo: MediaInfo,
         override val isActive: Boolean,
-        /** Laid over it while it is drawn, and over its picture wherever that is shown; null for none. */
+        /** What it is seen through while it is drawn, and its picture wherever that is shown; null for none. */
         val tint: Tint? = null,
     ) : Wallpaper
 
@@ -41,7 +41,7 @@ sealed interface Wallpaper {
         override val isActive: Boolean,
         /**
          * The tint the export put into the video's frames. The thumbnail is the frame before it: whoever
-         * shows the thumbnail lays the tint over it.
+         * shows the thumbnail adds the tint to it.
          */
         val tint: Tint? = null,
     ) : Wallpaper

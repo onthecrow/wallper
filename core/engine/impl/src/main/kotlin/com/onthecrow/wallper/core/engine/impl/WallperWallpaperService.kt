@@ -4,6 +4,7 @@ import android.app.WallpaperColors
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.graphics.Canvas
+import android.graphics.PorterDuff
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -83,8 +84,8 @@ class WallperWallpaperService : WallpaperService() {
     private fun colorsOf(bitmap: Bitmap): WallpaperColors = WallpaperColors.fromBitmap(bitmap).also { bitmap.recycle() }
 
     /**
-     * The thumbnail decoded at about [COLORS_SIZE] wide, never at full size, with the wallpaper's [tint] over
-     * it: the colours are those of what is on screen.
+     * The thumbnail decoded at about [COLORS_SIZE] wide, never at full size, seen through the wallpaper's
+     * [tint]: the colours are those of what is on screen.
      */
     private fun decodeSmall(path: String, tint: Tint?): Bitmap? {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -98,7 +99,8 @@ class WallperWallpaperService : WallpaperService() {
             inMutable = tint != null
         }
         val bitmap = BitmapFactory.decodeFile(path, options) ?: return null
-        if (tint != null) Canvas(bitmap).drawColor(tint.argb)
+        // Android's MULTIPLY is a plain product of the colours, which with an opaque one is the tint.
+        if (tint != null) Canvas(bitmap).drawColor(tint.multiplierArgb, PorterDuff.Mode.MULTIPLY)
         return bitmap
     }
 

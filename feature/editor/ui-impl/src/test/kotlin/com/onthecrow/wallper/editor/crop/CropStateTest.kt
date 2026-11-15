@@ -57,7 +57,7 @@ class CropStateTest {
 
     @Test
     fun `a frame that shrinks and grows step by step keeps the crop exactly`() {
-        // The tint's picker opens under the crop and closes again: the frame changes size every frame of it.
+        // A window resized by hand, or a split screen dragged: the frame changes size many times on the way.
         val state = CropState(media, screenAspectRatio = 0.45f, startCrop = null)
         state.onFrameSize(450f, 1000f)
         state.onGestureStart()

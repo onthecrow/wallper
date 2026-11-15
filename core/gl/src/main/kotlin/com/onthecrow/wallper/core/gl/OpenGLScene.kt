@@ -46,7 +46,7 @@ internal class OpenGLScene(
 
         void main() {
             vec4 color = texture2D(sTexture, vTextureCoord);
-            gl_FragColor = ${TintUniform.MIX};
+            gl_FragColor = ${TintUniform.APPLIED};
         }
     """.trimIndent()
 

@@ -29,6 +29,7 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
@@ -44,8 +45,9 @@ import kotlin.math.ceil
  *
  * It keeps nothing: [color] is what it shows, [onColorChange] what a touch asks for. The card is inset from
  * the picker's bounds by as much as a thumb at an edge reaches out ([ColorPickerDefaults.EdgeInset] on either
- * side). The picker's bounds are kept from the system's edge gestures, so a thumb near the screen's edge can
- * be dragged. Its geometry lives in `ColorPickerMath.kt` and is tested on the JVM.
+ * side). The two bars are kept from the system's edge gestures, so a thumb at the screen's edge can be
+ * dragged; the area above them is not, so «back» still works over most of the picker. Its geometry lives in
+ * `ColorPickerMath.kt` and is tested on the JVM.
  */
 @Composable
 fun ColorPicker(
@@ -56,14 +58,19 @@ fun ColorPicker(
     // Read while drawing and by the gesture, so neither is set up again for each colour.
     val currentColor by rememberUpdatedState(color)
     val currentOnColorChange by rememberUpdatedState(onColorChange)
+    val density = LocalDensity.current
     Spacer(
         modifier
             .fillMaxWidth()
             .height(ColorPickerDefaults.Height)
-            // A thumb at either end of a bar is where the system takes a swipe for «back»: the drag is the
-            // picker's. The system grants an edge 200 dp of this, from the bottom up, which covers both bars
-            // and most of the area.
-            .systemGestureExclusion()
+            // A thumb at either end of a bar is where the system takes a swipe for «back»: there the drag is
+            // the picker's. Only there: the bars, and the area's bottom edge as far as its thumb reaches. A
+            // swipe from the screen's edge anywhere higher is still «back».
+            .systemGestureExclusion { coordinates ->
+                val size = coordinates.size.toSize()
+                val top = with(density) { geometryOf(size).hueTop - ColorPickerDefaults.AreaThumbRadius.toPx() }
+                Rect(left = 0f, top = top.coerceAtLeast(0f), right = size.width, bottom = size.height)
+            }
             .pointerInput(Unit) {
                 awaitEachGesture {
                     // No touch slop: the thumb goes under the finger as it comes down.

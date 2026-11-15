@@ -57,12 +57,12 @@ internal class StorageViewModel @Inject constructor(
 
     private fun WallpaperStorage.toItem(): StorageItem? = when (val wallpaper = wallpaper) {
         is Wallpaper.Media -> if (wallpaper.type == MediaType.VIDEO) {
-            StorageItem(wallpaper.id, wallpaper.thumbnailPath, StorageItem.Kind.ORIGINAL_VIDEO, bytes, wallpaper.tint?.argb)
+            StorageItem(wallpaper.id, wallpaper.thumbnailPath, StorageItem.Kind.ORIGINAL_VIDEO, bytes, wallpaper.tint?.multiplierArgb)
         } else {
-            StorageItem(wallpaper.id, wallpaper.originalPath, StorageItem.Kind.PICTURE, bytes, wallpaper.tint?.argb)
+            StorageItem(wallpaper.id, wallpaper.originalPath, StorageItem.Kind.PICTURE, bytes, wallpaper.tint?.multiplierArgb)
         }
         is Wallpaper.ProcessedVideo ->
-            StorageItem(wallpaper.id, wallpaper.thumbnailPath, StorageItem.Kind.OPTIMISED_VIDEO, bytes, wallpaper.tint?.argb)
+            StorageItem(wallpaper.id, wallpaper.thumbnailPath, StorageItem.Kind.OPTIMISED_VIDEO, bytes, wallpaper.tint?.multiplierArgb)
         // Neither keeps files of its own; the storage list has none of them anyway.
         is Wallpaper.BuiltIn,
         is Wallpaper.Group -> null

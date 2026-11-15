@@ -28,7 +28,7 @@ internal data class EditorState(
     val isProcessingInfoSeen: Boolean = false,
     /** The explanation on screen, null when it isn't. */
     val processingInfo: ProcessingInfo? = null,
-    /** The colour laid over the wallpaper, and whether it is. */
+    /** The colour the wallpaper is seen through, and whether it is. */
     val tint: TintChoice = TintChoice(),
     /** The tint's picker and switch are on screen, in place of the trim bar and the save row. */
     val isTintOpen: Boolean = false,

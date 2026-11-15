@@ -8,30 +8,22 @@ import kotlin.test.assertEquals
 class TintMatrixTest {
 
     @Test
-    fun `a pixel comes out as the tint over it`() {
+    fun `a pixel comes out multiplied by the tint's factors`() {
         val tint = Tint(0x80FF8000.toInt())
-        val pixel = floatArrayOf(0.2f, 0.5f, 0.9f)
 
-        val out = TintMatrix(tint).toGlArray().times(pixel)
+        val out = TintMatrix(tint).toGlArray().times(floatArrayOf(0.2f, 0.5f, 0.9f))
 
-        assertEquals(tint.over(0.2f, tint.red), out[0], TOLERANCE)
-        assertEquals(tint.over(0.5f, tint.green), out[1], TOLERANCE)
-        assertEquals(tint.over(0.9f, tint.blue), out[2], TOLERANCE)
+        assertEquals(0.2f * tint.redFactor, out[0], TOLERANCE)
+        assertEquals(0.5f * tint.greenFactor, out[1], TOLERANCE)
+        assertEquals(0.9f * tint.blueFactor, out[2], TOLERANCE)
     }
 
     @Test
-    fun `an opaque tint leaves only its colour`() {
-        val out = TintMatrix(Tint(0xFF336699.toInt())).toGlArray().times(floatArrayOf(0.7f, 0.1f, 0.4f))
+    fun `black at full strength leaves nothing, and white leaves everything`() {
+        val pixel = floatArrayOf(0.7f, 0.1f, 0.4f)
 
-        assertContentEquals(floatArrayOf(0x33 / 255f, 0x66 / 255f, 0x99 / 255f), out)
-    }
-
-    @Test
-    fun `black at a third only darkens`() {
-        val matrix = TintMatrix(Tint(0x55000000))
-
-        assertEquals(2 / 3f, matrix.keep, TOLERANCE)
-        assertContentEquals(floatArrayOf(0f, 0f, 0f), floatArrayOf(matrix.addRed, matrix.addGreen, matrix.addBlue))
+        assertContentEquals(floatArrayOf(0f, 0f, 0f), TintMatrix(Tint(0xFF000000.toInt())).toGlArray().times(pixel))
+        assertContentEquals(pixel, TintMatrix(Tint(0xFFFFFFFF.toInt())).toGlArray().times(pixel))
     }
 
     /** The column-major matrix times `(r, g, b, 1)`, as the export's shader does it; its rgb. */

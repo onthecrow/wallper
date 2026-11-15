@@ -36,6 +36,9 @@ import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.IntSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import kotlin.math.max
 import kotlin.math.min
@@ -89,12 +92,7 @@ internal fun CropEditor(
             with(density) {
                 FrameBounds.fit(
                     area = Size(areaWidth, areaHeight),
-                    padding = Rect(
-                        left = framePadding.calculateStartPadding(layoutDirection).toPx(),
-                        top = framePadding.calculateTopPadding().toPx(),
-                        right = framePadding.calculateEndPadding(layoutDirection).toPx(),
-                        bottom = framePadding.calculateBottomPadding().toPx(),
-                    ),
+                    padding = framePadding.toPx(this, layoutDirection),
                     border = PhoneFrameDefaults.BorderWidth.toPx(),
                     aspectRatio = state.screenAspectRatio,
                 )
@@ -192,6 +190,39 @@ internal object CropEditorDefaults {
     /** The lines that show a snap. */
     val GuideColor = Color(0xFFFFD60A)
     const val GUIDE_FADE_MS = 150
+
+    /**
+     * How much smaller than it is laid out a [CropEditor] of [full] pixels is to be drawn, about its middle, to
+     * show its whole frame inside [FramePadding] in only [visibleHeight] pixels of height: 1 while it fits as
+     * it is. Drawn smaller as a whole, the frame keeps its proportions (border, buttons, cut-out) and the
+     * picture under it its place, so the crop is the same to the pixel; laying it out anew for the smaller
+     * room would keep those parts their size on a smaller body.
+     */
+    fun scaleToFit(
+        density: Density,
+        layoutDirection: LayoutDirection,
+        full: IntSize,
+        visibleHeight: Int,
+        screenAspectRatio: Float,
+    ): Float = with(density) {
+        FrameBounds.scaleToFit(
+            full = Size(full.width.toFloat(), full.height.toFloat()),
+            visible = Size(full.width.toFloat(), visibleHeight.toFloat()),
+            padding = FramePadding.toPx(this, layoutDirection),
+            border = PhoneFrameDefaults.BorderWidth.toPx(),
+            aspectRatio = screenAspectRatio,
+        )
+    }
+}
+
+/** Each side's inset in pixels. */
+private fun PaddingValues.toPx(density: Density, layoutDirection: LayoutDirection): Rect = with(density) {
+    Rect(
+        left = calculateStartPadding(layoutDirection).toPx(),
+        top = calculateTopPadding().toPx(),
+        right = calculateEndPadding(layoutDirection).toPx(),
+        bottom = calculateBottomPadding().toPx(),
+    )
 }
 
 /** The phone's [body] (its outer edge) and its [screen], the opening the crop shows, in pixels of the area. */
@@ -213,6 +244,18 @@ internal data class FrameBounds(val body: Rect, val screen: Rect) {
                 size = Size(bodyWidth, bodyHeight),
             )
             return FrameBounds(body = body, screen = body.deflate(border))
+        }
+
+        /**
+         * The scale at which the body [fit] into [full] also fits [visible] inside the same [padding]: 1 if it
+         * does already, never more, and 0 when [visible] leaves it no room at all.
+         */
+        fun scaleToFit(full: Size, visible: Size, padding: Rect, border: Float, aspectRatio: Float): Float {
+            val body = fit(full, padding, border, aspectRatio).body
+            if (body.width <= 0f || body.height <= 0f) return 1f
+            val roomWidth = visible.width - padding.left - padding.right
+            val roomHeight = visible.height - padding.top - padding.bottom
+            return minOf(1f, roomWidth / body.width, roomHeight / body.height).coerceAtLeast(0f)
         }
     }
 }

@@ -17,7 +17,7 @@ internal data class WallpaperItem(
     /** A group's first members, whose pictures make its picture (`MakeSeriesPictureUseCase`). */
     val cover: List<WallpaperItem> = emptyList(),
     /**
-     * Laid over the picture where it is shown: the wallpaper's own, which its picture's file never has. A
+     * What the picture is shown through: the wallpaper's own, which its picture's file never has in it. A
      * series' picture has its members' in it already; a series of one shows its member's picture, under its tint.
      */
     val tint: Tint? = null,

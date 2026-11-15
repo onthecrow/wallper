@@ -19,7 +19,7 @@ sealed interface WallpaperSpec {
         val crop: CropRect,
         val clip: ClipRange,
         val mediaInfo: MediaInfo,
-        /** Laid over every frame by the renderer; null for none. */
+        /** What the renderer shows every frame through; null for none. */
         val tint: Tint? = null,
     ) : WallpaperSpec
 

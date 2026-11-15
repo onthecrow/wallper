@@ -138,7 +138,7 @@ internal fun WallpaperPicture(wallpaper: WallpaperItem, modifier: Modifier = Mod
             AsyncImage(
                 modifier = Modifier
                     .fillMaxSize()
-                    .wallpaperTint(wallpaper.tint?.argb),
+                    .wallpaperTint(wallpaper.tint?.multiplierArgb),
                 model = picturePath,
                 contentScale = ContentScale.Crop,
                 contentDescription = null,

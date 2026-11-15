@@ -128,7 +128,7 @@ private fun StorageRow(item: StorageItem, onEditClick: () -> Unit, onDeleteClick
                 modifier = Modifier
                     .size(56.dp)
                     .clip(RoundedCornerShape(12.dp))
-                    .wallpaperTint(item.tint),
+                    .wallpaperTint(item.tintMultiplier),
             )
         },
         headlineContent = { Text(text = Formatter.formatShortFileSize(context, item.bytes)) },
