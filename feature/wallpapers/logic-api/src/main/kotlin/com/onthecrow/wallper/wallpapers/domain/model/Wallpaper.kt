@@ -6,6 +6,7 @@ import com.onthecrow.wallper.core.model.CropRect
 import com.onthecrow.wallper.core.model.MediaInfo
 import com.onthecrow.wallper.core.model.MediaType
 import com.onthecrow.wallper.core.model.SlideDuration
+import com.onthecrow.wallper.core.model.Tint
 
 /** A row of the wallpapers list; any of them can be the active one. */
 sealed interface Wallpaper {
@@ -25,6 +26,8 @@ sealed interface Wallpaper {
         val clip: ClipRange,
         val mediaInfo: MediaInfo,
         override val isActive: Boolean,
+        /** Laid over it while it is drawn, and over its picture wherever that is shown; null for none. */
+        val tint: Tint? = null,
     ) : Wallpaper
 
     /**
@@ -36,6 +39,11 @@ sealed interface Wallpaper {
         val path: String,
         val thumbnailPath: String,
         override val isActive: Boolean,
+        /**
+         * The tint the export put into the video's frames. The thumbnail is the frame before it: whoever
+         * shows the thumbnail lays the tint over it.
+         */
+        val tint: Tint? = null,
     ) : Wallpaper
 
     /** Ships with the app: it has settings instead of media and can't be deleted. */

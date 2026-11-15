@@ -10,12 +10,15 @@ internal fun Wallpaper.toItem(): WallpaperItem = when (this) {
         id = id,
         picturePath = if (type == MediaType.VIDEO) thumbnailPath else originalPath,
         isActive = isActive,
+        tint = tint,
     )
     is Wallpaper.ProcessedVideo -> WallpaperItem(
         id = id,
         picturePath = thumbnailPath,
         isActive = isActive,
         isOptimised = true,
+        // In the video's frames, but not in its thumbnail.
+        tint = tint,
     )
     // The picture is the preview: it is rendered in the background and added by the reducer.
     is Wallpaper.BuiltIn -> WallpaperItem(
@@ -25,11 +28,16 @@ internal fun Wallpaper.toItem(): WallpaperItem = when (this) {
         builtIn = wallpaper,
     )
     // The picture is made of the cover's in the background, and added by the reducer.
-    is Wallpaper.Group -> WallpaperItem(
-        id = id,
-        picturePath = null,
-        isActive = isActive,
-        isGroup = true,
-        cover = members.take(MakeSeriesPictureUseCase.MAX_PICTURES).map { it.toItem() },
-    )
+    is Wallpaper.Group -> {
+        val cover = members.take(MakeSeriesPictureUseCase.MAX_PICTURES).map { it.toItem() }
+        WallpaperItem(
+            id = id,
+            picturePath = null,
+            isActive = isActive,
+            isGroup = true,
+            cover = cover,
+            // A series of one shows its member's own picture, which has no tint in it.
+            tint = cover.singleOrNull()?.tint,
+        )
+    }
 }

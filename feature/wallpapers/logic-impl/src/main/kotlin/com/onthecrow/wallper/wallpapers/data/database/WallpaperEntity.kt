@@ -46,6 +46,11 @@ internal data class WallpaperEntity(
     @ColumnInfo(name = "built_in") val builtIn: String? = null,
     /** Set for a group only: how long each of its members shows ([com.onthecrow.wallper.core.model.SlideDuration]); since v6. */
     @ColumnInfo(name = "slide_duration_ms") val slideDurationMs: Long? = null,
+    /**
+     * [com.onthecrow.wallper.core.model.Tint.argb] of the user's media, null without a tint; since v7. A
+     * processed video has it in its frames already: there it is kept for the thumbnail.
+     */
+    @ColumnInfo(name = "tint") val tint: Int? = null,
 )
 
 /** The files of the row in device-protected storage. Empty paths are placeholders: a built-in's, a picture's thumbnail. */

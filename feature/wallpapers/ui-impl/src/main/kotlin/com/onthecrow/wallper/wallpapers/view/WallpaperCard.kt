@@ -37,6 +37,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toOffset
 import coil.compose.AsyncImage
 import com.onthecrow.wallper.core.designsystem.R as DesignR
+import com.onthecrow.wallper.core.designsystem.component.wallpaperTint
 import com.onthecrow.wallper.core.model.BuiltInWallpaper
 import com.onthecrow.wallper.wallpapers.model.WallpaperItem
 import com.onthecrow.wallper.wallpapers.ui.R
@@ -127,15 +128,17 @@ internal fun BoxScope.CornerEditButton(wallpaper: WallpaperItem, onClick: () -> 
 }
 
 /**
- * The wallpaper's picture, scaled to fill and cut evenly on the sides that don't fit. Until a built-in's
- * preview or a series' picture is made there is no picture, only the colour behind it.
+ * The wallpaper's picture, scaled to fill and cut evenly on the sides that don't fit, under the wallpaper's
+ * tint. Until a built-in's preview or a series' picture is made there is no picture, only the colour behind it.
  */
 @Composable
 internal fun WallpaperPicture(wallpaper: WallpaperItem, modifier: Modifier = Modifier) {
     Box(modifier = modifier.then(if (wallpaper.isPictureMade) Modifier.background(BuiltInPlaceholderColor) else Modifier)) {
         wallpaper.picturePath?.let { picturePath ->
             AsyncImage(
-                modifier = Modifier.fillMaxSize(),
+                modifier = Modifier
+                    .fillMaxSize()
+                    .wallpaperTint(wallpaper.tint?.argb),
                 model = picturePath,
                 contentScale = ContentScale.Crop,
                 contentDescription = null,

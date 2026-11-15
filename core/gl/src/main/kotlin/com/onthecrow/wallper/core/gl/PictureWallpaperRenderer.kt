@@ -8,6 +8,7 @@ import android.opengl.GLES20
 import android.opengl.GLUtils
 import android.os.Build
 import com.onthecrow.wallper.core.model.CropRect
+import com.onthecrow.wallper.core.model.Tint
 import timber.log.Timber
 import java.io.IOException
 import java.nio.ByteBuffer
@@ -30,6 +31,7 @@ import java.util.concurrent.atomic.AtomicReference
  * @param decodeOn runs the decoding it is given somewhere else than the GL thread, which may be drawing
  * another wallpaper meanwhile, and asks for a frame afterwards: that frame makes the texture. Null decodes
  * on the GL thread, inside the frame. A context lost later is always redecoded there.
+ * @param tint laid over the picture as it is drawn ([TintUniform]): the texture stays the picture itself.
  */
 class PictureWallpaperRenderer(
     private val path: String,
@@ -40,6 +42,7 @@ class PictureWallpaperRenderer(
     private var screenHeight: Int,
     private val onFailed: (Throwable?) -> Unit,
     private val decodeOn: ((decode: () -> Unit) -> Unit)? = null,
+    private val tint: Tint? = null,
 ) : GLWallpaperRenderer() {
 
     /**
@@ -96,6 +99,7 @@ class PictureWallpaperRenderer(
         val shift = pageOffset?.let(pageScroll::shift)
         GLES20.glUniform2f(GLES20.glGetUniformLocation(program, "uUvShift"), shift?.u ?: 0f, shift?.v ?: 0f)
         GLES20.glUniformMatrix4fv(GLES20.glGetUniformLocation(program, "uTexMatrix"), 1, false, textureMatrix, 0)
+        TintUniform.set(GLES20.glGetUniformLocation(program, TintUniform.NAME), tint)
 
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureId)
@@ -250,9 +254,11 @@ class PictureWallpaperRenderer(
             #endif
             varying vec2 vTextureCoord;
             uniform sampler2D sTexture;
+            ${TintUniform.DECLARATION}
 
             void main() {
-                gl_FragColor = texture2D(sTexture, vTextureCoord);
+                vec4 color = texture2D(sTexture, vTextureCoord);
+                gl_FragColor = ${TintUniform.MIX};
             }
         """
 

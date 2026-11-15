@@ -11,6 +11,7 @@ import com.onthecrow.wallper.core.model.CropRect
 import com.onthecrow.wallper.core.model.MediaInfo
 import com.onthecrow.wallper.core.model.MediaType
 import com.onthecrow.wallper.core.model.SlideDuration
+import com.onthecrow.wallper.core.model.Tint
 import com.onthecrow.wallper.core.navigation.Destination
 import com.onthecrow.wallper.core.navigation.Navigator
 import com.onthecrow.wallper.editor.EditorDestination
@@ -21,6 +22,7 @@ import com.onthecrow.wallper.settings.domain.AppSettingsSource
 import com.onthecrow.wallper.wallpapers.domain.ActivateWallpaperUseCase
 import com.onthecrow.wallper.wallpapers.domain.DeleteWallpaperUseCase
 import com.onthecrow.wallper.wallpapers.domain.MakeSeriesPictureUseCase
+import com.onthecrow.wallper.wallpapers.domain.SeriesPart
 import com.onthecrow.wallper.wallpapers.domain.ObserveWallpapersUseCase
 import com.onthecrow.wallper.wallpapers.domain.model.Wallpaper
 import com.onthecrow.wallper.wallpapers.model.WallpaperItem
@@ -105,7 +107,7 @@ class WallpapersViewModelTest {
             listOf(WallpaperItem(7, "thumbnail-1", true, isGroup = true, cover = listOf(WallpaperItem(1, "thumbnail-1", false)))),
             viewModel.state.value.items,
         )
-        assertEquals(listOf(7 to listOf<String?>("thumbnail-1")), seriesPictures.requests)
+        assertEquals(listOf(7 to parts("thumbnail-1")), seriesPictures.requests)
         assertEquals(listOf<Destination>(WallpaperGroupDestination(7)), navigator.destinations)
     }
 
@@ -119,7 +121,7 @@ class WallpapersViewModelTest {
 
         previews.paths.emit("previews/black_hole_1.png")
         assertEquals(
-            listOf(7 to listOf<String?>("previews/black_hole_1.png", "thumbnail-1", "thumbnail-2", "thumbnail-3")),
+            listOf(7 to parts("previews/black_hole_1.png", "thumbnail-1", "thumbnail-2", "thumbnail-3")),
             seriesPictures.requests,
         )
         assertEquals("series-7", viewModel.state.value.items.single().picturePath)
@@ -128,7 +130,36 @@ class WallpapersViewModelTest {
         wallpapers.value = listOf(group(id = 7, builtIn(id = 5), *(1..4).map { wallpaper(it, MediaType.VIDEO) }.toTypedArray(), isActive = false))
         assertEquals(1, seriesPictures.requests.size)
         previews.paths.emit("previews/black_hole_2.png")
-        assertEquals(listOf("previews/black_hole_2.png", "thumbnail-1", "thumbnail-2", "thumbnail-3"), seriesPictures.requests.last().second)
+        assertEquals(parts("previews/black_hole_2.png", "thumbnail-1", "thumbnail-2", "thumbnail-3"), seriesPictures.requests.last().second)
+    }
+
+    @Test
+    fun `a wallpaper's tint goes over its picture, and into its series' picture`() = runTest(dispatcher) {
+        val tint = Tint(0x4D000000)
+        val tinted = wallpaper(id = 1, type = MediaType.VIDEO).copy(tint = tint)
+        val optimised = Wallpaper.ProcessedVideo(id = 2, path = "processed-2", thumbnailPath = "thumbnail-2", isActive = false, tint = tint)
+        wallpapers.value = listOf(tinted, optimised, group(id = 7, tinted, wallpaper(id = 3, type = MediaType.IMAGE)))
+
+        val viewModel = createViewModel()
+
+        val items = viewModel.state.value.items
+        assertEquals(listOf(tint, tint, null), items.map { it.tint })
+        assertEquals(listOf(7 to listOf(SeriesPart("thumbnail-1", tint), SeriesPart("original-3"))), seriesPictures.requests)
+        // Made again when the tint goes.
+        wallpapers.value = listOf(group(id = 7, wallpaper(id = 1, type = MediaType.VIDEO), wallpaper(id = 3, type = MediaType.IMAGE)))
+        assertEquals(parts("thumbnail-1", "original-3"), seriesPictures.requests.last().second)
+    }
+
+    @Test
+    fun `a series of one shows its member's picture under its member's tint`() = runTest(dispatcher) {
+        val tint = Tint(0x4D000000)
+        wallpapers.value = listOf(group(id = 7, wallpaper(id = 1, type = MediaType.VIDEO).copy(tint = tint)))
+
+        val viewModel = createViewModel()
+
+        val series = viewModel.state.value.items.single()
+        assertEquals("thumbnail-1", series.picturePath)
+        assertEquals(tint, series.tint)
     }
 
     @Test
@@ -138,7 +169,7 @@ class WallpapersViewModelTest {
 
         createViewModel()
 
-        assertEquals(listOf(7 to listOf(null, "thumbnail-1")), seriesPictures.requests)
+        assertEquals(listOf(7 to parts(null, "thumbnail-1")), seriesPictures.requests)
         assertEquals(emptyList(), previews.requests)
     }
 
@@ -356,12 +387,14 @@ class WallpapersViewModelTest {
 
     /** A series of one shows its member's picture, as the real one does; others get `series-<id>`. */
     private class FakeSeriesPictures : MakeSeriesPictureUseCase {
-        val requests = mutableListOf<Pair<Int, List<String?>>>()
-        override suspend fun invoke(groupId: Int, pictures: List<String?>): String? {
-            requests += groupId to pictures
-            return if (pictures.size == 1) pictures.single() else "series-$groupId"
+        val requests = mutableListOf<Pair<Int, List<SeriesPart>>>()
+        override suspend fun invoke(groupId: Int, parts: List<SeriesPart>): String? {
+            requests += groupId to parts
+            return if (parts.size == 1) parts.single().picture else "series-$groupId"
         }
     }
+
+    private fun parts(vararg pictures: String?) = pictures.map { SeriesPart(it) }
 
     /** Renders nothing until the test sends a path to [paths]. */
     private class FakeBuiltInPreviews : BuiltInPreviews {

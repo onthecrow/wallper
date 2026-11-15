@@ -6,6 +6,7 @@ import com.onthecrow.wallper.core.model.ClipRange
 import com.onthecrow.wallper.core.model.CropRect
 import com.onthecrow.wallper.core.model.MediaInfo
 import com.onthecrow.wallper.core.model.MediaType
+import com.onthecrow.wallper.core.model.Tint
 import com.onthecrow.wallper.wallpapers.data.WallpapersRepository
 import com.onthecrow.wallper.wallpapers.data.database.WallpaperEntity
 import com.onthecrow.wallper.wallpapers.domain.model.NewWallpaper
@@ -72,6 +73,40 @@ class WallpapersLogicTest {
             WallpaperSpec.ProcessedVideo("originals/b.mp4", "thumbnails/b"),
             ActiveWallpaperSourceImpl(repository, activations).activeWallpaperFlow.first(),
         )
+    }
+
+    @Test
+    fun `a tint is saved with the media and reaches the engine`() = runTest {
+        val tint = Tint(0xCC3366FF.toInt())
+        add(media.copy(tint = tint))
+        ActivateWallpaperUseCaseImpl(repository, activations)(1)
+
+        assertEquals(tint.argb, dao.rows.value.single().tint)
+        assertEquals(tint, assertIs<Wallpaper.Media>(GetWallpaperUseCaseImpl(repository)(1)).tint)
+        val spec = ActiveWallpaperSourceImpl(repository, activations).activeWallpaperFlow.first()
+        assertEquals(tint, assertIs<WallpaperSpec.Media>(spec).tint)
+    }
+
+    @Test
+    fun `a processed video keeps the tint its frames have, for its thumbnail`() = runTest {
+        val tint = Tint(0x4D000000)
+        add(processed.copy(tint = tint))
+        ActivateWallpaperUseCaseImpl(repository, activations)(1)
+
+        assertEquals(tint, assertIs<Wallpaper.ProcessedVideo>(GetWallpaperUseCaseImpl(repository)(1)).tint)
+        assertEquals(
+            WallpaperSpec.ProcessedVideo("originals/b.mp4", "thumbnails/b", tint),
+            ActiveWallpaperSourceImpl(repository, activations).activeWallpaperFlow.first(),
+        )
+    }
+
+    @Test
+    fun `an edit that takes the tint off saves none`() = runTest {
+        add(media.copy(tint = Tint(0x4D000000)))
+
+        update(1, media)
+
+        assertNull(dao.rows.value.single().tint)
     }
 
     @Test

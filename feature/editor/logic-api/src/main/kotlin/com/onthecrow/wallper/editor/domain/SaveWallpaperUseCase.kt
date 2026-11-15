@@ -2,6 +2,7 @@ package com.onthecrow.wallper.editor.domain
 
 import com.onthecrow.wallper.core.model.ClipRange
 import com.onthecrow.wallper.core.model.CropRect
+import com.onthecrow.wallper.core.model.Tint
 import com.onthecrow.wallper.editor.domain.model.ExportStatus
 import com.onthecrow.wallper.editor.domain.model.PreparedMedia
 import kotlinx.coroutines.flow.Flow
@@ -12,6 +13,7 @@ import kotlinx.coroutines.flow.Flow
  *
  * Without [process] the original is kept and the wallpaper crops and trims it while it plays. With it a
  * video is exported cropped and trimmed, and only the export is kept: the wallpaper can't be edited again.
+ * A [tint] is drawn over the original each time it is shown, and goes into the frames of an export.
  * Files reach permanent storage only once the wallpaper is saved; the scratch ones stay until
  * [DiscardPreparedMediaUseCase].
  */
@@ -21,5 +23,6 @@ interface SaveWallpaperUseCase {
         crop: CropRect,
         clip: ClipRange,
         process: Boolean,
+        tint: Tint?,
     ): Flow<ExportStatus>
 }

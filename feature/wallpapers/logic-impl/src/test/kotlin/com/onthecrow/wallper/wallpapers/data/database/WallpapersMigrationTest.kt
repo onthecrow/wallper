@@ -218,6 +218,54 @@ class WallpapersMigrationTest {
     }
 
     @Test
+    fun `migration 6 to 7 keeps the wallpapers without a tint, and a new one keeps its own`() = runTest {
+        createDatabase(version = 6) { connection ->
+            connection.execSQL(
+                """
+                INSERT INTO wallpapers (id, type, original_path, processed_path, thumbnail_path,
+                    crop_left, crop_top, crop_right, crop_bottom, crop_rotation, clip_start_ms, clip_end_ms,
+                    media_width, media_height, media_rotation, media_duration_ms, is_active, built_in,
+                    slide_duration_ms)
+                VALUES (1, 'VIDEO', 'originals/a', NULL, 'thumbnails/a',
+                    10, 20, 110, 220, -12.5, 500, 1500, 1920, 1080, 90, 3000, 1, NULL, NULL)
+                """.trimIndent()
+            )
+        }
+        val media = WallpaperEntity(
+            id = 1,
+            type = MediaType.VIDEO,
+            originalPath = "originals/a",
+            processedPath = null,
+            thumbnailPath = "thumbnails/a",
+            cropLeft = 10,
+            cropTop = 20,
+            cropRight = 110,
+            cropBottom = 220,
+            cropRotation = -12.5f,
+            clipStartMs = 500,
+            clipEndMs = 1500,
+            mediaWidth = 1920,
+            mediaHeight = 1080,
+            mediaRotation = 90,
+            mediaDurationMs = 3000,
+            isActive = true,
+        )
+        // Alpha in the top byte makes the colour a negative Int: the column keeps all 32 bits.
+        val tint = 0xCC3366FF.toInt()
+
+        val rows = withDatabase { database ->
+            val dao = database.wallpaperDao()
+            dao.insert(media.copy(id = 0, originalPath = "originals/b", isActive = false, tint = tint))
+            dao.observeAll().first()
+        }
+
+        assertEquals(media, rows.single { it.id == 1 })
+        assertEquals(null, rows.single { it.id == 1 }.tint)
+        assertEquals(tint, rows.single { it.originalPath == "originals/b" }.tint)
+        assertBuiltInsSeeded(rows)
+    }
+
+    @Test
     fun `a fresh install gets the built-ins`() = runTest {
         val rows = withDatabase { it.wallpaperDao().observeAll().first() }
 

@@ -90,6 +90,7 @@ internal class PictureSlideEngine(
                     if (!released) gl.requestRender()
                 }
             },
+            tint = wallpaper.tint,
         ).apply { pageOffset = this@PictureSlideEngine.pageOffset }
 
         override fun onFirstPicture() = slide.onReady()

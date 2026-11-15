@@ -4,6 +4,7 @@ import com.onthecrow.wallper.core.coroutines.DispatchersProvider
 import com.onthecrow.wallper.core.model.ClipRange
 import com.onthecrow.wallper.core.model.CropRect
 import com.onthecrow.wallper.core.model.MediaType
+import com.onthecrow.wallper.core.model.Tint
 import com.onthecrow.wallper.core.storage.MediaStorage
 import com.onthecrow.wallper.editor.domain.SaveWallpaperUseCase
 import com.onthecrow.wallper.editor.domain.model.ExportStatus
@@ -37,19 +38,20 @@ internal class SaveWallpaperUseCaseImpl @Inject constructor(
         crop: CropRect,
         clip: ClipRange,
         process: Boolean,
+        tint: Tint?,
     ): Flow<ExportStatus> = flow {
         // The export works in scratch storage too: a failed or abandoned one leaves nothing elsewhere.
         val processed = mediaStorage.tempProcessedFile.takeIf { media.type == MediaType.VIDEO && process }
         val export = if (processed != null) {
             mediaStorage.delete(processed.path)
-            videoExporter.export(media.path, processed.path, crop, clip)
+            videoExporter.export(media.path, processed.path, crop, clip, tint)
         } else {
             flowOf(ExportStatus.Success)
         }
 
         emitAll(
             export.onEach { status ->
-                if (status is ExportStatus.Success) save(media, crop, clip, isProcessed = processed != null)
+                if (status is ExportStatus.Success) save(media, crop, clip, tint, isProcessed = processed != null)
             }
         )
     }.flowOn(dispatchersProvider.io)
@@ -58,7 +60,7 @@ internal class SaveWallpaperUseCaseImpl @Inject constructor(
      * Copies the files the wallpaper keeps to permanent storage, only now that it is ready, and saves it. If
      * that fails halfway, the copies go again: no file outlives a wallpaper that wasn't saved.
      */
-    private suspend fun save(media: PreparedMedia, crop: CropRect, clip: ClipRange, isProcessed: Boolean) {
+    private suspend fun save(media: PreparedMedia, crop: CropRect, clip: ClipRange, tint: Tint?, isProcessed: Boolean) {
         val edited = media.edited
         val persisted = mutableListOf<String>()
         try {
@@ -66,11 +68,12 @@ internal class SaveWallpaperUseCaseImpl @Inject constructor(
             val thumbnailPath = edited?.thumbnailPath ?: persistThumbnail(media.type)?.also(persisted::add).orEmpty()
             val wallpaper = if (isProcessed) {
                 // The export is all a processed video needs: it can't be edited again, so the original goes.
-                NewWallpaper.ProcessedVideo(mediaStorage.persistTempProcessed().also(persisted::add), thumbnailPath)
+                // The tint is in its frames; the thumbnail, made before, is shown under it.
+                NewWallpaper.ProcessedVideo(mediaStorage.persistTempProcessed().also(persisted::add), thumbnailPath, tint)
             } else {
                 // An edited wallpaper's original is in permanent storage already.
                 val originalPath = if (edited != null) media.path else mediaStorage.persistTempMedia().also(persisted::add)
-                NewWallpaper.Media(media.type, originalPath, thumbnailPath, crop, clip, media.mediaInfo)
+                NewWallpaper.Media(media.type, originalPath, thumbnailPath, crop, clip, media.mediaInfo, tint)
             }
             if (edited != null) updateWallpaperUseCase(edited.id, wallpaper) else add(wallpaper)
         } catch (error: Throwable) {

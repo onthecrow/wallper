@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import com.onthecrow.wallper.core.designsystem.R as DesignR
 import com.onthecrow.wallper.core.designsystem.component.DeleteWallpaperDialog
+import com.onthecrow.wallper.core.designsystem.component.wallpaperTint
 import com.onthecrow.wallper.settings.ui.R
 
 @Composable
@@ -126,7 +127,8 @@ private fun StorageRow(item: StorageItem, onEditClick: () -> Unit, onDeleteClick
                 contentScale = ContentScale.Crop,
                 modifier = Modifier
                     .size(56.dp)
-                    .clip(RoundedCornerShape(12.dp)),
+                    .clip(RoundedCornerShape(12.dp))
+                    .wallpaperTint(item.tint),
             )
         },
         headlineContent = { Text(text = Formatter.formatShortFileSize(context, item.bytes)) },

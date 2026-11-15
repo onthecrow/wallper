@@ -3,6 +3,7 @@ package com.onthecrow.wallper.core.engine.impl
 import android.app.WallpaperColors
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -17,7 +18,9 @@ import com.onthecrow.wallper.core.engine.WallpaperEngine
 import com.onthecrow.wallper.core.engine.WallpaperSettingsSource
 import com.onthecrow.wallper.core.engine.WallpaperSpec
 import com.onthecrow.wallper.core.engine.impl.engine.WallpaperEngineFactory
+import com.onthecrow.wallper.core.model.MediaType
 import com.onthecrow.wallper.core.model.SeriesSwitch
+import com.onthecrow.wallper.core.model.Tint
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -79,15 +82,29 @@ class WallperWallpaperService : WallpaperService() {
     @RequiresApi(Build.VERSION_CODES.O_MR1)
     private fun colorsOf(bitmap: Bitmap): WallpaperColors = WallpaperColors.fromBitmap(bitmap).also { bitmap.recycle() }
 
-    /** The thumbnail decoded at about [COLORS_SIZE] wide, never at full size. */
-    private fun decodeSmall(path: String): Bitmap? {
+    /**
+     * The thumbnail decoded at about [COLORS_SIZE] wide, never at full size, with the wallpaper's [tint] over
+     * it: the colours are those of what is on screen.
+     */
+    private fun decodeSmall(path: String, tint: Tint?): Bitmap? {
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(path, bounds)
         if (bounds.outWidth <= 0) return null
         var sample = 1
         while (bounds.outWidth / (sample * 2) >= COLORS_SIZE) sample *= 2
-        return BitmapFactory.decodeFile(path, BitmapFactory.Options().apply { inSampleSize = sample })
+        val options = BitmapFactory.Options().apply {
+            inSampleSize = sample
+            // Drawn on only for a tint.
+            inMutable = tint != null
+        }
+        val bitmap = BitmapFactory.decodeFile(path, options) ?: return null
+        if (tint != null) Canvas(bitmap).drawColor(tint.argb)
+        return bitmap
     }
+
+    /** A video's thumbnail; a picture has none and is its own. */
+    private val WallpaperSpec.Media.picturePath: String
+        get() = if (type == MediaType.IMAGE) sourcePath else thumbnailPath
 
     inner class GLEngine : Engine(), EngineHost {
 
@@ -294,8 +311,10 @@ class WallperWallpaperService : WallpaperService() {
             computeColorsJob = engineScope.launch(Dispatchers.IO) {
                 computedColors = when (colorSource) {
                     is WallpaperSpec.BuiltIn -> builtIns[colorSource.wallpaper]?.colors()
-                    is WallpaperSpec.Media -> decodeSmall(colorSource.thumbnailPath)?.let(::colorsOf)
-                    is WallpaperSpec.ProcessedVideo -> decodeSmall(colorSource.thumbnailPath)?.let(::colorsOf)
+                    is WallpaperSpec.Media -> decodeSmall(colorSource.picturePath, colorSource.tint)?.let(::colorsOf)
+                    // The thumbnail is the frame before the export tinted it.
+                    is WallpaperSpec.ProcessedVideo ->
+                        decodeSmall(colorSource.thumbnailPath, colorSource.tint)?.let(::colorsOf)
                     // Not a slide: the factory leaves them out.
                     is WallpaperSpec.Series,
                     null -> {

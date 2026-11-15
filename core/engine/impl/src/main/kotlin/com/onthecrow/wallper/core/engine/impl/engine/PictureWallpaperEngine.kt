@@ -34,6 +34,7 @@ internal class PictureWallpaperEngine(
         screenHeight = holder.surfaceFrame.height(),
         // On the GL thread: the host posts to the main thread, which then releases this engine.
         onFailed = { error -> if (!released) host.showPlaceholder("The picture can't be decoded", error) },
+        tint = wallpaper.tint,
     )
 
     private val glThread = WallpaperGLThread(holder, renderer, continuous = false).apply {

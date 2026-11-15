@@ -17,6 +17,8 @@ internal data class StorageItem(
     val picturePath: String,
     val kind: Kind,
     val bytes: Long,
+    /** The wallpaper's tint, laid over its picture: the colour as Android packs it, null for none. */
+    val tint: Int? = null,
 ) {
     enum class Kind { ORIGINAL_VIDEO, OPTIMISED_VIDEO, PICTURE }
 

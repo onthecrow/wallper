@@ -5,6 +5,7 @@ import com.onthecrow.wallper.core.model.ClipRange
 import com.onthecrow.wallper.core.model.CropRect
 import com.onthecrow.wallper.core.model.MediaInfo
 import com.onthecrow.wallper.core.model.MediaType
+import com.onthecrow.wallper.core.model.Tint
 import com.onthecrow.wallper.editor.domain.model.EditedWallpaper
 import com.onthecrow.wallper.editor.domain.model.ExportStatus
 import com.onthecrow.wallper.editor.domain.model.PreparedMedia
@@ -36,6 +37,7 @@ class SaveWallpaperUseCaseImplTest {
     private val added = mutableListOf<NewWallpaper>()
     private val updated = mutableListOf<Pair<Int, NewWallpaper>>()
     private val exports = mutableListOf<Pair<String, String>>()
+    private val exportedTints = mutableListOf<Tint?>()
     private var exportResult: List<ExportStatus> = listOf(ExportStatus.InProgress(50), ExportStatus.Success)
     private var saveError: Exception? = null
     private val activated = mutableListOf<Int>()
@@ -44,8 +46,15 @@ class SaveWallpaperUseCaseImplTest {
     private val useCase = SaveWallpaperUseCaseImpl(
         mediaStorage = storage,
         videoExporter = object : VideoExporter {
-            override fun export(inputPath: String, outputPath: String, crop: CropRect, clip: ClipRange): Flow<ExportStatus> {
+            override fun export(
+                inputPath: String,
+                outputPath: String,
+                crop: CropRect,
+                clip: ClipRange,
+                tint: Tint?,
+            ): Flow<ExportStatus> {
                 exports += inputPath to outputPath
+                exportedTints += tint
                 return flowOf(*exportResult.toTypedArray())
             }
         },
@@ -90,7 +99,7 @@ class SaveWallpaperUseCaseImplTest {
 
     @Test
     fun `video without processing keeps the original and is cropped later in GL`() = runTest(dispatcher) {
-        val statuses = useCase(video, crop, clip, process = false).toList()
+        val statuses = useCase(video, crop, clip, process = false, tint = null).toList()
 
         assertEquals(listOf<ExportStatus>(ExportStatus.Success), statuses)
         assertTrue(exports.isEmpty())
@@ -102,7 +111,7 @@ class SaveWallpaperUseCaseImplTest {
 
     @Test
     fun `processed video is exported in scratch and keeps only the export`() = runTest(dispatcher) {
-        val statuses = useCase(video, crop, clip, process = true).toList()
+        val statuses = useCase(video, crop, clip, process = true, tint = null).toList()
 
         assertEquals(listOf(ExportStatus.InProgress(50), ExportStatus.Success), statuses)
         assertEquals(listOf("editor/media" to "editor/processed.mp4"), exports)
@@ -111,10 +120,39 @@ class SaveWallpaperUseCaseImplTest {
     }
 
     @Test
+    fun `a tint is saved with the original, which is drawn under it later`() = runTest(dispatcher) {
+        val tint = Tint(0x4D000000)
+
+        useCase(video, crop, clip, process = false, tint = tint).toList()
+
+        assertTrue(exports.isEmpty())
+        assertEquals(tint, (added.single() as NewWallpaper.Media).tint)
+    }
+
+    @Test
+    fun `a tint goes into a processed video's frames and is kept for its thumbnail`() = runTest(dispatcher) {
+        val tint = Tint(0xCC3366FF.toInt())
+
+        useCase(video, crop, clip, process = true, tint = tint).toList()
+
+        assertEquals(listOf<Tint?>(tint), exportedTints)
+        assertEquals(NewWallpaper.ProcessedVideo(FakeMediaStorage.PROCESSED, FakeMediaStorage.THUMBNAIL, tint), added.single())
+    }
+
+    @Test
+    fun `an edit saves the new tint in place of the old one`() = runTest(dispatcher) {
+        val tinted = savedVideo.copy(edited = savedVideo.edited?.copy(tint = Tint(0x4D000000)))
+
+        useCase(tinted, crop, clip, process = false, tint = null).toList()
+
+        assertEquals(null, (updated.single().second as NewWallpaper.Media).tint)
+    }
+
+    @Test
     fun `failed export saves nothing and leaves nothing in permanent storage`() = runTest(dispatcher) {
         exportResult = listOf(ExportStatus.Error(IllegalStateException("encoder")))
 
-        useCase(video, crop, clip, process = true).toList()
+        useCase(video, crop, clip, process = true, tint = null).toList()
 
         assertTrue(added.isEmpty())
         assertTrue(storage.persisted.isEmpty())
@@ -124,7 +162,7 @@ class SaveWallpaperUseCaseImplTest {
     fun `a wallpaper that can't be saved takes its copies with it`() = runTest(dispatcher) {
         saveError = IllegalStateException("database")
 
-        assertFailsWith<IllegalStateException> { useCase(video, crop, clip, process = false).toList() }
+        assertFailsWith<IllegalStateException> { useCase(video, crop, clip, process = false, tint = null).toList() }
 
         assertEquals(listOf(FakeMediaStorage.THUMBNAIL, FakeMediaStorage.MEDIA), storage.persisted)
         assertEquals(storage.persisted, storage.deleted)
@@ -134,7 +172,7 @@ class SaveWallpaperUseCaseImplTest {
     fun `image is never processed and has no video thumbnail`() = runTest(dispatcher) {
         val image = PreparedMedia("editor/media", MediaType.IMAGE, MediaInfo(800, 600, 0, 0))
 
-        useCase(image, crop, clip, process = true).toList()
+        useCase(image, crop, clip, process = true, tint = null).toList()
 
         assertTrue(exports.isEmpty())
         assertEquals(NewWallpaper.Media(MediaType.IMAGE, FakeMediaStorage.MEDIA, "", crop, clip, image.mediaInfo), added.single())
@@ -142,24 +180,24 @@ class SaveWallpaperUseCaseImplTest {
 
     @Test
     fun `a new wallpaper becomes the active one, if the user wants it so`() = runTest(dispatcher) {
-        useCase(video, crop, clip, process = false).toList()
+        useCase(video, crop, clip, process = false, tint = null).toList()
         assertEquals(listOf(NEW_ID), activated)
 
         appSettings.value = AppSettings(activateNewWallpapers = false)
-        useCase(video, crop, clip, process = false).toList()
+        useCase(video, crop, clip, process = false, tint = null).toList()
         assertEquals(listOf(NEW_ID), activated)
     }
 
     @Test
     fun `an edit doesn't change which wallpaper is active`() = runTest(dispatcher) {
-        useCase(savedVideo, crop, clip, process = false).toList()
+        useCase(savedVideo, crop, clip, process = false, tint = null).toList()
 
         assertTrue(activated.isEmpty())
     }
 
     @Test
     fun `an edit without processing only changes the crop and the trim`() = runTest(dispatcher) {
-        useCase(savedVideo, crop, clip, process = false).toList()
+        useCase(savedVideo, crop, clip, process = false, tint = null).toList()
 
         assertEquals(
             7 to NewWallpaper.Media(MediaType.VIDEO, "originals/a", "thumbnails/old", crop, clip, video.mediaInfo),
@@ -171,7 +209,7 @@ class SaveWallpaperUseCaseImplTest {
 
     @Test
     fun `an edit with processing exports the original and replaces it with the export`() = runTest(dispatcher) {
-        useCase(savedVideo, crop, clip, process = true).toList()
+        useCase(savedVideo, crop, clip, process = true, tint = null).toList()
 
         assertEquals(listOf("originals/a" to "editor/processed.mp4"), exports)
         assertEquals(7 to NewWallpaper.ProcessedVideo(FakeMediaStorage.PROCESSED, "thumbnails/old"), updated.single())

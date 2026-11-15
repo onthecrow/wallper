@@ -3,19 +3,22 @@ package com.onthecrow.wallper.core.gl
 import android.opengl.GLES20
 import com.onthecrow.wallper.core.model.CropRect
 import com.onthecrow.wallper.core.model.MediaInfo
+import com.onthecrow.wallper.core.model.Tint
 import timber.log.Timber
 
-/** The shader program and crop geometry shared by all video slots. GL thread only. */
+/** The shader program, crop geometry and tint shared by all video slots. GL thread only. */
 internal class OpenGLScene(
     private val sceneWidth: Int,
     private val sceneHeight: Int,
     private val mediaInfo: MediaInfo,
     rect: CropRect,
+    private val tint: Tint? = null,
 ) {
     private val programId: Int
     private val uMVPMatrixHandle: Int
     private val uTexMatrixHandle: Int
     private val uUvShiftHandle: Int
+    private val uTintHandle: Int
     private val aPositionHandle: Int
     private val aTextureCoordHandler: Int
 
@@ -39,9 +42,11 @@ internal class OpenGLScene(
         precision mediump float;
         varying vec2 vTextureCoord;
         uniform samplerExternalOES sTexture;
+        ${TintUniform.DECLARATION}
 
         void main() {
-            gl_FragColor = texture2D(sTexture, vTextureCoord);
+            vec4 color = texture2D(sTexture, vTextureCoord);
+            gl_FragColor = ${TintUniform.MIX};
         }
     """.trimIndent()
 
@@ -85,6 +90,12 @@ internal class OpenGLScene(
             throw RuntimeException("Could not get attrib location for uUvShift")
         }
 
+        uTintHandle = GLES20.glGetUniformLocation(programId, TintUniform.NAME)
+        checkGlError("glGetUniformLocation ${TintUniform.NAME}")
+        if (uTintHandle == -1) {
+            throw RuntimeException("Could not get uniform location for ${TintUniform.NAME}")
+        }
+
         aTextureCoordHandler = GLES20.glGetAttribLocation(programId, "aTextureCoord")
         checkGlError("glGetAttribLocation aTextureCoord")
         if (aTextureCoordHandler == -1) {
@@ -113,6 +124,7 @@ internal class OpenGLScene(
 
         val shift = pageOffset?.let(pageScroll::shift)
         GLES20.glUniform2f(uUvShiftHandle, shift?.u ?: 0f, shift?.v ?: 0f)
+        TintUniform.set(uTintHandle, tint)
 
         texture.draw(
             aPositionHandle = aPositionHandle,

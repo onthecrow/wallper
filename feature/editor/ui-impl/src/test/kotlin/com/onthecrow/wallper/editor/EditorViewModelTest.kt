@@ -3,11 +3,13 @@ package com.onthecrow.wallper.editor
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
+import com.onthecrow.wallper.core.designsystem.component.colorpicker.HsvColor
 import com.onthecrow.wallper.core.haptics.Haptics
 import com.onthecrow.wallper.core.model.ClipRange
 import com.onthecrow.wallper.core.model.CropRect
 import com.onthecrow.wallper.core.model.MediaInfo
 import com.onthecrow.wallper.core.model.MediaType
+import com.onthecrow.wallper.core.model.Tint
 import com.onthecrow.wallper.core.navigation.Destination
 import com.onthecrow.wallper.core.navigation.Navigator
 import com.onthecrow.wallper.editor.domain.PrepareMediaUseCase
@@ -38,7 +40,13 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalCoroutinesApi::class)
 class EditorViewModelTest {
 
-    private data class SaveCall(val media: PreparedMedia, val crop: CropRect, val clip: ClipRange, val process: Boolean)
+    private data class SaveCall(
+        val media: PreparedMedia,
+        val crop: CropRect,
+        val clip: ClipRange,
+        val process: Boolean,
+        val tint: Tint? = null,
+    )
 
     private val dispatcher = UnconfinedTestDispatcher()
     private val media = PreparedMedia("temp/media", MediaType.VIDEO, MediaInfo(1920, 1080, 0, 10_000))
@@ -50,6 +58,7 @@ class EditorViewModelTest {
     )
     private val crop = CropRect(0, 0, 100, 200)
     private var prepareResult: Result<PreparedMedia> = Result.success(media)
+    private var prepareSavedResult = savedMedia
     private val preparedSaved = mutableListOf<Int>()
     private var exportStatuses: Flow<ExportStatus> = flowOf(ExportStatus.InProgress(10), ExportStatus.Success)
     private val saveCalls = mutableListOf<SaveCall>()
@@ -73,12 +82,18 @@ class EditorViewModelTest {
         prepareSavedMediaUseCase = object : PrepareSavedMediaUseCase {
             override suspend fun invoke(wallpaperId: Int): Result<PreparedMedia> {
                 preparedSaved += wallpaperId
-                return Result.success(savedMedia)
+                return Result.success(prepareSavedResult)
             }
         },
         saveWallpaperUseCase = object : SaveWallpaperUseCase {
-            override fun invoke(media: PreparedMedia, crop: CropRect, clip: ClipRange, process: Boolean): Flow<ExportStatus> {
-                saveCalls += SaveCall(media, crop, clip, process)
+            override fun invoke(
+                media: PreparedMedia,
+                crop: CropRect,
+                clip: ClipRange,
+                process: Boolean,
+                tint: Tint?,
+            ): Flow<ExportStatus> {
+                saveCalls += SaveCall(media, crop, clip, process, tint)
                 return exportStatuses
             }
         },
@@ -196,6 +211,33 @@ class EditorViewModelTest {
 
         assertEquals(SaveCall(savedMedia, crop, ClipRange(2_000, 6_000), process = false), saveCalls.single())
         assertEquals(1, backNavigations)
+    }
+
+    @Test
+    fun `the picked tint is saved with the wallpaper`() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+        viewModel.onEvent(EditorEvent.OnTintClick)
+        viewModel.onEvent(EditorEvent.OnTintColorChange(HsvColor(hue = 240f, saturation = 1f, value = 1f, alpha = 0.2f)))
+
+        viewModel.onEvent(EditorEvent.OnSaveClick(crop))
+
+        assertEquals(Tint(0x330000FF), saveCalls.single().tint)
+    }
+
+    @Test
+    fun `an edit that leaves the tint alone saves it again, and one that switches it off saves none`() = runTest(dispatcher) {
+        val tint = Tint(0x4D000000)
+        val tinted = savedMedia.copy(edited = savedMedia.edited?.copy(tint = tint))
+        prepareSavedResult = tinted
+
+        createViewModel(EditorDestination.Edit(4)).onEvent(EditorEvent.OnSaveClick(crop))
+        assertEquals(tint, saveCalls.single().tint)
+
+        saveCalls.clear()
+        val viewModel = createViewModel(EditorDestination.Edit(4))
+        viewModel.onEvent(EditorEvent.OnTintToggle)
+        viewModel.onEvent(EditorEvent.OnSaveClick(crop))
+        assertNull(saveCalls.single().tint)
     }
 
     @Test

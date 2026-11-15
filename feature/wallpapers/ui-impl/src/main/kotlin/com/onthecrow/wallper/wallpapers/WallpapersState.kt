@@ -2,6 +2,7 @@ package com.onthecrow.wallper.wallpapers
 
 import com.onthecrow.wallper.core.model.BuiltInWallpaper
 import com.onthecrow.wallper.core.mvi.State
+import com.onthecrow.wallper.wallpapers.domain.SeriesPart
 import com.onthecrow.wallper.wallpapers.domain.model.Wallpaper
 import com.onthecrow.wallper.wallpapers.model.WallpaperItem
 
@@ -24,10 +25,10 @@ internal data class WallpapersState(
 ) : State {
 
     /**
-     * What each series' picture is to be made of, by group id: its cover's pictures, once every built-in among
-     * them has its preview (or is known to have none).
+     * What each series' picture is to be made of, by group id: its cover's pictures and tints, once every
+     * built-in among them has its preview (or is known to have none).
      */
-    fun seriesCovers(): Map<Int, List<String?>> = items
+    fun seriesCovers(): Map<Int, List<SeriesPart>> = items
         .filter { item -> item.isGroup && item.cover.all { it.builtIn == null || it.builtIn in builtInPreviews } }
-        .associate { group -> group.id to group.cover.map { it.picturePath } }
+        .associate { group -> group.id to group.cover.map { SeriesPart(it.picturePath, it.tint) } }
 }

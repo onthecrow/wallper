@@ -2,15 +2,19 @@
 
 package com.onthecrow.wallper.editor
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.SizeTransform
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
 import androidx.compose.animation.scaleOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -23,6 +27,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -31,9 +36,12 @@ import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
+import androidx.compose.material3.IconToggleButton
 import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.derivedStateOf
@@ -45,16 +53,21 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.window.layout.WindowMetricsCalculator
+import com.onthecrow.wallper.core.designsystem.component.colorpicker.ColorPicker
+import com.onthecrow.wallper.core.designsystem.component.colorpicker.ColorPickerDefaults
+import com.onthecrow.wallper.core.designsystem.component.colorpicker.HsvColor
 import com.onthecrow.wallper.core.designsystem.component.trimbar.TrimBar
 import com.onthecrow.wallper.core.model.ClipRange
 import com.onthecrow.wallper.core.model.MediaType
@@ -80,6 +93,9 @@ internal fun EditorScreen(
 ) {
     val screenAspectRatio = rememberScreenAspectRatio()
     val scope = rememberCoroutineScope()
+
+    // Back from the tint's picker is back to the trim bar and the save row, not out of the editor.
+    BackHandler(enabled = state.isTintOpen) { onEvent(EditorEvent.OnTintClose) }
 
     Scaffold(modifier = modifier) {
         Box {
@@ -122,6 +138,8 @@ internal fun EditorScreen(
                         )
                     }
 
+                    val tintColor = state.tint.tint?.let { Color(it.argb) }
+                    // It takes what is left above the controls: less while the tint's picker is open.
                     CropEditor(
                         state = cropState,
                         onSnap = { onEvent(EditorEvent.OnCropSnapped) },
@@ -134,17 +152,34 @@ internal fun EditorScreen(
                         } else {
                             PictureImage(media.path, Modifier.fillMaxSize())
                         }
+                        // Over the whole picture, as the wallpaper draws it.
+                        if (tintColor != null) {
+                            Box(
+                                Modifier
+                                    .fillMaxSize()
+                                    .background(tintColor)
+                            )
+                        }
                     }
 
-                    // The reset button sits on the right of the playback buttons; a picture has only the button.
+                    val durationMs = media.mediaInfo.durationMs
+                    // The tint button sits on the left of the playback buttons and the reset button on their
+                    // right; a picture has only the two.
                     Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(bottom = 12.dp)
                             .heightIn(min = 48.dp),
                     ) {
+                        TintButton(
+                            isOpen = state.isTintOpen,
+                            isTinted = tintColor != null,
+                            onClick = { onEvent(EditorEvent.OnTintClick) },
+                            modifier = Modifier
+                                .align(Alignment.CenterStart)
+                                .padding(start = 16.dp),
+                        )
                         if (player != null) {
-                            val durationMs = media.mediaInfo.durationMs
                             PlaybackControls(
                                 player = player,
                                 // Without a known length there is nothing to trim.
@@ -168,64 +203,68 @@ internal fun EditorScreen(
                         )
                     }
 
-                    if (player != null) {
-                        val durationMs = media.mediaInfo.durationMs
-                        // Without a known length there is nothing to trim: the export keeps the whole video.
-                        if (durationMs > 0) {
-                            val videoAspectRatio = media.mediaInfo.displayWidth.toFloat() / media.mediaInfo.displayHeight
-                            val frames = rememberVideoFrames(media.path, durationMs, videoAspectRatio, paused = isExporting)
-                            TrimBar(
-                                durationMs = durationMs,
-                                position = { player.positionMs },
-                                startMs = state.trim.startMs,
-                                endMs = state.trim.endMs,
-                                onTrimChange = { startMs, endMs ->
-                                    onEvent(EditorEvent.OnTrimChange(ClipRange(startMs, endMs)))
-                                },
-                                onSeek = player::seekTo,
-                                onDragStart = {
-                                    isDragging = true
-                                    player.setScrubbing(true)
-                                },
-                                onDragEnd = {
-                                    player.setScrubbing(false)
-                                    isDragging = false
-                                },
-                                frames = { frames.value },
-                                modifier = Modifier.padding(bottom = 8.dp),
+                    // Without a known length there is nothing to trim: the export keeps the whole video. The
+                    // strip's frames outlive the trim bar, which goes while the tint's picker is open.
+                    val frames = if (player != null && durationMs > 0) {
+                        val videoAspectRatio = media.mediaInfo.displayWidth.toFloat() / media.mediaInfo.displayHeight
+                        rememberVideoFrames(media.path, durationMs, videoAspectRatio, paused = isExporting)
+                    } else {
+                        null
+                    }
+                    // The tint button changes what is under the buttons; the crop above grows or shrinks to fit.
+                    AnimatedContent(
+                        targetState = state.isTintOpen,
+                        transitionSpec = {
+                            fadeIn(tween(PANEL_FADE_IN_MS, delayMillis = PANEL_FADE_OUT_MS)) togetherWith
+                                fadeOut(tween(PANEL_FADE_OUT_MS)) using SizeTransform()
+                        },
+                        // What comes is uncovered where it stays, from its bottom up, as the crop makes room.
+                        contentAlignment = Alignment.BottomCenter,
+                        label = "tint panel",
+                    ) { isTintOpen ->
+                        if (isTintOpen) {
+                            TintPanel(
+                                tint = state.tint,
+                                onColorChange = { onEvent(EditorEvent.OnTintColorChange(it)) },
+                                onToggle = { onEvent(EditorEvent.OnTintToggle) },
                             )
+                        } else {
+                            Column {
+                                if (player != null && frames != null) {
+                                    TrimBar(
+                                        durationMs = durationMs,
+                                        position = { player.positionMs },
+                                        startMs = state.trim.startMs,
+                                        endMs = state.trim.endMs,
+                                        onTrimChange = { startMs, endMs ->
+                                            onEvent(EditorEvent.OnTrimChange(ClipRange(startMs, endMs)))
+                                        },
+                                        onSeek = player::seekTo,
+                                        onDragStart = {
+                                            isDragging = true
+                                            player.setScrubbing(true)
+                                        },
+                                        onDragEnd = {
+                                            player.setScrubbing(false)
+                                            isDragging = false
+                                        },
+                                        frames = { frames.value },
+                                        modifier = Modifier.padding(bottom = 8.dp),
+                                    )
+                                }
+                                SaveRow(
+                                    // Only a video is ever optimised: a picture is always kept as it is.
+                                    isOptimised = state.isOptimised.takeIf { media.type == MediaType.VIDEO },
+                                    onEvent = onEvent,
+                                    onSaveClick = { onEvent(EditorEvent.OnSaveClick(cropState.crop())) },
+                                )
+                            }
                         }
                     }
+                } else {
+                    // Nothing to save until the media is there.
+                    SaveRow(isOptimised = null, onEvent = onEvent, onSaveClick = {})
                 }
-
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    // Only a video is ever optimised: a picture is always kept as it is.
-                    if (media?.type == MediaType.VIDEO) {
-                        OptimisedToggle(
-                            isOptimised = state.isOptimised,
-                            onToggle = { onEvent(EditorEvent.OnOptimisedToggle) },
-                            onInfoClick = { onEvent(EditorEvent.OnProcessingInfoClick) },
-                        )
-                    }
-                    Button(onClick = { cropState?.let { onEvent(EditorEvent.OnSaveClick(it.crop())) } }) {
-                        Row(verticalAlignment = Alignment.CenterVertically) {
-                            Image(
-                                painter = painterResource(id = R.drawable.ic_save_outline),
-                                contentDescription = "",
-                                colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onPrimary)
-                            )
-                            Spacer(modifier = Modifier.size(8.dp))
-                            Text(text = "SAVE")
-                        }
-                    }
-                }
-
             }
             if (state.processingInfo != null) {
                 ProcessingInfoDialog(
@@ -306,7 +345,123 @@ private fun PlaybackControls(
     }
 }
 
-/** Undoes every change: crop, trim and the original / optimised choice. Appears once there is one. */
+/**
+ * Original / optimised and save, under the trim bar. Without [isOptimised] there is no such choice: a picture
+ * is always kept as it is.
+ */
+@Composable
+private fun SaveRow(
+    isOptimised: Boolean?,
+    onEvent: (EditorEvent) -> Unit,
+    onSaveClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(start = 16.dp, end = 16.dp, bottom = 16.dp, top = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        if (isOptimised != null) {
+            OptimisedToggle(
+                isOptimised = isOptimised,
+                onToggle = { onEvent(EditorEvent.OnOptimisedToggle) },
+                onInfoClick = { onEvent(EditorEvent.OnProcessingInfoClick) },
+            )
+        }
+        Button(onClick = onSaveClick) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Image(
+                    painter = painterResource(id = R.drawable.ic_save_outline),
+                    contentDescription = "",
+                    colorFilter = ColorFilter.tint(MaterialTheme.colorScheme.onPrimary)
+                )
+                Spacer(modifier = Modifier.size(8.dp))
+                Text(text = "SAVE")
+            }
+        }
+    }
+}
+
+/**
+ * Opens the tint's picker in place of what is under the buttons, and closes it again: filled while it is
+ * open. In the accent colour while the wallpaper has a tint.
+ */
+@Composable
+private fun TintButton(isOpen: Boolean, isTinted: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    val colors = MaterialTheme.colorScheme
+    val contentColor by animateColorAsState(
+        targetValue = when {
+            isTinted -> colors.primary
+            isOpen -> colors.onSecondaryContainer
+            else -> LocalContentColor.current
+        },
+        label = "tint button content",
+    )
+    IconToggleButton(
+        checked = isOpen,
+        onCheckedChange = { onClick() },
+        modifier = modifier,
+        colors = IconButtonDefaults.iconToggleButtonColors(
+            contentColor = contentColor,
+            checkedContainerColor = colors.secondaryContainer,
+            checkedContentColor = contentColor,
+        ),
+    ) {
+        Icon(
+            painter = painterResource(R.drawable.ic_tint),
+            contentDescription = stringResource(R.string.editor_tint),
+        )
+    }
+}
+
+/**
+ * The tint's colour and its switch: what the tint button puts in place of the trim bar and the save row. The
+ * picker's card is as far from the screen's edges as the crop's frame may come.
+ */
+@Composable
+private fun TintPanel(
+    tint: TintChoice,
+    onColorChange: (HsvColor) -> Unit,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(
+        modifier
+            .fillMaxWidth()
+            .padding(bottom = 8.dp)
+    ) {
+        ColorPicker(
+            color = tint.color,
+            onColorChange = onColorChange,
+            modifier = Modifier.padding(horizontal = TintPanelPadding - ColorPickerDefaults.EdgeInset),
+        )
+        // The row toggles as a whole, like the settings' switches.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .toggleable(value = tint.isOn, role = Role.Switch, onValueChange = { onToggle() })
+                .padding(horizontal = TintPanelPadding, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = stringResource(R.string.editor_tint),
+                modifier = Modifier.weight(1f),
+                style = MaterialTheme.typography.bodyLarge,
+            )
+            Switch(checked = tint.isOn, onCheckedChange = null)
+        }
+    }
+}
+
+/** The same as the crop frame's ([com.onthecrow.wallper.editor.crop.CropEditorDefaults.FramePadding]). */
+private val TintPanelPadding = 24.dp
+
+private const val PANEL_FADE_OUT_MS = 90
+private const val PANEL_FADE_IN_MS = 220
+
+/** Undoes every change: crop, trim, tint and the original / optimised choice. Appears once there is one. */
 @Composable
 private fun ResetButton(visible: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
     AnimatedVisibility(

@@ -56,6 +56,21 @@ class CropStateTest {
     }
 
     @Test
+    fun `a frame that shrinks and grows step by step keeps the crop exactly`() {
+        // The tint's picker opens under the crop and closes again: the frame changes size every frame of it.
+        val state = CropState(media, screenAspectRatio = 0.45f, startCrop = null)
+        state.onFrameSize(450f, 1000f)
+        state.onGestureStart()
+        state.onGesture(30f, -40f, panX = 57f, panY = -23f, zoom = 1.7f, rotation = 11f)
+        val moved = state.crop()
+
+        val heights = (1..40).map { 1000f - it * 7.3f }
+        (heights + heights.reversed() + 1000f).forEach { height -> state.onFrameSize(height * 0.45f, height) }
+
+        assertEquals(moved, state.crop())
+    }
+
+    @Test
     fun `the crop to save always covers the frame, even before the picture springs back`() {
         val state = CropState(media, screenAspectRatio = 0.45f, startCrop = null)
         state.onFrameSize(450f, 1000f)

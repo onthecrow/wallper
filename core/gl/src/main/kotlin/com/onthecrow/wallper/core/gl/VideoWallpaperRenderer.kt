@@ -6,7 +6,7 @@ import android.view.Surface
 import timber.log.Timber
 
 /**
- * Renders video frames cropped through UV coordinates.
+ * Renders video frames cropped through UV coordinates, under the wallpaper's tint if it has one.
  *
  * Owns one video texture per EGL context and hands its surface out through [Listener.onVideoSurfaceCreated].
  * The renderer knows nothing about players.
@@ -54,6 +54,7 @@ class VideoWallpaperRenderer(
             sceneWidth = renderParams.width,
             mediaInfo = renderParams.mediaInfo,
             rect = renderParams.crop,
+            tint = renderParams.tint,
         )
         val newTexture = newScene.createTexture().apply {
             setFrameListener(callbackHandler, listener::onFrameAvailable)

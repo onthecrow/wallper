@@ -6,6 +6,7 @@ import com.onthecrow.wallper.core.model.CropRect
 import com.onthecrow.wallper.core.model.MediaInfo
 import com.onthecrow.wallper.core.model.MediaType
 import com.onthecrow.wallper.core.model.SlideDuration
+import com.onthecrow.wallper.core.model.Tint
 
 /** Everything the live wallpaper needs to render the active wallpaper. All paths are in device-protected storage. */
 sealed interface WallpaperSpec {
@@ -18,12 +19,18 @@ sealed interface WallpaperSpec {
         val crop: CropRect,
         val clip: ClipRange,
         val mediaInfo: MediaInfo,
+        /** Laid over every frame by the renderer; null for none. */
+        val tint: Tint? = null,
     ) : WallpaperSpec
 
-    /** A video the editor already cropped and trimmed: played as is. */
+    /**
+     * A video the editor already cropped and trimmed: played as is. Its [tint] is in its frames already and
+     * is never drawn; it is here for the system's colours, which come from the thumbnail, the frame before it.
+     */
     data class ProcessedVideo(
         val path: String,
         val thumbnailPath: String,
+        val tint: Tint? = null,
     ) : WallpaperSpec
 
     /** A wallpaper rendered by the app itself. */

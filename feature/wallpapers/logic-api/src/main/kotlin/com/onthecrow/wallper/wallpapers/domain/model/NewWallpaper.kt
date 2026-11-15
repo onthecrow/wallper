@@ -4,6 +4,7 @@ import com.onthecrow.wallper.core.model.ClipRange
 import com.onthecrow.wallper.core.model.CropRect
 import com.onthecrow.wallper.core.model.MediaInfo
 import com.onthecrow.wallper.core.model.MediaType
+import com.onthecrow.wallper.core.model.Tint
 
 /** What the editor made: its files are already in permanent storage, but no record shows them yet. */
 sealed interface NewWallpaper {
@@ -17,11 +18,14 @@ sealed interface NewWallpaper {
         val crop: CropRect,
         val clip: ClipRange,
         val mediaInfo: MediaInfo,
+        val tint: Tint? = null,
     ) : NewWallpaper
 
     /** See [Wallpaper.ProcessedVideo]. */
     data class ProcessedVideo(
         val path: String,
         override val thumbnailPath: String,
+        /** Already in the video's frames; kept for its thumbnail. */
+        val tint: Tint? = null,
     ) : NewWallpaper
 }

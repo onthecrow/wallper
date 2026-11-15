@@ -32,6 +32,7 @@ internal class PrepareSavedMediaUseCaseImpl @Inject constructor(
                     thumbnailPath = wallpaper.thumbnailPath,
                     crop = wallpaper.crop,
                     clip = wallpaper.clip,
+                    tint = wallpaper.tint,
                 ),
             )
         }.onFailure(Timber::e)
