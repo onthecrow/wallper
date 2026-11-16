@@ -448,7 +448,8 @@ private fun MemberRow(member: WallpaperItem) {
 }
 
 /**
- * The time each member shows ([DurationChips], the chosen one in the middle once [centresChoice]), then save;
+ * The time each member shows beside its title ([DurationChips], the chosen one in the middle once
+ * [centresChoice]), then save;
  * save waits for [GroupEditorState.MIN_MEMBERS]. Its top edge has
  * [cradle] cut into it, null for none. It is read while drawing, so the cradle follows the button through
  * every scroll without recomposing the panel.
@@ -478,17 +479,22 @@ private fun ArrangePanel(
         color = panelColor,
     ) {
         Column(modifier = Modifier.padding(top = PanelContentTop, bottom = 16.dp)) {
-            Text(
-                text = stringResource(R.string.group_duration_title),
-                style = MaterialTheme.typography.titleSmall,
-                modifier = Modifier.padding(horizontal = 20.dp),
-            )
-            DurationChips(
-                selected = slideDuration,
-                centresChoice = centresChoice,
-                edgeColor = panelColor,
-                onPick = onDurationPick,
-            )
+            // The times beside their title, not under it: the members keep the height.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = stringResource(R.string.group_duration_title),
+                    style = MaterialTheme.typography.titleSmall,
+                    maxLines = 1,
+                    modifier = Modifier.padding(start = 20.dp),
+                )
+                DurationChips(
+                    selected = slideDuration,
+                    centresChoice = centresChoice,
+                    edgeColor = panelColor,
+                    onPick = onDurationPick,
+                    modifier = Modifier.weight(1f),
+                )
+            }
             if (memberCount < GroupEditorState.MIN_MEMBERS) {
                 Text(
                     text = pluralStringResource(R.plurals.group_too_few, GroupEditorState.MIN_MEMBERS, GroupEditorState.MIN_MEMBERS),
@@ -614,6 +620,7 @@ private fun DurationChips(
     centresChoice: Boolean,
     edgeColor: Color,
     onPick: (SlideDuration) -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     val scroll = rememberScrollState()
     val density = LocalDensity.current
@@ -630,7 +637,7 @@ private fun DurationChips(
     Row(
         horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
-        modifier = Modifier
+        modifier = modifier
             .onSizeChanged { viewportWidth = it.width }
             // Drawn over the chips, outside the scroll: read while drawing, it follows the scroll without
             // recomposing.
