@@ -1,14 +1,12 @@
 package com.onthecrow.wallper.wallpapers.view
 
 import androidx.annotation.DrawableRes
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -74,14 +72,12 @@ private fun AddOption(@DrawableRes icon: Int, title: String, description: String
             verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.padding(16.dp),
         ) {
+            // The whole of the place a badge would take, in the accent: no badge behind it.
             Icon(
                 painter = painterResource(icon),
                 contentDescription = null,
-                tint = MaterialTheme.colorScheme.onSecondaryContainer,
-                modifier = Modifier
-                    .size(40.dp)
-                    .background(MaterialTheme.colorScheme.secondaryContainer, CircleShape)
-                    .padding(8.dp),
+                tint = MaterialTheme.colorScheme.primary,
+                modifier = Modifier.size(40.dp),
             )
             Column {
                 Text(text = title, style = MaterialTheme.typography.titleMedium)
