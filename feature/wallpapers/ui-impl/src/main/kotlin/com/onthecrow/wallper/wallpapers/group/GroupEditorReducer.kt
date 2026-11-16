@@ -23,18 +23,20 @@ internal class GroupEditorReducer @Inject constructor() : Reducer<GroupEditorSta
                 transition = event.transition,
                 isLoaded = true,
             )
-            is GroupEditorEvent.OnTransitionsOffered -> state.copy(
-                offersTransitions = event.offered,
-                step = if (!event.offered && state.step == GroupEditorStep.TRANSITION) GroupEditorStep.ARRANGE else state.step,
-            )
+            is GroupEditorEvent.OnTransitionsOffered -> if (!event.offered && state.step == GroupEditorStep.TRANSITION) {
+                // The step closes under the user: back to the members.
+                state.copy(offersTransitions = false, step = GroupEditorStep.ARRANGE, stepGoesBack = true)
+            } else {
+                state.copy(offersTransitions = event.offered)
+            }
             // The members may have changed since the last time: they are read again.
             GroupEditorEvent.OnTransitionClick -> if (state.offersTransitions && state.step == GroupEditorStep.ARRANGE) {
-                state.copy(step = GroupEditorStep.TRANSITION, previewSlides = null)
+                state.copy(step = GroupEditorStep.TRANSITION, stepGoesBack = false, previewSlides = null)
             } else {
                 state
             }
             GroupEditorEvent.OnTransitionClose -> if (state.step == GroupEditorStep.TRANSITION) {
-                state.copy(step = GroupEditorStep.ARRANGE, previewSlides = null)
+                state.copy(step = GroupEditorStep.ARRANGE, stepGoesBack = true, previewSlides = null)
             } else {
                 state
             }

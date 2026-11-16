@@ -182,6 +182,20 @@ class GroupEditorReducerTest {
     }
 
     @Test
+    fun `the transition's step slides on as it opens and back as it closes, also when it is taken away`() = runTest {
+        val arranging = listed.copy(step = GroupEditorStep.ARRANGE, members = listOf(1, 2), offersTransitions = true, stepGoesBack = true)
+
+        var state = reducer.reduce(arranging, GroupEditorEvent.OnTransitionClick)
+        assertFalse(state.stepGoesBack)
+        state = reducer.reduce(state, GroupEditorEvent.OnTransitionClose)
+        assertTrue(state.stepGoesBack)
+
+        state = reducer.reduce(reducer.reduce(state, GroupEditorEvent.OnTransitionClick), GroupEditorEvent.OnTransitionsOffered(false))
+        assertEquals(GroupEditorStep.ARRANGE, state.step)
+        assertTrue(state.stepGoesBack)
+    }
+
+    @Test
     fun `slides read for a step that was left are dropped`() = runTest {
         val arranging = listed.copy(step = GroupEditorStep.ARRANGE, offersTransitions = true)
 
