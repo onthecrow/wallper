@@ -35,6 +35,8 @@ internal sealed interface EditorEvent : Event {
     data class OnTintColorChange(val color: HsvColor) : EditorEvent
     /** The picture snapped level, or its centre to the frame's middle: a tick. */
     data object OnCropSnapped : EditorEvent
+    /** Cancel in the export's dialog: the save stops, and the editor stays as it was. */
+    data object OnExportCancel : EditorEvent
 
     // Internal events
     data class OnProcessingInfoSeenLoaded(val isSeen: Boolean) : EditorEvent

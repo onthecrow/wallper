@@ -14,16 +14,20 @@ import dagger.assisted.Assisted
 import dagger.assisted.AssistedFactory
 import dagger.assisted.AssistedInject
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.flow.filter
-import kotlinx.coroutines.flow.filterNotNull
+import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.onEach
 import kotlinx.coroutines.launch
 import timber.log.Timber
 
+@OptIn(ExperimentalCoroutinesApi::class)
 @HiltViewModel(assistedFactory = EditorViewModel.Factory::class)
 internal class EditorViewModel @AssistedInject constructor(
     @Assisted private val destination: EditorDestination,
@@ -56,8 +60,11 @@ internal class EditorViewModel @AssistedInject constructor(
             }
         }.launchIn(viewModelScope)
 
-        // The reducer decides when a save starts: once the media is ready, one at a time.
-        state.map { it.save }.distinctUntilChanged().filterNotNull().onEach(::save).launchIn(viewModelScope)
+        // The reducer decides when a save starts: once the media is ready, one at a time. A save it lets go of
+        // (cancelled) stops its export.
+        state.map { it.save }.distinctUntilChanged()
+            .flatMapLatest { request -> request?.let(::save) ?: emptyFlow() }
+            .launchIn(viewModelScope)
 
         // Shown is seen, for later editors too.
         state.map { it.processingInfo != null }.distinctUntilChanged().filter { it }
@@ -91,7 +98,7 @@ internal class EditorViewModel @AssistedInject constructor(
         }
     }
 
-    private fun save(request: SaveRequest) {
+    private fun save(request: SaveRequest): Flow<ExportStatus> =
         saveWallpaperUseCase(request.media, request.crop, request.trim, request.isOptimised, request.tint)
             .onEach { status ->
                 onEvent(EditorEvent.OnExportStatusChanged(status))
@@ -103,6 +110,4 @@ internal class EditorViewModel @AssistedInject constructor(
                 Timber.e(error, "Can't save the wallpaper")
                 onEvent(EditorEvent.OnExportStatusChanged(ExportStatus.Error(error)))
             }
-            .launchIn(viewModelScope)
-    }
 }

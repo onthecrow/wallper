@@ -2,7 +2,9 @@ package com.onthecrow.wallper.editor.export
 
 import android.content.Context
 import android.media.MediaMetadataRetriever
+import android.os.SystemClock
 import androidx.annotation.OptIn
+import androidx.media3.common.C
 import androidx.media3.common.MediaItem
 import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
@@ -15,11 +17,13 @@ import androidx.media3.transformer.Effects
 import androidx.media3.transformer.ExportException
 import androidx.media3.transformer.ExportResult
 import androidx.media3.transformer.ProgressHolder
+import androidx.media3.transformer.TransformationRequest
 import androidx.media3.transformer.Transformer
 import com.onthecrow.wallper.core.coroutines.DispatchersProvider
 import com.onthecrow.wallper.core.model.ClipRange
 import com.onthecrow.wallper.core.model.CropRect
 import com.onthecrow.wallper.core.model.Tint
+import com.onthecrow.wallper.editor.domain.model.ExportOutput
 import com.onthecrow.wallper.editor.domain.model.ExportStatus
 import com.onthecrow.wallper.editor.domain.model.VideoExportException
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -31,6 +35,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import timber.log.Timber
 import java.io.File
 import javax.inject.Inject
 import kotlin.math.roundToInt
@@ -50,11 +55,20 @@ internal class TransformerVideoExporter @Inject constructor(
         tint: Tint?,
     ): Flow<ExportStatus> = callbackFlow {
         // Disk work: off the main thread, which only drives the Transformer.
-        val item = withContext(dispatchersProvider.io) {
+        val metadata = withContext(dispatchersProvider.io) {
             // An edit of a saved wallpaper copies nothing into scratch storage, so its directory may be missing.
             File(outputPath).parentFile?.mkdirs()
-            getEditedMediaItemForVideo(inputPath, crop, clip, tint)
+            getVideoMetadata(inputPath)
         }
+        val item = getEditedMediaItemForVideo(inputPath, crop, clip, tint, metadata)
+        // What it makes: the crop as it is shown, until an encoder that can't take it says otherwise.
+        var output = ExportOutput(
+            width = crop.width,
+            height = crop.height,
+            durationMs = ((clip.endMsOrNull ?: metadata.durationMs) - clip.startMs).coerceAtLeast(0),
+            codec = codecName(VIDEO_MIME_TYPE),
+        )
+        val startedAt = SystemClock.elapsedRealtime()
         val transformer = getTransformer(
             onCompleted = {
                 trySend(ExportStatus.Success)
@@ -63,16 +77,26 @@ internal class TransformerVideoExporter @Inject constructor(
             onError = { error ->
                 trySend(ExportStatus.Error(VideoExportException(error.errorCode, error)))
                 close()
-            }
+            },
+            onFallback = { fallback ->
+                Timber.w(
+                    "The encoder can't make %s: Transformer falls back to a height of %d, %s",
+                    output, fallback.outputHeight, fallback.videoMimeType,
+                )
+                output = output.after(fallback)
+            },
         )
         transformer.start(item, outputPath)
-        trySend(ExportStatus.InProgress())
+        trySend(ExportStatus.InProgress(output = output))
         val progressJob = launch {
             val progressHolder = ProgressHolder()
+            val pace = ExportPace()
             while (isActive) {
                 delay(DELAY_PROGRESS_RENEWAL)
                 if (transformer.getProgress(progressHolder) == Transformer.PROGRESS_STATE_AVAILABLE) {
-                    trySend(ExportStatus.InProgress(progressHolder.progress))
+                    val progress = progressHolder.progress
+                    val remainingMs = pace.remainingMs(progress, SystemClock.elapsedRealtime() - startedAt)
+                    trySend(ExportStatus.InProgress(progress, remainingMs, output))
                 }
             }
         }
@@ -86,9 +110,10 @@ internal class TransformerVideoExporter @Inject constructor(
     private fun getTransformer(
         onCompleted: () -> Unit,
         onError: (ExportException) -> Unit,
+        onFallback: (TransformationRequest) -> Unit,
     ): Transformer {
         return Transformer.Builder(applicationContext)
-            .setVideoMimeType(MimeTypes.VIDEO_H264)
+            .setVideoMimeType(VIDEO_MIME_TYPE)
             .addListener(object : Transformer.Listener {
                 override fun onCompleted(
                     composition: Composition,
@@ -105,6 +130,14 @@ internal class TransformerVideoExporter @Inject constructor(
                 ) {
                     super.onError(composition, exportResult, exportException)
                     onError(exportException)
+                }
+
+                override fun onFallbackApplied(
+                    composition: Composition,
+                    originalTransformationRequest: TransformationRequest,
+                    fallbackTransformationRequest: TransformationRequest,
+                ) {
+                    onFallback(fallbackTransformationRequest)
                 }
             })
             .build()
@@ -148,8 +181,8 @@ internal class TransformerVideoExporter @Inject constructor(
         crop: CropRect,
         clip: ClipRange,
         tint: Tint?,
+        videoMetadata: VideoMetadata,
     ): EditedMediaItem {
-        val videoMetadata = getVideoMetadata(inputPath)
         return EditedMediaItem.Builder(
             MediaItem.Builder()
                 .setUri(inputPath)
@@ -184,6 +217,7 @@ internal class TransformerVideoExporter @Inject constructor(
                 retriever.extractFloatMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH),
                 retriever.extractFloatMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT),
                 retriever.extractFloatMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION),
+                retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull() ?: 0L,
             )
         } finally {
             retriever.release()
@@ -193,12 +227,30 @@ internal class TransformerVideoExporter @Inject constructor(
     private fun MediaMetadataRetriever.extractFloatMetadata(metadataKey: Int): Float =
         extractMetadata(metadataKey)?.toFloat() ?: throw IllegalStateException("Can't retrieve metadata!")
 
-    private class VideoMetadata(val width: Float, val height: Float, val rotation: Float) {
+    private class VideoMetadata(val width: Float, val height: Float, val rotation: Float, val durationMs: Long) {
         val displayWidth: Float get() = if (rotation % 180f == 0f) width else height
         val displayHeight: Float get() = if (rotation % 180f == 0f) height else width
     }
 
+    /** [fallback] applied to what the export makes: another size (its height as shown), another codec. */
+    @OptIn(UnstableApi::class)
+    private fun ExportOutput.after(fallback: TransformationRequest): ExportOutput {
+        val resized = if (fallback.outputHeight == C.LENGTH_UNSET) this else withHeight(fallback.outputHeight)
+        return fallback.videoMimeType?.let { resized.copy(codec = codecName(it)) } ?: resized
+    }
+
+    /** The codec's name as people know it. */
+    @OptIn(UnstableApi::class)
+    private fun codecName(mimeType: String): String = when (mimeType) {
+        MimeTypes.VIDEO_H264 -> "H.264"
+        MimeTypes.VIDEO_H265 -> "H.265"
+        MimeTypes.VIDEO_AV1 -> "AV1"
+        MimeTypes.VIDEO_VP9 -> "VP9"
+        else -> mimeType.substringAfter('/').uppercase()
+    }
+
     companion object {
         private const val DELAY_PROGRESS_RENEWAL = 500L
+        private const val VIDEO_MIME_TYPE = MimeTypes.VIDEO_H264
     }
 }

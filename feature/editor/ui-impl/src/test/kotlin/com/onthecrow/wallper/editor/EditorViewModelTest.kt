@@ -21,6 +21,7 @@ import com.onthecrow.wallper.editor.domain.model.ExportStatus
 import com.onthecrow.wallper.editor.domain.model.PreparedMedia
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
@@ -327,6 +328,29 @@ class EditorViewModelTest {
         viewModel.onEvent(EditorEvent.OnSaveClick(crop))
 
         assertIs<ExportStatus.Error>(viewModel.state.value.exportStatus)
+        assertNull(viewModel.state.value.save)
+        assertEquals(0, backNavigations)
+    }
+
+    @Test
+    fun `cancel stops the export and keeps the editor open`() = runTest(dispatcher) {
+        var stopped = false
+        exportStatuses = flow {
+            emit(ExportStatus.InProgress(10))
+            try {
+                awaitCancellation()
+            } finally {
+                stopped = true
+            }
+        }
+        val viewModel = createViewModel()
+        viewModel.onEvent(EditorEvent.OnSaveClick(crop))
+        assertEquals(ExportStatus.InProgress(10), viewModel.state.value.exportStatus)
+
+        viewModel.onEvent(EditorEvent.OnExportCancel)
+
+        assertTrue(stopped)
+        assertNull(viewModel.state.value.exportStatus)
         assertNull(viewModel.state.value.save)
         assertEquals(0, backNavigations)
     }
