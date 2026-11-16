@@ -9,6 +9,8 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.upstream.DefaultAllocator
+import com.onthecrow.wallper.core.player.engine.LeadInRenderersFactory
+import com.onthecrow.wallper.core.player.engine.LeadInVideoRenderer
 
 /**
  * A silent, looping ExoPlayer with a small buffer. The only place that builds ExoPlayer:
@@ -18,9 +20,12 @@ import androidx.media3.exoplayer.upstream.DefaultAllocator
  * which costs battery and becomes the playback clock.
  *
  * @param looper the thread all calls to the player must come from; the calling thread when null.
+ * @param clipStartMs where the clip of the media starts, for an item that is set to start on a key frame
+ * whether it does or not (`ClippingConfiguration.startsAtKeyFrame`): the player then keeps the frames
+ * before the start off the screen ([LeadInVideoRenderer]). 0 for any other item.
  */
-@OptIn(UnstableApi::class) // the allocator, load control tuning and decoder fallback
-fun createLeanExoPlayer(context: Context, looper: Looper? = null): ExoPlayer {
+@OptIn(UnstableApi::class) // the allocator, load control tuning, decoder fallback and the renderer
+fun createLeanExoPlayer(context: Context, looper: Looper? = null, clipStartMs: Long = 0): ExoPlayer {
     // 64 KB segments, trimmed on reset
     val allocator = DefaultAllocator(/* trimOnReset = */ true,
         C.DEFAULT_BUFFER_SEGMENT_SIZE
@@ -42,7 +47,12 @@ fun createLeanExoPlayer(context: Context, looper: Looper? = null): ExoPlayer {
         .build()
 
     // If the preferred decoder fails to initialize, try the next one instead of failing playback.
-    val renderersFactory = DefaultRenderersFactory(context).setEnableDecoderFallback(true)
+    val renderersFactory = if (clipStartMs > 0) {
+        LeadInRenderersFactory(context, clipStartUs = clipStartMs * 1_000)
+    } else {
+        DefaultRenderersFactory(context)
+    }
+        .setEnableDecoderFallback(true)
 
     return ExoPlayer.Builder(context, renderersFactory)
         .setLoadControl(loadControl)
