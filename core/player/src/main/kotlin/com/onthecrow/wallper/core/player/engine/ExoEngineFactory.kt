@@ -10,8 +10,9 @@ import com.onthecrow.wallper.core.player.PlayerMedia
 import com.onthecrow.wallper.core.player.createLeanExoPlayer
 
 /**
- * Engines for [media]: lean, silent, clipped to end with its video ([loopEndUs]), living on [handler]'s
- * thread. A clip that starts into the file loops without a decoder flush, see [mediaItem].
+ * Engines for [media]: lean, silent, clipped to end with its video ([loopEndUs]) and with the last frame
+ * it can show ([cutEndUs]), living on [handler]'s thread. A clip that starts into the file loops without
+ * a decoder flush, see [mediaItem].
  */
 @UnstableApi
 internal class ExoEngineFactory(
@@ -26,7 +27,11 @@ internal class ExoEngineFactory(
 
     /** Read from the file once, on the player thread, with the first engine. */
     private val clipEndUs: Long? by lazy(LazyThreadSafetyMode.NONE) {
-        loopEndUs(media.clipStartMs, media.clipEndMs, videoTrackEndUs(media.path))
+        val videoEndUs = videoTrackEndUs(media.path)
+        val endUs = loopEndUs(media.clipStartMs, media.clipEndMs, videoEndUs)
+        // A clip that ends with its video is cut by nothing: there are no frames after its end.
+        if (endUs == null || endUs == videoEndUs) return@lazy endUs
+        frameTimesAroundUs(media.path, endUs)?.let { cutEndUs(clipStartMs * 1_000, endUs, it) } ?: endUs
     }
 
     override fun create(positionMs: Long, surface: Surface?, playWhenReady: Boolean): ManagedEngine {
