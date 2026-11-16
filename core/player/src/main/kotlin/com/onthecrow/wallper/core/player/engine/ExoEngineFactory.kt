@@ -9,7 +9,7 @@ import androidx.media3.common.util.UnstableApi
 import com.onthecrow.wallper.core.player.PlayerMedia
 import com.onthecrow.wallper.core.player.createLeanExoPlayer
 
-/** Engines for [media]: lean, silent, clipped, living on [handler]'s thread. */
+/** Engines for [media]: lean, silent, clipped to end with its video ([loopEndUs]), living on [handler]'s thread. */
 @UnstableApi
 internal class ExoEngineFactory(
     private val context: Context,
@@ -18,6 +18,11 @@ internal class ExoEngineFactory(
 ) : EngineFactory {
 
     private var nextId = 1
+
+    /** Read from the file once, on the player thread, with the first engine. */
+    private val clipEndUs: Long? by lazy(LazyThreadSafetyMode.NONE) {
+        loopEndUs(media.clipStartMs, media.clipEndMs, videoTrackEndUs(media.path))
+    }
 
     override fun create(positionMs: Long, surface: Surface?, playWhenReady: Boolean): ManagedEngine {
         val player = createLeanExoPlayer(context, handler.looper).apply {
@@ -33,7 +38,7 @@ internal class ExoEngineFactory(
     private fun mediaItem(): MediaItem {
         val clippingConfiguration = MediaItem.ClippingConfiguration.Builder().apply {
             media.clipStartMs?.let { setStartPositionMs(it) }
-            media.clipEndMs?.let { setEndPositionMs(it) }
+            clipEndUs?.let { setEndPositionUs(it) }
         }
             .build()
 
