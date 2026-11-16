@@ -6,8 +6,6 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.foundation.layout.calculateEndPadding
-import androidx.compose.foundation.layout.calculateStartPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
@@ -32,16 +30,18 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.layout
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import com.onthecrow.wallper.core.designsystem.component.phoneframe.FrameBounds
+import com.onthecrow.wallper.core.designsystem.component.phoneframe.PhoneFrame
+import com.onthecrow.wallper.core.designsystem.component.phoneframe.PhoneFrameDefaults
+import com.onthecrow.wallper.core.designsystem.component.phoneframe.placedAt
+import com.onthecrow.wallper.core.designsystem.component.phoneframe.toRect
 import kotlin.math.max
-import kotlin.math.min
 import kotlin.math.roundToInt
 
 /**
@@ -92,7 +92,7 @@ internal fun CropEditor(
             with(density) {
                 FrameBounds.fit(
                     area = Size(areaWidth, areaHeight),
-                    padding = framePadding.toPx(this, layoutDirection),
+                    padding = framePadding.toRect(this, layoutDirection),
                     border = PhoneFrameDefaults.BorderWidth.toPx(),
                     aspectRatio = state.screenAspectRatio,
                 )
@@ -127,7 +127,7 @@ internal fun CropEditor(
         Box(Modifier.fillMaxSize()) {
             Box(
                 Modifier
-                    .placedAt(pictureLeft, pictureTop, pictureWidth, pictureHeight)
+                    .placedAt(pictureLeft.toFloat(), pictureTop.toFloat(), pictureWidth.toFloat(), pictureHeight.toFloat())
                     .graphicsLayer {
                         val placement = state.placement
                         if (placement == null || baseScale <= 0f) {
@@ -167,12 +167,7 @@ internal fun CropEditor(
             }
 
             PhoneFrame(
-                modifier = Modifier.placedAt(
-                    left = bounds.body.left.roundToInt(),
-                    top = bounds.body.top.roundToInt(),
-                    width = bounds.body.width.roundToInt(),
-                    height = bounds.body.height.roundToInt(),
-                ),
+                modifier = Modifier.placedAt(bounds.body.left, bounds.body.top, bounds.body.width, bounds.body.height),
                 color = frameColor,
             )
         }
@@ -208,62 +203,11 @@ internal object CropEditorDefaults {
         FrameBounds.scaleToFit(
             full = Size(full.width.toFloat(), full.height.toFloat()),
             visible = Size(full.width.toFloat(), visibleHeight.toFloat()),
-            padding = FramePadding.toPx(this, layoutDirection),
+            padding = FramePadding.toRect(this, layoutDirection),
             border = PhoneFrameDefaults.BorderWidth.toPx(),
             aspectRatio = screenAspectRatio,
         )
     }
-}
-
-/** Each side's inset in pixels. */
-private fun PaddingValues.toPx(density: Density, layoutDirection: LayoutDirection): Rect = with(density) {
-    Rect(
-        left = calculateStartPadding(layoutDirection).toPx(),
-        top = calculateTopPadding().toPx(),
-        right = calculateEndPadding(layoutDirection).toPx(),
-        bottom = calculateBottomPadding().toPx(),
-    )
-}
-
-/** The phone's [body] (its outer edge) and its [screen], the opening the crop shows, in pixels of the area. */
-internal data class FrameBounds(val body: Rect, val screen: Rect) {
-    companion object {
-        /**
-         * The largest body that fits [area] inside [padding] (each side's inset), centred, around a screen of
-         * [aspectRatio] (width / height) with a [border] on every side.
-         */
-        fun fit(area: Size, padding: Rect, border: Float, aspectRatio: Float): FrameBounds {
-            val zoneWidth = area.width - padding.left - padding.right
-            val zoneHeight = area.height - padding.top - padding.bottom
-            val screenHeight = min(zoneHeight - 2 * border, (zoneWidth - 2 * border) / aspectRatio).coerceAtLeast(0f)
-            val screenWidth = screenHeight * aspectRatio
-            val bodyWidth = screenWidth + 2 * border
-            val bodyHeight = screenHeight + 2 * border
-            val body = Rect(
-                offset = Offset(padding.left + (zoneWidth - bodyWidth) / 2, padding.top + (zoneHeight - bodyHeight) / 2),
-                size = Size(bodyWidth, bodyHeight),
-            )
-            return FrameBounds(body = body, screen = body.deflate(border))
-        }
-
-        /**
-         * The scale at which the body [fit] into [full] also fits [visible] inside the same [padding]: 1 if it
-         * does already, never more, and 0 when [visible] leaves it no room at all.
-         */
-        fun scaleToFit(full: Size, visible: Size, padding: Rect, border: Float, aspectRatio: Float): Float {
-            val body = fit(full, padding, border, aspectRatio).body
-            if (body.width <= 0f || body.height <= 0f) return 1f
-            val roomWidth = visible.width - padding.left - padding.right
-            val roomHeight = visible.height - padding.top - padding.bottom
-            return minOf(1f, roomWidth / body.width, roomHeight / body.height).coerceAtLeast(0f)
-        }
-    }
-}
-
-/** Lays the content out at [width] x [height], placed at [left], [top] of a parent it fills. */
-private fun Modifier.placedAt(left: Int, top: Int, width: Int, height: Int) = layout { measurable, constraints ->
-    val placeable = measurable.measure(Constraints.fixed(width.coerceAtLeast(0), height.coerceAtLeast(0)))
-    layout(constraints.maxWidth, constraints.maxHeight) { placeable.place(left, top) }
 }
 
 /** Covers everything but the [screen] with [color]. */

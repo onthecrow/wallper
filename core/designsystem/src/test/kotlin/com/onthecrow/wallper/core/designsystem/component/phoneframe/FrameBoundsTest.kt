@@ -1,4 +1,4 @@
-package com.onthecrow.wallper.editor.crop
+package com.onthecrow.wallper.core.designsystem.component.phoneframe
 
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size

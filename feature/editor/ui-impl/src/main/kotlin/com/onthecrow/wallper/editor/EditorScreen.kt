@@ -55,7 +55,6 @@ import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.ColorFilter
 import androidx.compose.ui.layout.Layout
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
@@ -70,10 +69,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
-import androidx.window.layout.WindowMetricsCalculator
 import com.onthecrow.wallper.core.designsystem.component.colorpicker.ColorPicker
 import com.onthecrow.wallper.core.designsystem.component.colorpicker.ColorPickerDefaults
 import com.onthecrow.wallper.core.designsystem.component.colorpicker.HsvColor
+import com.onthecrow.wallper.core.designsystem.component.phoneframe.rememberScreenAspectRatio
 import com.onthecrow.wallper.core.designsystem.component.trimbar.TrimBar
 import com.onthecrow.wallper.core.designsystem.component.wallpaperTint
 import com.onthecrow.wallper.core.model.ClipRange
@@ -605,16 +604,6 @@ private fun ExportProgressDialog(status: ExportStatus.InProgress) {
                 )
             }
         }
-    }
-}
-
-/** The crop frame keeps the proportions of the screen the wallpaper is drawn on. */
-@Composable
-private fun rememberScreenAspectRatio(): Float {
-    val context = LocalContext.current
-    return remember(context) {
-        val bounds = WindowMetricsCalculator.getOrCreate().computeMaximumWindowMetrics(context).bounds
-        bounds.width().toFloat() / bounds.height().toFloat()
     }
 }
 

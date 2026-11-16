@@ -19,7 +19,6 @@ dependencies {
     implementation(projects.core.haptics)
     implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
-    implementation(libs.androidx.window)
     implementation(libs.hilt.lifecycle.viewmodel.compose)
     implementation(libs.timber)
     testImplementation(libs.kotlinx.coroutines.test)
