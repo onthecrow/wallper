@@ -138,6 +138,7 @@ internal fun WallpapersScreen(
 
     if (state.isAddDialogShown) {
         AddWallpaperDialog(
+            offersSeries = state.offersSeries,
             onMediaClick = {
                 onEvent(WallpapersEvent.OnAddMediaClick)
                 pickMedia.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo))

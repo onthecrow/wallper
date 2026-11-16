@@ -28,6 +28,7 @@ import com.onthecrow.wallper.wallpapers.ui.R
  */
 @Composable
 internal fun AddWallpaperDialog(
+    offersSeries: Boolean,
     onMediaClick: () -> Unit,
     onSeriesClick: () -> Unit,
     onDismiss: () -> Unit,
@@ -48,12 +49,15 @@ internal fun AddWallpaperDialog(
                     description = stringResource(R.string.add_media_description),
                     onClick = onMediaClick,
                 )
-                AddOption(
-                    icon = R.drawable.ic_series,
-                    title = stringResource(R.string.add_series),
-                    description = stringResource(R.string.add_series_description),
-                    onClick = onSeriesClick,
-                )
+                // Not until there are wallpapers enough for one.
+                if (offersSeries) {
+                    AddOption(
+                        icon = R.drawable.ic_series,
+                        title = stringResource(R.string.add_series),
+                        description = stringResource(R.string.add_series_description),
+                        onClick = onSeriesClick,
+                    )
+                }
             }
         },
     )
@@ -94,5 +98,5 @@ private fun AddOption(@DrawableRes icon: Int, title: String, description: String
 @Preview
 @Composable
 private fun AddWallpaperDialogPreview() {
-    AddWallpaperDialog(onMediaClick = {}, onSeriesClick = {}, onDismiss = {})
+    AddWallpaperDialog(offersSeries = true, onMediaClick = {}, onSeriesClick = {}, onDismiss = {})
 }

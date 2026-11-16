@@ -41,6 +41,7 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 @OptIn(ExperimentalCoroutinesApi::class)
@@ -269,6 +270,31 @@ class WallpapersViewModelTest {
 
         wallpapers.value = listOf(builtIn(id = 5, isActive = true), wallpaper(id = 1, type = MediaType.VIDEO))
         assertEquals(listOf(5, 1), viewModel.state.value.items.map { it.id })
+    }
+
+    @Test
+    fun `a series is offered from two wallpapers it could pick, not counting groups or hidden built-ins`() = runTest(dispatcher) {
+        val video = wallpaper(id = 1, type = MediaType.VIDEO)
+        wallpapers.value = listOf(builtIn(id = 5, isActive = true), video, group(id = 9, video, builtIn(id = 5)))
+        val viewModel = createViewModel()
+        // The black hole and the video.
+        assertTrue(viewModel.state.value.offersSeries)
+
+        // Hidden, it stays listed as the active wallpaper, but a new series doesn't offer it.
+        appSettings.value = AppSettings(showBuiltInWallpapers = false)
+        assertEquals(listOf(5, 1, 9), viewModel.state.value.items.map { it.id })
+        assertFalse(viewModel.state.value.offersSeries)
+
+        wallpapers.value += wallpaper(id = 2, type = MediaType.IMAGE)
+        assertTrue(viewModel.state.value.offersSeries)
+    }
+
+    @Test
+    fun `a built-in this device can't draw doesn't count for a series`() = runTest(dispatcher) {
+        builtInsSupported = false
+        wallpapers.value = listOf(builtIn(id = 5), wallpaper(id = 1, type = MediaType.VIDEO))
+
+        assertFalse(createViewModel().state.value.offersSeries)
     }
 
     @Test

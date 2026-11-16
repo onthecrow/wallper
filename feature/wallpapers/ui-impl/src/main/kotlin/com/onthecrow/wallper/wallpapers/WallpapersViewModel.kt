@@ -65,15 +65,29 @@ internal class WallpapersViewModel @Inject constructor(
         }.launchIn(viewModelScope)
 
         combine(observeWallpapersUseCase(), appSettings.settings.map { it.showBuiltInWallpapers }) { wallpapers, showsBuiltIns ->
-            wallpapers.map { it.toItem() }.filter { item -> item.isListed(showsBuiltIns) }
+            val items = wallpapers.map { it.toItem() }
+            WallpapersEvent.OnWallpapersChanged(
+                items = items.filter { item -> item.isListed(showsBuiltIns) },
+                seriesCandidates = items.count { item -> item.isSeriesCandidate(showsBuiltIns) },
+            )
         }
             .distinctUntilChanged()
-            .onEach { items -> onEvent(WallpapersEvent.OnWallpapersChanged(items)) }
+            .onEach(::onEvent)
             .catch { onEvent(WallpapersEvent.OnWallpapersLoadFailed(it.message.orEmpty())) }
             .flowOn(dispatchersProvider.io)
             .launchIn(viewModelScope)
 
         followSeriesPictures()
+    }
+
+    /**
+     * What a new series offers to pick (its pick step): no group, and no built-in the user hides, even the
+     * active one, or this device can't draw.
+     */
+    private fun WallpaperItem.isSeriesCandidate(showsBuiltIns: Boolean): Boolean {
+        if (isGroup) return false
+        val builtIn = builtIn ?: return true
+        return showsBuiltIns && liveWallpaperController.isSupported(builtIn)
     }
 
     /** A built-in this device can't draw never is; hidden built-ins are, while one is the active wallpaper. */

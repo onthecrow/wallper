@@ -4,6 +4,7 @@ import com.onthecrow.wallper.core.model.BuiltInWallpaper
 import com.onthecrow.wallper.core.model.SlideDuration
 import com.onthecrow.wallper.core.mvi.State
 import com.onthecrow.wallper.wallpapers.domain.SwipeHintMemory
+import com.onthecrow.wallper.wallpapers.domain.model.Wallpaper
 import com.onthecrow.wallper.wallpapers.model.WallpaperItem
 
 /**
@@ -50,12 +51,14 @@ internal data class GroupEditorState(
 
     val canSave: Boolean get() = memberItems.size >= MIN_MEMBERS && save == null
 
+    /** The pick step goes on only with enough ticked for a series. */
+    val canConfirmPick: Boolean get() = picked.size >= MIN_MEMBERS
+
     /** The members can show: the group is read and so is whether the hint shows. */
     val isArrangeReady: Boolean get() = isLoaded && showsSwipeHint != null
 
     companion object {
-        /** A series of one wallpaper would be that wallpaper. */
-        const val MIN_MEMBERS = 2
+        const val MIN_MEMBERS = Wallpaper.Group.MIN_MEMBERS
 
         fun initial(groupId: Int?) = GroupEditorState(
             isNew = groupId == null,

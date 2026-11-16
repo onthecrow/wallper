@@ -2,6 +2,7 @@ package com.onthecrow.wallper.wallpapers
 
 import com.onthecrow.wallper.core.model.BuiltInWallpaper
 import com.onthecrow.wallper.core.mvi.State
+import com.onthecrow.wallper.wallpapers.domain.model.Wallpaper
 import com.onthecrow.wallper.wallpapers.model.WallpaperItem
 
 internal data class WallpapersState(
@@ -18,6 +19,8 @@ internal data class WallpapersState(
     val deleteCandidate: Int? = null,
     /** The «+» asks whether to add one wallpaper or a series. */
     val isAddDialogShown: Boolean = false,
+    /** There are enough wallpapers for a series ([Wallpaper.Group.MIN_MEMBERS]): the «+» offers one. */
+    val offersSeries: Boolean = false,
 ) : State {
 
     /**

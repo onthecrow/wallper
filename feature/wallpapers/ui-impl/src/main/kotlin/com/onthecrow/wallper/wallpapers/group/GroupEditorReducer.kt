@@ -46,7 +46,7 @@ internal class GroupEditorReducer @Inject constructor() : Reducer<GroupEditorSta
      * goes back to them; a new group's first pick goes on to its members.
      */
     private fun GroupEditorState.confirmPick(): GroupEditorState {
-        if (picked.isEmpty()) return this
+        if (!canConfirmPick) return this
         val kept = members.filter { it in picked }
         val added = pickable.map { it.id }.filter { it in picked && it !in kept }
         return copy(

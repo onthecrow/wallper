@@ -52,14 +52,14 @@ internal abstract class WallpaperDao {
     )
     abstract suspend fun getGroupMembers(groupId: Int): List<WallpaperEntity>
 
-    /** Groups left without members: their last one was deleted. */
+    /** Groups left with fewer than [minMembers] members: the others were deleted. */
     @Query(
         """
         DELETE FROM wallpapers WHERE slide_duration_ms IS NOT NULL
-            AND id NOT IN (SELECT group_id FROM wallpaper_group_items)
+            AND (SELECT COUNT(*) FROM wallpaper_group_items WHERE group_id = wallpapers.id) < :minMembers
         """
     )
-    abstract suspend fun deleteEmptyGroups()
+    abstract suspend fun deleteGroupsUnder(minMembers: Int)
 
     /** Adds [group] with [memberIds] in their order; returns its id. */
     @Transaction

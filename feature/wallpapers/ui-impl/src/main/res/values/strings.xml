@@ -22,6 +22,10 @@
         <item quantity="one">Add at least %1$d wallpaper</item>
         <item quantity="other">Add at least %1$d wallpapers</item>
     </plurals>
+    <plurals name="group_pick_more">
+        <item quantity="one">Pick %1$d more wallpaper</item>
+        <item quantity="other">Pick %1$d more wallpapers</item>
+    </plurals>
     <string name="group_swipe_hint">Swipe a wallpaper aside to take it out, or hold it to move it</string>
     <string name="group_empty_title">No wallpapers yet</string>
     <string name="group_empty_text">Add the ones this series will show in turn</string>

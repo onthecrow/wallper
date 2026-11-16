@@ -48,7 +48,8 @@ internal class WallpapersRepository @Inject constructor(
     suspend fun updateGroup(id: Int, memberIds: List<Int>, slideDuration: SlideDuration, isActive: Boolean) =
         wallpaperDao.updateGroup(groupEntity(id, slideDuration, isActive), memberIds)
 
-    suspend fun deleteEmptyGroups() = wallpaperDao.deleteEmptyGroups()
+    /** Groups that deleted members left too small to be a series ([Wallpaper.Group.MIN_MEMBERS]). */
+    suspend fun deleteTooSmallGroups() = wallpaperDao.deleteGroupsUnder(Wallpaper.Group.MIN_MEMBERS)
 
     /** The ids of every group there is. */
     suspend fun groupIds(): Set<Int> = wallpaperDao.observeAll().first().filter { it.isGroup }.map { it.id }.toSet()

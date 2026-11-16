@@ -42,6 +42,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.overscroll
 import androidx.compose.foundation.rememberOverscrollEffect
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.withoutVisualEffect
 import androidx.compose.material3.Button
@@ -167,17 +168,24 @@ internal fun GroupEditorScreen(
             )
         },
         floatingActionButton = {
-            // Comes up from below once something is ticked, and goes back down when nothing is.
+            // Comes up from below once something is ticked, and goes back down when nothing is. Until there
+            // are enough for a series it is greyed out, and says beside it how many more.
             AnimatedVisibility(
                 visible = state.step == GroupEditorStep.PICK && state.picked.isNotEmpty(),
                 enter = slideInVertically { height -> height * FAB_TRAVEL },
                 exit = slideOutVertically { height -> height * FAB_TRAVEL },
             ) {
-                FAB(
-                    painter = painterResource(R.drawable.ic_check),
-                    contentDescription = stringResource(android.R.string.ok),
-                    onClick = { onEvent(GroupEditorEvent.OnPickConfirm) },
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    AnimatedVisibility(visible = !state.canConfirmPick) {
+                        PickMoreHint(missing = GroupEditorState.MIN_MEMBERS - state.picked.size)
+                    }
+                    FAB(
+                        painter = painterResource(R.drawable.ic_check),
+                        contentDescription = stringResource(android.R.string.ok),
+                        enabled = state.canConfirmPick,
+                        onClick = { onEvent(GroupEditorEvent.OnPickConfirm) },
+                    )
+                }
             }
         },
     ) { padding ->
@@ -203,6 +211,27 @@ internal fun GroupEditorScreen(
                 GroupEditorStep.ARRANGE -> ArrangeStep(state = state, listState = memberListState, onEvent = onEvent)
             }
         }
+    }
+}
+
+/** How many more to tick, as a snackbar says it: it stands out over the pictures. */
+@Composable
+private fun PickMoreHint(missing: Int) {
+    // While it fades out the count is already enough: it keeps saying the last one, which was one.
+    val shown = missing.coerceAtLeast(1)
+    Surface(
+        shape = CircleShape,
+        color = MaterialTheme.colorScheme.inverseSurface,
+        contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+        shadowElevation = 3.dp,
+        modifier = Modifier.padding(end = 12.dp),
+    ) {
+        Text(
+            text = pluralStringResource(R.plurals.group_pick_more, shown, shown),
+            style = MaterialTheme.typography.labelLarge,
+            maxLines = 1,
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
+        )
     }
 }
 

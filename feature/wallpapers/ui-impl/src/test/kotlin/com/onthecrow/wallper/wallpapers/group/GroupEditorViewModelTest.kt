@@ -145,6 +145,7 @@ class GroupEditorViewModelTest {
         assertEquals(0, hintShown)
 
         viewModel.onEvent(GroupEditorEvent.OnWallpaperClick(1))
+        viewModel.onEvent(GroupEditorEvent.OnWallpaperClick(2))
         viewModel.onEvent(GroupEditorEvent.OnPickConfirm)
         viewModel.onEvent(GroupEditorEvent.OnAddClick)
         viewModel.onEvent(GroupEditorEvent.OnPickCancel)

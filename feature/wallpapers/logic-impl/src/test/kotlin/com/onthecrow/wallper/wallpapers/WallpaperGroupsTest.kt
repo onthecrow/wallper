@@ -119,35 +119,42 @@ class WallpaperGroupsTest {
     }
 
     @Test
-    fun `a deleted member leaves its groups, and a group left empty goes too`() = runTest {
+    fun `a deleted member leaves its groups, and a group left with one member goes too`() = runTest {
         val first = add(video)
         val second = add(processed)
-        val both = saveGroup(null, listOf(first, second), SlideDuration.DEFAULT)
-        val onlyFirst = saveGroup(null, listOf(first), SlideDuration.DEFAULT)
+        val third = add(video)
+        val all = saveGroup(null, listOf(first, second, third), SlideDuration.DEFAULT)
+        val two = saveGroup(null, listOf(first, second), SlideDuration.DEFAULT)
+        val others = saveGroup(null, listOf(second, third), SlideDuration.DEFAULT)
 
         delete(first)
 
-        assertEquals(listOf(second), assertIs<Wallpaper.Group>(GetWallpaperUseCaseImpl(repository)(both)).members.map { it.id })
-        assertNull(GetWallpaperUseCaseImpl(repository)(onlyFirst))
+        val left = assertIs<Wallpaper.Group>(GetWallpaperUseCaseImpl(repository)(all))
+        assertEquals(listOf(second, third), left.members.map { it.id })
+        assertNull(GetWallpaperUseCaseImpl(repository)(two))
+        // Its members stay.
+        assertIs<Wallpaper.ProcessedVideo>(GetWallpaperUseCaseImpl(repository)(second))
+        assertIs<Wallpaper.Group>(GetWallpaperUseCaseImpl(repository)(others))
     }
 
     @Test
     fun `the pictures of deleted groups go, those of the others stay`() = runTest {
         val first = add(video)
         val second = add(processed)
-        val both = saveGroup(null, listOf(first, second), SlideDuration.DEFAULT)
-        val onlyFirst = saveGroup(null, listOf(first), SlideDuration.DEFAULT)
-        val bothPicture = File(picturesDirectory, "${both}_1.webp").apply { writeText("x") }
-        val onlyFirstPicture = File(picturesDirectory, "${onlyFirst}_2.webp").apply { writeText("x") }
+        val third = add(video)
+        val all = saveGroup(null, listOf(first, second, third), SlideDuration.DEFAULT)
+        val two = saveGroup(null, listOf(first, second), SlideDuration.DEFAULT)
+        val allPicture = File(picturesDirectory, "${all}_1.webp").apply { writeText("x") }
+        val twoPicture = File(picturesDirectory, "${two}_2.webp").apply { writeText("x") }
 
-        // The last member of one group, and so that group too.
+        // One of two members of a group, and so that group too.
         delete(first)
 
-        assertTrue(bothPicture.exists())
-        assertTrue(!onlyFirstPicture.exists())
+        assertTrue(allPicture.exists())
+        assertTrue(!twoPicture.exists())
 
-        delete(both)
-        assertTrue(!bothPicture.exists())
+        delete(all)
+        assertTrue(!allPicture.exists())
     }
 
     @Test

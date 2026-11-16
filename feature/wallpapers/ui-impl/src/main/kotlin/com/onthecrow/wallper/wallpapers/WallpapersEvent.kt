@@ -25,7 +25,8 @@ internal sealed interface WallpapersEvent : Event {
     data object OnSettingsClick : WallpapersEvent
 
     // Internal events
-    data class OnWallpapersChanged(val items: List<WallpaperItem>) : WallpapersEvent
+    /** [items] as listed; [seriesCandidates] is how many a new series could pick from. */
+    data class OnWallpapersChanged(val items: List<WallpaperItem>, val seriesCandidates: Int = 0) : WallpapersEvent
     data class OnWallpapersLoadFailed(val message: String) : WallpapersEvent
     /** [path] is null for a built-in this device can't render: none will come. */
     data class OnBuiltInPreviewLoaded(val wallpaper: BuiltInWallpaper, val path: String?) : WallpapersEvent

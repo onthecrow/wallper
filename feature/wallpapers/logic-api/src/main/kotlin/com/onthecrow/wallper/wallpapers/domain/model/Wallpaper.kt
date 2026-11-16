@@ -47,12 +47,18 @@ sealed interface Wallpaper {
 
     /**
      * A series of other wallpapers, never of groups: each of [members], in their order, shows for
-     * [slideDuration]. Deleting it leaves them; deleting the last of them deletes it.
+     * [slideDuration]. Deleting it leaves them; a member deleted so that fewer than [MIN_MEMBERS] are left
+     * deletes it.
      */
     data class Group(
         override val id: Int,
         val members: List<Wallpaper>,
         val slideDuration: SlideDuration,
         override val isActive: Boolean,
-    ) : Wallpaper
+    ) : Wallpaper {
+        companion object {
+            /** A series of one wallpaper would be that wallpaper. */
+            const val MIN_MEMBERS = 2
+        }
+    }
 }

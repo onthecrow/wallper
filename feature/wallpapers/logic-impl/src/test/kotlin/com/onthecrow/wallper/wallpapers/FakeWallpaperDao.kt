@@ -48,9 +48,9 @@ internal class FakeWallpaperDao(initial: List<WallpaperEntity> = emptyList()) : 
         groupItems.value.filter { it.groupId == groupId }.sortedBy { it.position }
             .mapNotNull { item -> rows.value.firstOrNull { it.id == item.wallpaperId } }
 
-    override suspend fun deleteEmptyGroups() {
+    override suspend fun deleteGroupsUnder(minMembers: Int) {
         rows.update { list ->
-            list.filterNot { row -> row.slideDurationMs != null && groupItems.value.none { it.groupId == row.id } }
+            list.filterNot { row -> row.slideDurationMs != null && groupItems.value.count { it.groupId == row.id } < minMembers }
         }
     }
 

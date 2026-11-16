@@ -44,8 +44,17 @@ class GroupEditorReducerTest {
     }
 
     @Test
-    fun `nothing picked, nothing to confirm`() = runTest {
+    fun `fewer than two picked, nothing to confirm`() = runTest {
         assertSame(listed, reducer.reduce(listed, GroupEditorEvent.OnPickConfirm))
+
+        val one = reducer.reduce(listed, GroupEditorEvent.OnWallpaperClick(2))
+        assertFalse(one.canConfirmPick)
+        assertSame(one, reducer.reduce(one, GroupEditorEvent.OnPickConfirm))
+
+        // Adding to members: those unticked down to one can't go on either.
+        val adding = reducer.reduce(listed.copy(step = GroupEditorStep.ARRANGE, members = listOf(3, 1)), GroupEditorEvent.OnAddClick)
+        val unticked = reducer.reduce(adding, GroupEditorEvent.OnWallpaperClick(1))
+        assertSame(unticked, reducer.reduce(unticked, GroupEditorEvent.OnPickConfirm))
     }
 
     @Test
@@ -77,13 +86,14 @@ class GroupEditorReducerTest {
     @Test
     fun `steps slide on as they open and back as they close, a new group's first pick going on`() = runTest {
         var state = reducer.reduce(listed, GroupEditorEvent.OnWallpaperClick(1))
+        state = reducer.reduce(state, GroupEditorEvent.OnWallpaperClick(2))
         state = reducer.reduce(state, GroupEditorEvent.OnPickConfirm)
         assertEquals(GroupEditorStep.ARRANGE, state.step)
         assertFalse(state.stepGoesBack)
 
         state = reducer.reduce(state, GroupEditorEvent.OnAddClick)
         assertFalse(state.stepGoesBack)
-        state = reducer.reduce(state, GroupEditorEvent.OnWallpaperClick(2))
+        state = reducer.reduce(state, GroupEditorEvent.OnWallpaperClick(3))
         state = reducer.reduce(state, GroupEditorEvent.OnPickConfirm)
         assertTrue(state.stepGoesBack)
 
