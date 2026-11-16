@@ -8,12 +8,12 @@ import kotlinx.coroutines.flow.Flow
 data class WallpaperSettings(
     val playback: VideoPlayback = VideoPlayback.LOOP,
     /** Pause the video in Battery Saver and when the phone is hot; it stays on its frame. */
-    val pausesToSaveBattery: Boolean = true,
+    val pausesToSaveBattery: Boolean = false,
     /**
      * Follow the launcher's pages: an original video pans within what its crop leaves out, the black hole
      * turns. Off, the service tells every wallpaper there are no pages.
      */
-    val scrollsWithPages: Boolean = true,
+    val scrollsWithPages: Boolean = false,
     /** How a series changes its slides; the service makes the series' engine anew when it changes. */
     val seriesSwitch: SeriesSwitch = SeriesSwitch.CUT,
 )

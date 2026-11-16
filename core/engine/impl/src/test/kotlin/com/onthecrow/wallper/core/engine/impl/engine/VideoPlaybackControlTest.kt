@@ -55,7 +55,11 @@ class VideoPlaybackControlTest {
     fun `battery saver pauses the video when the user wants it to`() = runTest {
         control()
 
+        // Not by default.
         savingPower.value = true
+        assertTrue(player.playing)
+
+        settings.value = WallpaperSettings(pausesToSaveBattery = true)
         assertFalse(player.playing)
 
         settings.value = WallpaperSettings(pausesToSaveBattery = false)
@@ -104,7 +108,7 @@ class VideoPlaybackControlTest {
 
     @Test
     fun `coming back from Battery Saver isn't a new wake`() = runTest {
-        settings.value = WallpaperSettings(playback = VideoPlayback.RESTART)
+        settings.value = WallpaperSettings(playback = VideoPlayback.RESTART, pausesToSaveBattery = true)
         control()
 
         savingPower.value = true
@@ -116,7 +120,7 @@ class VideoPlaybackControlTest {
 
     @Test
     fun `a wake the battery saver held starts over once it plays`() = runTest {
-        settings.value = WallpaperSettings(playback = VideoPlayback.RESTART)
+        settings.value = WallpaperSettings(playback = VideoPlayback.RESTART, pausesToSaveBattery = true)
         val control = control()
         savingPower.value = true
 

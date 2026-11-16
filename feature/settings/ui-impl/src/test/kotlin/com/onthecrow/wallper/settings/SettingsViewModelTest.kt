@@ -76,8 +76,8 @@ class SettingsViewModelTest {
     fun `settings come from the store and changes go back to it`() = runTest(dispatcher) {
         val viewModel = createViewModel()
 
-        viewModel.onEvent(SettingsEvent.OnSaveBatteryChange(false))
-        viewModel.onEvent(SettingsEvent.OnScrollWithPagesChange(false))
+        viewModel.onEvent(SettingsEvent.OnSaveBatteryChange(true))
+        viewModel.onEvent(SettingsEvent.OnScrollWithPagesChange(true))
         viewModel.onEvent(SettingsEvent.OnActivateNewWallpapersChange(false))
         viewModel.onEvent(SettingsEvent.OnShowBuiltInWallpapersChange(false))
         viewModel.onEvent(SettingsEvent.OnDynamicColorChange(false))
@@ -88,8 +88,8 @@ class SettingsViewModelTest {
 
         val expected = AppSettings(
             videoPlayback = VideoPlayback.ONCE,
-            pauseVideoToSaveBattery = false,
-            scrollVideoWithPages = false,
+            pauseVideoToSaveBattery = true,
+            scrollVideoWithPages = true,
             activateNewWallpapers = false,
             showBuiltInWallpapers = false,
             theme = ThemeMode.DARK,

@@ -14,10 +14,13 @@ import kotlinx.serialization.json.Json
 @Serializable
 data class AppSettings(
     val videoPlayback: VideoPlayback = VideoPlayback.LOOP,
-    /** Pause video wallpapers in Battery Saver and when the phone is hot. */
-    val pauseVideoToSaveBattery: Boolean = true,
-    /** Move every wallpaper with the launcher's pages: original videos pan, the black hole turns. */
-    val scrollVideoWithPages: Boolean = true,
+    /** Pause video wallpapers in Battery Saver and when the phone is hot; off unless the user turns it on. */
+    val pauseVideoToSaveBattery: Boolean = false,
+    /**
+     * Move every wallpaper with the launcher's pages: original videos pan, the black hole turns. Off unless the
+     * user turns it on: the wallpaper stays as it was cropped.
+     */
+    val scrollVideoWithPages: Boolean = false,
     /** Make a wallpaper the active one as soon as it is added. */
     val activateNewWallpapers: Boolean = true,
     /** List the built-in wallpapers; the active one stays listed anyway. */
