@@ -279,6 +279,19 @@ class GroupEditorViewModelTest {
     }
 
     @Test
+    fun `the transition's step plays only the first two members`() = runTest(dispatcher) {
+        val viewModel = createViewModel(groupId = 4)
+        viewModel.onEvent(GroupEditorEvent.OnAddClick)
+        viewModel.onEvent(GroupEditorEvent.OnWallpaperClick(3))
+        viewModel.onEvent(GroupEditorEvent.OnPickConfirm)
+        assertEquals(listOf(2, 1, 3), viewModel.state.value.members)
+
+        viewModel.onEvent(GroupEditorEvent.OnTransitionClick)
+
+        assertEquals(listOf(listOf(2, 1)), specRequests)
+    }
+
+    @Test
     fun `transitions come and go with the series that change on one GL thread`() = runTest(dispatcher) {
         val viewModel = createViewModel(groupId = 4)
         viewModel.onEvent(GroupEditorEvent.OnTransitionClick)

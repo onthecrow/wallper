@@ -38,8 +38,6 @@
     <string name="group_transition_title">Transition</string>
     <string name="group_transition_duration">Duration</string>
     <string name="group_transition_seconds">%1$.1f s</string>
-    <string name="preview_moment_wallpaper">Wallpaper %1$d of %2$d</string>
-    <string name="preview_moment_transition">Transition %1$d → %2$d</string>
     <string name="transition_none">None</string>
     <string name="transition_crossfade">Crossfade</string>
     <string name="transition_dip_to_black">Dip to black</string>

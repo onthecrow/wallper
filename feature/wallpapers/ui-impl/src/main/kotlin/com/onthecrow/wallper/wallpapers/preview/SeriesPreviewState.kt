@@ -12,16 +12,9 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.Immutable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.SideEffect
-import androidx.compose.runtime.Stable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableLongStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.runtime.withFrameMillis
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
@@ -42,12 +35,9 @@ internal data class SeriesPreviewSpec(
 )
 
 /**
- * A series' preview on a [TextureView] ([SeriesPreviewSurface]) and where it is ([positionMs]), for a
- * [SeriesScrubBar] to show and move. It plays while the screen is resumed and no finger is on the bar; a
- * finger stops it on the moment under it, and letting go plays on from there. A new [spec] (another
- * transition, say) or a new surface size makes the preview anew at the same position. Main thread only.
+ * A series' preview on a [TextureView] ([SeriesPreviewSurface]), playing while the screen is resumed. A new
+ * [spec] (another transition, say) or a new surface size makes the preview anew, from its start. Main thread only.
  */
-@Stable
 internal class SeriesPreviewState(
     private val context: Context,
     private val previews: SeriesPreviews,
@@ -61,18 +51,7 @@ internal class SeriesPreviewState(
             remake()
         }
 
-    /** The preview on the surface, while there are one and a [spec]. */
-    var preview: SeriesPreview? by mutableStateOf(null)
-        private set
-
-    /** Where it is in its round, in ms; follows playback every frame and the finger on the bar. */
-    var positionMs by mutableLongStateOf(0L)
-        private set
-
-    var isScrubbing by mutableStateOf(false)
-        private set
-
-    /** The screen is resumed: it plays, unless a finger holds it. */
+    /** The screen is resumed: it plays. */
     var resumed = false
         set(value) {
             if (value == field) return
@@ -80,35 +59,9 @@ internal class SeriesPreviewState(
             updatePlaying()
         }
 
+    /** The preview on the surface, while there are one and a [spec]. */
+    private var preview: SeriesPreview? = null
     private var holder: TextureSurfaceHolder? = null
-
-    /** Follows playback; call it every frame. */
-    fun onFrame() {
-        val playing = preview?.takeIf { it.isPlaying } ?: return
-        positionMs = playing.positionMs
-    }
-
-    /** A finger on the bar: the preview stands still on the moment at [positionMs], tuned for the seeks to come. */
-    fun startScrubbing(positionMs: Long) {
-        isScrubbing = true
-        preview?.setScrubbing(true)
-        updatePlaying()
-        scrubTo(positionMs)
-    }
-
-    fun scrubTo(positionMs: Long) {
-        val preview = preview ?: return
-        preview.seekTo(positionMs)
-        this.positionMs = preview.positionMs
-    }
-
-    /** The finger let go: it plays on from where it is. */
-    fun stopScrubbing() {
-        if (!isScrubbing) return
-        isScrubbing = false
-        preview?.setScrubbing(false)
-        updatePlaying()
-    }
 
     override fun onSurfaceTextureAvailable(surface: SurfaceTexture, width: Int, height: Int) {
         holder = TextureSurfaceHolder(Surface(surface), width, height)
@@ -137,12 +90,7 @@ internal class SeriesPreviewState(
         stop()
         val holder = holder ?: return
         val spec = spec?.takeIf { it.slides.isNotEmpty() } ?: return
-        val made = previews.create(context, holder, spec.slides, spec.transition, spec.holdMs)
-        made.setScrubbing(isScrubbing)
-        // The same moment in the new round, which may be shorter.
-        made.seekTo(positionMs)
-        positionMs = made.positionMs
-        preview = made
+        preview = previews.create(context, holder, spec.slides, spec.transition, spec.holdMs)
         updatePlaying()
     }
 
@@ -153,7 +101,7 @@ internal class SeriesPreviewState(
 
     private fun updatePlaying() {
         val preview = preview ?: return
-        if (resumed && !isScrubbing) preview.play() else preview.pause()
+        if (resumed) preview.play() else preview.pause()
     }
 }
 
@@ -170,9 +118,6 @@ internal fun rememberSeriesPreviewState(spec: SeriesPreviewSpec?): SeriesPreview
     }
     DisposableEffect(state) {
         onDispose { state.release() }
-    }
-    LaunchedEffect(state) {
-        while (true) withFrameMillis { state.onFrame() }
     }
     return state
 }

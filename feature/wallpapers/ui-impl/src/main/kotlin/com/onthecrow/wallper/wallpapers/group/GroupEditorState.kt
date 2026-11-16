@@ -39,7 +39,10 @@ internal data class GroupEditorState(
     val transition: SlideTransition = SlideTransition.NONE,
     /** Series blend their slides here: they change on one GL thread they share (`SeriesSwitch.SHARED_GL`). */
     val offersTransitions: Boolean = false,
-    /** The members as the engines take them, which the transition step plays; null until they are read. */
+    /**
+     * The first [PREVIEW_MEMBERS] members as the engines take them, which the transition step plays one into
+     * the other and back; null until they are read.
+     */
     val previewSlides: List<WallpaperSpec>? = null,
     /**
      * Whether the members show the «swipe aside» hint: on the first few visits only ([SwipeHintMemory]). Null
@@ -68,6 +71,9 @@ internal data class GroupEditorState(
 
     companion object {
         const val MIN_MEMBERS = Wallpaper.Group.MIN_MEMBERS
+
+        /** A transition shows between two wallpapers: the first two, whatever follows them. */
+        const val PREVIEW_MEMBERS = 2
 
         fun initial(groupId: Int?) = GroupEditorState(
             isNew = groupId == null,

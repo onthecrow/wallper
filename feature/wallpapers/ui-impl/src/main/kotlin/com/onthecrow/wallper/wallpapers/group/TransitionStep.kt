@@ -28,16 +28,15 @@ import com.onthecrow.wallper.core.model.SlideTransition
 import com.onthecrow.wallper.core.model.TransitionEffect
 import com.onthecrow.wallper.wallpapers.preview.SeriesPreviewSpec
 import com.onthecrow.wallper.wallpapers.preview.SeriesPreviewSurface
-import com.onthecrow.wallper.wallpapers.preview.SeriesScrubBar
 import com.onthecrow.wallper.wallpapers.preview.rememberSeriesPreviewState
 import com.onthecrow.wallper.wallpapers.ui.R
 import kotlin.math.roundToLong
 
 /**
- * The series' transition: its members playing through it in a phone with the screen's proportions, each for a
- * few seconds; under it the round as a bar to move the preview along by hand ([SeriesScrubBar]), through the
- * transitions too; below, on a panel, the transitions to pick from and how long one takes. A pick shows at
- * once, at the same moment of the round.
+ * The series' transition: its first two members going one into the other and back through it, round and round,
+ * in a phone with the screen's proportions, each alone for a couple of seconds between: what a transition looks
+ * like has nothing to do with how long a member stays on the wallpaper, an hour maybe. Below, on a panel, the
+ * transitions to pick from and how long one takes. A pick shows at once: the loop starts again with it.
  */
 @Composable
 internal fun TransitionStep(state: GroupEditorState, onEvent: (GroupEditorEvent) -> Unit) {
@@ -54,10 +53,6 @@ internal fun TransitionStep(state: GroupEditorState, onEvent: (GroupEditorEvent)
         ) {
             SeriesPreviewSurface(preview, Modifier.fillMaxSize())
         }
-        SeriesScrubBar(
-            state = preview,
-            modifier = Modifier.padding(start = ScrubBarMargin, end = ScrubBarMargin, bottom = 12.dp),
-        )
         TransitionPanel(
             transition = transition,
             onEffectPick = { onEvent(GroupEditorEvent.OnTransitionEffectPick(it)) },
@@ -155,11 +150,8 @@ internal fun TransitionEffect.label(): String = stringResource(
     }
 )
 
-/** Each slide alone between two transitions: long enough to see it, short enough to wait for the next. */
-private const val PREVIEW_HOLD_MS = 3_000L
-
-/** As far from the screen's edges as the phone frame's sides. */
-private val ScrubBarMargin = 12.dp
+/** Each member alone between two transitions: a couple of seconds to see it, not long to wait for the next. */
+private const val PREVIEW_HOLD_MS = 2_000L
 
 private const val DISABLED_ALPHA = 0.38f
 

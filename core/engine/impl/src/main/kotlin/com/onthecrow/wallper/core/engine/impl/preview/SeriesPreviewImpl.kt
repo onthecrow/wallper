@@ -19,14 +19,14 @@ import java.util.concurrent.Executors
 
 /**
  * A [SeriesPreview] on [SeriesPreviewGl]: every frame is [SeriesTimeline.at] the position, which moves with
- * the clock while it plays and stands where it is put otherwise. So a pause, a seek and playing on look the
- * same as the moment they start from.
+ * the clock while it plays and stands still while it is paused, so playing on looks the same as the moment it
+ * starts from.
  *
  * Only the slides around the position live ([neighbours]: the ones on screen, the one before and the one
  * that comes next), so at most three players decode at once; the others are made as the position comes near
- * and let go of as it leaves. A slide that comes onto the screen, or any slide on a seek, is moved to its own
- * time there; one that plays on screen just plays, its player keeping time with the clock. The one coming
- * next waits at its start, still.
+ * and let go of as it leaves. A slide that comes onto the screen, or any slide when it starts to play, is moved
+ * to its own time there; one that plays on screen just plays, its player keeping time with the clock. The one
+ * coming next waits at its start, still.
  *
  * Main thread only, like the players and the frame callbacks.
  */
@@ -39,7 +39,7 @@ internal class SeriesPreviewImpl(
     private val builtIns: BuiltInWallpapers,
 ) : SeriesPreview {
 
-    override val timeline = SeriesTimeline(
+    private val timeline = SeriesTimeline(
         slideCount = slides.size,
         holdMs = holdMs,
         transitionMs = if (transition.isNone) 0 else transition.durationMs,
@@ -62,14 +62,11 @@ internal class SeriesPreviewImpl(
     /** The slides the last frame showed: one that wasn't among them comes onto the screen. */
     private var onScreen: Set<Int> = emptySet()
 
-    private var scrubbing = false
     private var released = false
 
-    override var positionMs = 0L
-        private set
-
-    override var isPlaying = false
-        private set
+    /** Where it is in its round, in ms. */
+    private var positionMs = 0L
+    private var isPlaying = false
 
     /** Where the clock started from while it plays: the position then and the uptime then. */
     private var clockFromMs = 0L
@@ -100,18 +97,6 @@ internal class SeriesPreviewImpl(
         showPosition(seek = false)
     }
 
-    override fun seekTo(positionMs: Long) {
-        if (released) return
-        this.positionMs = Math.floorMod(positionMs, timeline.durationMs)
-        if (isPlaying) startClock()
-        showPosition(seek = true)
-    }
-
-    override fun setScrubbing(scrubbing: Boolean) {
-        this.scrubbing = scrubbing
-        alive.values.forEach { it.setScrubbing(scrubbing) }
-    }
-
     override fun release() {
         if (released) return
         released = true
@@ -140,8 +125,8 @@ internal class SeriesPreviewImpl(
         Math.floorMod(clockFromMs + SystemClock.uptimeMillis() - clockStartedAtMs, timeline.durationMs)
 
     /**
-     * Draws the moment at [positionMs]. With [seek] every slide on screen is moved to its own time there;
-     * otherwise only one that comes onto the screen, or was just made.
+     * Draws the moment at [positionMs]. With [seek] every slide on screen is moved to its own time there (it
+     * starts to play); otherwise only one that comes onto the screen, or was just made.
      */
     private fun showPosition(seek: Boolean) {
         val moment = timeline.at(positionMs)
@@ -164,7 +149,7 @@ internal class SeriesPreviewImpl(
         (alive.keys - wanted).forEach(::drop)
     }
 
-    /** Besides those on screen: the slide before (a finger may go back) and the one that comes next. */
+    /** Besides those on screen: the slide before and the one that comes next. */
     private fun neighbours(moment: Moment): Set<Int> {
         val count = slides.size
         return when (moment) {
@@ -203,7 +188,6 @@ internal class SeriesPreviewImpl(
             // A series holds no series.
             is WallpaperSpec.Series -> EmptyPreviewSlide
         }
-        slide.setScrubbing(scrubbing)
         slide.renderer?.let(gl::add)
         return slide
     }

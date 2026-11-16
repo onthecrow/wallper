@@ -111,8 +111,11 @@ internal class GroupEditorViewModel @AssistedInject constructor(
             .catch { Timber.e(it, "Can't read the wallpaper's settings") }
             .launchIn(viewModelScope)
 
-        // The transition's step plays the members as they are when it opens.
-        state.map { editor -> editor.memberItems.map { it.id }.takeIf { editor.step == GroupEditorStep.TRANSITION && editor.previewSlides == null } }
+        // The transition's step plays the first members as they are when it opens.
+        state.map { editor ->
+            editor.memberItems.take(GroupEditorState.PREVIEW_MEMBERS).map { it.id }
+                .takeIf { editor.step == GroupEditorStep.TRANSITION && editor.previewSlides == null }
+        }
             .distinctUntilChanged()
             .filterNotNull()
             .onEach { ids -> onEvent(GroupEditorEvent.OnPreviewSlidesLoaded(wallpaperSpecs.slides(ids))) }

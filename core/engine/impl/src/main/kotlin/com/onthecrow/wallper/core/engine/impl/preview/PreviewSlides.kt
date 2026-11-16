@@ -4,11 +4,9 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import android.view.Surface
-import androidx.annotation.OptIn
 import androidx.core.net.toUri
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
-import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import com.onthecrow.wallper.core.engine.BuiltInScene
 import com.onthecrow.wallper.core.engine.WallpaperSpec
@@ -34,9 +32,6 @@ internal interface PreviewSlide {
      */
     fun moveTo(sinceShownMs: Long, playing: Boolean, seek: Boolean)
 
-    /** Many seeks are coming: the finger is on the timeline. */
-    fun setScrubbing(scrubbing: Boolean) = Unit
-
     /** Lets go of what it holds; its renderer goes with the GL thread's [SeriesPreviewImpl.drop]. */
     fun release()
 }
@@ -44,13 +39,11 @@ internal interface PreviewSlide {
 /**
  * A video slide: an ExoPlayer of its own, not the wallpaper's player, playing the clip round and round into
  * the texture of the wallpaper's [VideoWallpaperRenderer], which crops, turns and tints it as on the home
- * screen. Seeks show the frame there even while it stands still, and a finger on the timeline puts the player
- * in its scrubbing mode, as on the editor's trim bar.
+ * screen. A seek shows the frame there even while it stands still.
  *
  * @param wallpaper an original video, or an optimised one as a whole frame.
  * @param onFrame a new video frame waits in the texture: the preview draws it.
  */
-@OptIn(UnstableApi::class)
 internal class VideoPreviewSlide(
     context: Context,
     wallpaper: WallpaperSpec.Media,
@@ -96,8 +89,6 @@ internal class VideoPreviewSlide(
         }
         player.playWhenReady = playing
     }
-
-    override fun setScrubbing(scrubbing: Boolean) = player.setScrubbingModeEnabled(scrubbing)
 
     override fun release() {
         released = true
