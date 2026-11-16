@@ -28,6 +28,7 @@ internal class GroupEditorReducer @Inject constructor() : Reducer<GroupEditorSta
             GroupEditorEvent.OnPickCancel -> state.copy(step = GroupEditorStep.ARRANGE, stepGoesBack = true, picked = emptySet())
             GroupEditorEvent.OnAddClick -> state.copy(step = GroupEditorStep.PICK, stepGoesBack = false, picked = state.members.toSet())
             is GroupEditorEvent.OnMemberRemove -> state.copy(members = state.members - event.id)
+            is GroupEditorEvent.OnMembersReorder -> state.copy(members = event.memberIds)
             is GroupEditorEvent.OnDurationPick -> state.copy(slideDuration = event.duration)
             GroupEditorEvent.OnSaveClick -> if (state.canSave) {
                 state.copy(save = GroupSaveRequest(state.memberItems.map { it.id }, state.slideDuration))

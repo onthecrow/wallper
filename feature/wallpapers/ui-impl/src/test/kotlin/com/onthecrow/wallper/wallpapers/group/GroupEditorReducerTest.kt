@@ -93,6 +93,15 @@ class GroupEditorReducerTest {
     }
 
     @Test
+    fun `members dropped in a new order keep it`() = runTest {
+        val arranged = listed.copy(step = GroupEditorStep.ARRANGE, members = listOf(3, 1, 2))
+
+        val state = reducer.reduce(arranged, GroupEditorEvent.OnMembersReorder(listOf(1, 2, 3)))
+
+        assertEquals(listOf(1, 2, 3), state.members)
+    }
+
+    @Test
     fun `a swiped member leaves`() = runTest {
         val arranged = listed.copy(step = GroupEditorStep.ARRANGE, members = listOf(3, 1, 2))
 

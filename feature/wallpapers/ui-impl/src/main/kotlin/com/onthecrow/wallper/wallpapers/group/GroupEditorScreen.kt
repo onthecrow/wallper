@@ -19,6 +19,7 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.OverscrollEffect
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -45,6 +46,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.withoutVisualEffect
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -65,6 +67,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -76,11 +79,14 @@ import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
@@ -88,6 +94,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.zIndex
 import com.onthecrow.wallper.core.designsystem.component.FAB
 import com.onthecrow.wallper.core.model.BuiltInWallpaper
 import com.onthecrow.wallper.core.model.SlideDuration
@@ -275,6 +282,7 @@ private fun ArrangeStep(state: GroupEditorState, listState: LazyListState, onEve
                 listState = listState,
                 overscrollEffect = overscrollEffect?.withoutVisualEffect(),
                 onRemove = { onEvent(GroupEditorEvent.OnMemberRemove(it)) },
+                onReorder = { onEvent(GroupEditorEvent.OnMembersReorder(it)) },
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(
@@ -345,8 +353,18 @@ private fun MemberList(
     listState: LazyListState,
     overscrollEffect: OverscrollEffect?,
     onRemove: (Int) -> Unit,
+    onReorder: (List<Int>) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val drag = rememberMemberDrag(listState)
+    val memberIds = members.map { it.id }
+    LaunchedEffect(memberIds) { drag.onMembersChanged() }
+    // While a row is dragged, and until the series has the order it was dropped in, the rows are in that order.
+    val shown = drag.order?.mapNotNull { id -> members.firstOrNull { it.id == id } } ?: members
+    val hasHint = showsHint && members.isNotEmpty()
+    val currentMemberIds by rememberUpdatedState(memberIds)
+    val currentOnReorder by rememberUpdatedState(onReorder)
+    val haptics = LocalHapticFeedback.current
     LazyColumn(
         state = listState,
         overscrollEffect = overscrollEffect,
@@ -355,7 +373,7 @@ private fun MemberList(
         verticalArrangement = Arrangement.spacedBy(MemberSpacing),
         modifier = modifier,
     ) {
-        if (showsHint && members.isNotEmpty()) {
+        if (hasHint) {
             item(key = HINT_KEY) {
                 Text(
                     text = stringResource(R.string.group_swipe_hint),
@@ -367,15 +385,41 @@ private fun MemberList(
                 )
             }
         }
-        items(members, { it.id }) { member ->
+        items(shown, { it.id }) { member ->
             val dismissState = rememberSwipeToDismissBoxState()
+            val isDragged = drag.draggedId == member.id
             SwipeToDismissBox(
                 state = dismissState,
                 backgroundContent = {},
                 onDismiss = { onRemove(member.id) },
-                modifier = Modifier.animateItem(),
+                modifier = if (isDragged) {
+                    // Under the finger, over the rows it passes; the others make way for it.
+                    Modifier
+                        .zIndex(1f)
+                        .graphicsLayer { translationY = drag.offsetOf(member.id) }
+                } else {
+                    Modifier.animateItem()
+                },
             ) {
-                MemberRow(member)
+                MemberRow(
+                    member = member,
+                    lifted = isDragged,
+                    // A long press picks the row up; a swipe aside without it takes the member out.
+                    modifier = Modifier.pointerInput(member.id) {
+                        detectDragGesturesAfterLongPress(
+                            onDragStart = {
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                drag.start(member.id, currentMemberIds) { orderIndex -> orderIndex + if (hasHint) 1 else 0 }
+                            },
+                            onDrag = { change, amount ->
+                                change.consume()
+                                drag.drag(amount.y)
+                            },
+                            onDragEnd = { drag.end()?.let(currentOnReorder) },
+                            onDragCancel = { drag.end()?.let(currentOnReorder) },
+                        )
+                    },
+                )
             }
         }
         // The button is drawn over the list (AddButtonPlacement); this keeps its place, so that at the end of
@@ -442,9 +486,10 @@ private fun ListEndShade(modifier: Modifier = Modifier) {
 
 /** A member: its picture across the whole row, the middle of it where it is taller, and what it is. */
 @Composable
-private fun MemberRow(member: WallpaperItem) {
+private fun MemberRow(member: WallpaperItem, lifted: Boolean, modifier: Modifier = Modifier) {
     Card(
-        modifier = Modifier
+        elevation = CardDefaults.cardElevation(defaultElevation = if (lifted) LiftedElevation else 0.dp),
+        modifier = modifier
             .fillMaxWidth()
             .height(MemberHeight)
             .padding(horizontal = 16.dp),
@@ -719,6 +764,9 @@ private val MoveSpec = spring<Float>(stiffness = Spring.StiffnessMediumLow)
 
 private val ListTopPadding = 8.dp
 private val MemberHeight = 120.dp
+
+/** A member's row while it is dragged. */
+private val LiftedElevation = 8.dp
 private val MemberSpacing = 8.dp
 
 /** Between the last member and «Add wallpaper». */
