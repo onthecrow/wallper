@@ -1,7 +1,6 @@
 package com.onthecrow.wallper.wallpapers.model
 
 import com.onthecrow.wallper.core.model.BuiltInWallpaper
-import com.onthecrow.wallper.core.model.Tint
 
 internal data class WallpaperItem(
     val id: Int,
@@ -16,11 +15,6 @@ internal data class WallpaperItem(
     val isGroup: Boolean = false,
     /** A group's first members, whose pictures make its picture (`MakeSeriesPictureUseCase`). */
     val cover: List<WallpaperItem> = emptyList(),
-    /**
-     * What the picture is shown through: the wallpaper's own, which its picture's file never has in it. A
-     * series' picture has its members' in it already; a series of one shows its member's picture, under its tint.
-     */
-    val tint: Tint? = null,
 ) {
     /** The built-ins whose rendered previews this item's picture shows. */
     val previewsShown: List<BuiltInWallpaper> get() = listOfNotNull(builtIn) + cover.mapNotNull { it.builtIn }

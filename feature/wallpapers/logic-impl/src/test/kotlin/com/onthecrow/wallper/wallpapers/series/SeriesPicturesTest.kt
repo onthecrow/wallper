@@ -1,7 +1,5 @@
 package com.onthecrow.wallper.wallpapers.series
 
-import com.onthecrow.wallper.core.model.Tint
-import com.onthecrow.wallper.wallpapers.domain.SeriesPart
 import kotlinx.coroutines.test.runTest
 import java.io.File
 import kotlin.io.path.createTempDirectory
@@ -18,28 +16,14 @@ class SeriesPicturesTest {
     fun `the key follows what the picture shows`() {
         val first = File(directory.parentFile, "member-a").apply { writeText("a") }
         val second = File(directory.parentFile, "member-b").apply { writeText("b") }
-        val key = pictures.key(parts(first.path, second.path))
+        val key = pictures.key(listOf(first.path, second.path))
 
-        assertEquals(key, pictures.key(parts(first.path, second.path)))
-        assertNotEquals(key, pictures.key(parts(second.path, first.path)))
-        assertNotEquals(key, pictures.key(parts(first.path, null)))
+        assertEquals(key, pictures.key(listOf(first.path, second.path)))
+        assertNotEquals(key, pictures.key(listOf(second.path, first.path)))
+        assertNotEquals(key, pictures.key(listOf(first.path, null)))
         // The same file written again: a thumbnail made anew under its old name.
         second.writeText("bb")
-        assertNotEquals(key, pictures.key(parts(first.path, second.path)))
-    }
-
-    @Test
-    fun `the key follows the members' tints`() {
-        val first = File(directory.parentFile, "member-c").apply { writeText("c") }
-        val second = File(directory.parentFile, "member-d").apply { writeText("d") }
-        val key = pictures.key(parts(first.path, second.path))
-        val tinted = pictures.key(listOf(SeriesPart(first.path, Tint(0x4D000000)), SeriesPart(second.path)))
-
-        assertNotEquals(key, tinted)
-        assertEquals(tinted, pictures.key(listOf(SeriesPart(first.path, Tint(0x4D000000)), SeriesPart(second.path))))
-        // Another colour, and the same one on the other member.
-        assertNotEquals(tinted, pictures.key(listOf(SeriesPart(first.path, Tint(0x4DFF0000)), SeriesPart(second.path))))
-        assertNotEquals(tinted, pictures.key(listOf(SeriesPart(first.path), SeriesPart(second.path, Tint(0x4D000000)))))
+        assertNotEquals(key, pictures.key(listOf(first.path, second.path)))
     }
 
     @Test
@@ -65,6 +49,4 @@ class SeriesPicturesTest {
     }
 
     private fun picture(name: String) = File(directory, name).apply { writeText("x") }
-
-    private fun parts(vararg pictures: String?) = pictures.map { SeriesPart(it) }
 }

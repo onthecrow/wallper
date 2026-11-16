@@ -17,8 +17,6 @@ internal data class StorageItem(
     val picturePath: String,
     val kind: Kind,
     val bytes: Long,
-    /** What the wallpaper's tint multiplies its picture by (`Tint.multiplierArgb`), null without a tint. */
-    val tintMultiplier: Int? = null,
 ) {
     enum class Kind { ORIGINAL_VIDEO, OPTIMISED_VIDEO, PICTURE }
 

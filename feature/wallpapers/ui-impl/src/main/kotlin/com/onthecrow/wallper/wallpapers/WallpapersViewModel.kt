@@ -145,8 +145,8 @@ internal class WallpapersViewModel @Inject constructor(
         state.map { it.seriesCovers() }
             .distinctUntilChanged()
             .mapLatest { covers ->
-                covers.forEach { (groupId, parts) ->
-                    makeSeriesPictureUseCase(groupId, parts)?.let { onEvent(WallpapersEvent.OnSeriesPictureMade(groupId, it)) }
+                covers.forEach { (groupId, pictures) ->
+                    makeSeriesPictureUseCase(groupId, pictures)?.let { onEvent(WallpapersEvent.OnSeriesPictureMade(groupId, it)) }
                 }
             }
             .flowOn(dispatchersProvider.io)

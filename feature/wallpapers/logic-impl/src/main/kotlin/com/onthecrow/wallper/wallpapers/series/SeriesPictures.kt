@@ -12,7 +12,6 @@ import android.graphics.PorterDuffXfermode
 import android.graphics.Shader
 import android.os.Build
 import androidx.core.graphics.createBitmap
-import com.onthecrow.wallper.wallpapers.domain.SeriesPart
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import java.io.File
@@ -20,22 +19,21 @@ import java.util.zip.CRC32
 import kotlin.math.max
 
 /**
- * The list's pictures of series, made of their members' pictures as [SeriesPictureLayout] places them, each
- * under its member's tint, kept in [directory] as `<group id>_<key>.webp`. The key is made of what the picture
- * shows: the members' pictures, each file's path, size and time, their tints, and how it is drawn
- * ([FORMAT_VERSION], [SIZE]). A black hole's preview is named by its settings, so new settings make a new key
- * too. A group has one picture at a time: its older ones are deleted once the new one is made, and all of them
- * with the group.
+ * The list's pictures of series, made of their members' pictures as [SeriesPictureLayout] places them, kept in
+ * [directory] as `<group id>_<key>.webp`. The key is made of what the picture shows: the members' pictures,
+ * each file's path, size and time, and how it is drawn ([FORMAT_VERSION], [SIZE]). A black hole's preview is
+ * named by its settings, so new settings make a new key too. A group has one picture at a time: its older ones
+ * are deleted once the new one is made, and all of them with the group.
  */
 internal class SeriesPictures(private val directory: File) {
 
     /** One at a time: two screens asking for the same picture still write one file. */
     private val lock = Mutex()
 
-    /** The path to [groupId]'s picture of [parts], made now unless it was before; null if it can't be. */
-    suspend fun picture(groupId: Int, parts: List<SeriesPart>): String? = lock.withLock {
-        val file = File(directory, "${groupId}_${key(parts)}.$EXTENSION")
-        if (!file.exists() && !render(parts, file)) return@withLock null
+    /** The path to [groupId]'s picture of [pictures], made now unless it was before; null if it can't be. */
+    suspend fun picture(groupId: Int, pictures: List<String?>): String? = lock.withLock {
+        val file = File(directory, "${groupId}_${key(pictures)}.$EXTENSION")
+        if (!file.exists() && !render(pictures, file)) return@withLock null
         // Older pictures go only now: the list keeps showing one until the new one is ready.
         pictureFiles().filter { it.groupId == groupId && it != file }.forEach(File::delete)
         file.path
@@ -55,30 +53,26 @@ internal class SeriesPictures(private val directory: File) {
 
     private val File.groupId: Int? get() = name.substringBefore('_').toIntOrNull()
 
-    /**
-     * What the picture of [parts] is named by: it changes with any of them, or with how it is drawn. A part
-     * without a tint adds nothing for it, so the pictures made before there were tints keep their names.
-     */
-    internal fun key(parts: List<SeriesPart>): Long = CRC32().apply {
+    /** What the picture of [pictures] is named by: it changes with any of them, or with how it is drawn. */
+    internal fun key(pictures: List<String?>): Long = CRC32().apply {
         update("$FORMAT_VERSION $SIZE".toByteArray())
-        parts.forEach { part ->
-            val stamp = part.picture?.let { File(it).run { "$it:${length()}:${lastModified()}" } } ?: "-"
-            val tint = part.tint?.let { ":x${it.argb}" }.orEmpty()
-            update(" $stamp$tint".toByteArray())
+        pictures.forEach { path ->
+            val stamp = path?.let { File(it).run { "$it:${length()}:${lastModified()}" } } ?: "-"
+            update(" $stamp".toByteArray())
         }
     }.value
 
     /**
      * Draws the pictures one over the next, each over everything right of its left line: the parts meet without
      * a seam, the line's smoothing over the part before. A picture fills its part's box, scaled to cover it and
-     * cut evenly on the sides, as on the list's cards, and is seen through its member's tint.
+     * cut evenly on the sides, as on the list's cards.
      */
-    private fun render(parts: List<SeriesPart>, file: File): Boolean {
-        val layout = SeriesPictureLayout(parts.size, SIZE.toFloat(), SIZE.toFloat())
+    private fun render(pictures: List<String?>, file: File): Boolean {
+        val layout = SeriesPictureLayout(pictures.size, SIZE.toFloat(), SIZE.toFloat())
         val output = createBitmap(SIZE, SIZE)
         try {
             val canvas = Canvas(output)
-            parts.forEachIndexed { index, part ->
+            pictures.forEachIndexed { index, path ->
                 val left = layout.boxLeft(index)
                 val right = layout.boxRight(index)
                 val area = Path().apply {
@@ -88,7 +82,7 @@ internal class SeriesPictures(private val directory: File) {
                     lineTo(if (index == 0) 0f else layout.lineX(index, layout.height), layout.height)
                     close()
                 }
-                val picture = part.picture?.let { decode(it, right - left, layout.height) }
+                val picture = path?.let { decode(it, right - left, layout.height) }
                 if (picture == null) {
                     canvas.drawPath(area, Paint(Paint.ANTI_ALIAS_FLAG).apply { xfermode = PorterDuffXfermode(PorterDuff.Mode.CLEAR) })
                 } else {
@@ -97,16 +91,6 @@ internal class SeriesPictures(private val directory: File) {
                     }
                     canvas.drawPath(area, Paint(Paint.ANTI_ALIAS_FLAG or Paint.FILTER_BITMAP_FLAG).apply { this.shader = shader })
                     picture.recycle()
-                    // Over the same area, multiplying it: the next part covers both where it begins.
-                    part.tint?.let { tint ->
-                        canvas.drawPath(
-                            area,
-                            Paint(Paint.ANTI_ALIAS_FLAG).apply {
-                                color = tint.multiplierArgb
-                                xfermode = PorterDuffXfermode(PorterDuff.Mode.MULTIPLY)
-                            },
-                        )
-                    }
                 }
             }
             directory.mkdirs()

@@ -1,8 +1,6 @@
 package com.onthecrow.wallper.wallpapers
 
 import com.onthecrow.wallper.core.model.BuiltInWallpaper
-import com.onthecrow.wallper.core.model.Tint
-import com.onthecrow.wallper.wallpapers.domain.SeriesPart
 import com.onthecrow.wallper.wallpapers.model.WallpaperItem
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -12,7 +10,6 @@ import kotlin.test.assertSame
 class WallpapersReducerTest {
 
     private val reducer = WallpapersReducer()
-    private val tint = Tint(0x4D000000)
 
     @Test
     fun `wallpapers change replaces the list`() = runTest {
@@ -75,14 +72,13 @@ class WallpapersReducerTest {
     fun `a series' picture waits for its cover's previews, and its made picture survives list updates`() = runTest {
         val group = WallpaperItem(
             5, null, false, isGroup = true,
-            cover = listOf(WallpaperItem(1, null, false, BuiltInWallpaper.BLACK_HOLE), WallpaperItem(2, "a", false, tint = tint)),
+            cover = listOf(WallpaperItem(1, null, false, BuiltInWallpaper.BLACK_HOLE), WallpaperItem(2, "a", false)),
         )
         val listed = reducer.reduce(WallpapersState(), WallpapersEvent.OnWallpapersChanged(listOf(group)))
         assertEquals(emptyMap(), listed.seriesCovers())
 
         val loaded = reducer.reduce(listed, WallpapersEvent.OnBuiltInPreviewLoaded(BuiltInWallpaper.BLACK_HOLE, "previews/bh.png"))
-        // Each part with its member's tint: the picture is made again when one changes.
-        assertEquals(mapOf(5 to listOf(SeriesPart("previews/bh.png"), SeriesPart("a", tint))), loaded.seriesCovers())
+        assertEquals(mapOf(5 to listOf<String?>("previews/bh.png", "a")), loaded.seriesCovers())
 
         val made = reducer.reduce(loaded, WallpapersEvent.OnSeriesPictureMade(5, "series/5.webp"))
         assertEquals("series/5.webp", made.items.single().picturePath)
@@ -99,7 +95,7 @@ class WallpapersReducerTest {
 
         val loaded = reducer.reduce(listed, WallpapersEvent.OnBuiltInPreviewLoaded(BuiltInWallpaper.BLACK_HOLE, null))
 
-        assertEquals(mapOf(5 to listOf(SeriesPart(null))), loaded.seriesCovers())
+        assertEquals(mapOf(5 to listOf<String?>(null)), loaded.seriesCovers())
     }
 
     @Test
