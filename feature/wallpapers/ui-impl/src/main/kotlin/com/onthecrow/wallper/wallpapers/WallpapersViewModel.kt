@@ -19,14 +19,19 @@ import com.onthecrow.wallper.wallpapers.mapper.toItem
 import com.onthecrow.wallper.wallpapers.model.WallpaperItem
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.channels.BufferOverflow
+import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.conflate
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.mapLatest
+import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.flow.onStart
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
@@ -48,6 +53,8 @@ internal class WallpapersViewModel @Inject constructor(
     /** Built-ins whose previews are followed. Touched only from [eventFlow], on the main thread. */
     private val followedPreviews = mutableSetOf<BuiltInWallpaper>()
 
+    private val wallpaperChecks = MutableSharedFlow<Unit>(extraBufferCapacity = 1, onBufferOverflow = BufferOverflow.DROP_OLDEST)
+
     init {
         eventFlow.onEach { event ->
             when (event) {
@@ -60,6 +67,7 @@ internal class WallpapersViewModel @Inject constructor(
                 is WallpapersEvent.OnWallpapersChanged -> event.items.flatMap { it.previewsShown }.forEach(::followPreview)
                 is WallpapersEvent.OnMediaPicked -> openEditor(event.uri)
                 WallpapersEvent.OnSettingsClick -> navigator.navigate(SettingsDestination)
+                WallpapersEvent.OnResume -> wallpaperChecks.tryEmit(Unit)
                 else -> Unit
             }
         }.launchIn(viewModelScope)
@@ -78,6 +86,16 @@ internal class WallpapersViewModel @Inject constructor(
             .launchIn(viewModelScope)
 
         followSeriesPictures()
+
+        // As the settings' «Wallpaper» row does: one check at a time, so an older answer never lands after a
+        // newer one, and the first one doesn't wait for the screen's resume.
+        merge(wallpaperChecks, liveWallpaperController.wallpaperChanges())
+            .onStart { emit(Unit) }
+            .conflate()
+            .map { liveWallpaperController.isWallpaperSet() }
+            .flowOn(dispatchersProvider.io)
+            .onEach { isSet -> onEvent(WallpapersEvent.OnWallpaperChecked(isSet)) }
+            .launchIn(viewModelScope)
     }
 
     /**

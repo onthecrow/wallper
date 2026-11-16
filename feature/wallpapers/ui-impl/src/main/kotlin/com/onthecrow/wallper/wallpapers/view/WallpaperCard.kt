@@ -1,7 +1,9 @@
 package com.onthecrow.wallper.wallpapers.view
 
 import androidx.annotation.StringRes
+import android.os.Build
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
@@ -11,6 +13,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -19,6 +22,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawBehind
@@ -26,16 +30,24 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toOffset
+import androidx.compose.ui.zIndex
 import coil.compose.AsyncImage
+import com.onthecrow.nimbus.NimbusEffect
+import com.onthecrow.nimbus.NimbusLayer
+import com.onthecrow.nimbus.NimbusMotion
+import com.onthecrow.nimbus.nimbus
 import com.onthecrow.wallper.core.designsystem.R as DesignR
 import com.onthecrow.wallper.core.model.BuiltInWallpaper
 import com.onthecrow.wallper.wallpapers.model.WallpaperItem
@@ -43,11 +55,11 @@ import com.onthecrow.wallper.wallpapers.ui.R
 import kotlin.math.roundToInt
 
 /**
- * A wallpaper of the list; a tap makes it the active one. Over its picture: a mark if it is the active one
- * (top left), its actions (top right) and what it is (bottom right).
+ * A wallpaper of the list; a tap makes it the active one, which glows round its edge ([activeGlow]). Over its
+ * picture: its actions (top right) and what it is (bottom right).
  *
- * With [selected] it is a choice instead (a group's members): no actions and no active mark; a tap
- * toggles it, and a chosen one is tinted in the accent colour with a check in the middle.
+ * With [selected] it is a choice instead (a group's members): no actions and no glow; a tap toggles it,
+ * and a chosen one is tinted in the accent colour with a check in the middle.
  *
  * @param onEditClick the editor for media that keeps its original, a group's members, the settings of a built-in.
  * @param onDeleteClick the user's media and groups only: built-ins stay.
@@ -62,12 +74,23 @@ internal fun WallpaperCard(
     selected: Boolean? = null,
 ) {
     val haptics = LocalHapticFeedback.current
+    val isMarked = selected == null && wallpaper.isActive
+    val primary = MaterialTheme.colorScheme.primary
+    val tertiary = MaterialTheme.colorScheme.tertiary
+    val accent = remember(primary) { primary.vivid() }
+    val contrast = remember(tertiary) { tertiary.vivid() }
+    val activeDescription = stringResource(R.string.active_wallpaper)
     Card(
         onClick = {
             haptics.performHapticFeedback(HapticFeedbackType.Confirm)
             onClick()
         },
-        modifier = modifier,
+        shape = CardShape,
+        modifier = modifier
+            // Over its neighbours, which its glow reaches.
+            .zIndex(if (isMarked) 1f else 0f)
+            .activeGlow(isMarked, accent, contrast)
+            .semantics { if (isMarked) stateDescription = activeDescription },
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             WallpaperPicture(wallpaper, Modifier.matchParentSize())
@@ -88,10 +111,6 @@ internal fun WallpaperCard(
                         }
                     }
                 }
-                ActiveMark(
-                    isActive = wallpaper.isActive,
-                    modifier = Modifier.align(Alignment.TopStart),
-                )
             }
             KindLabel(wallpaper)
         }
@@ -160,11 +179,9 @@ internal fun BoxScope.KindLabel(wallpaper: WallpaperItem) {
 /**
  * Shades the card's corner behind an element aligned there with [alignment], so that light content stays
  * readable on a bright picture: an elliptic gradient from the corner, [ShadeSpread] times the element's
- * size with its padding, drawn at [alpha].
+ * size with its padding.
  */
-private fun Modifier.cornerShade(alignment: Alignment, alpha: () -> Float = { 1f }): Modifier = drawBehind {
-    val shadeAlpha = alpha()
-    if (shadeAlpha <= 0f) return@drawBehind
+private fun Modifier.cornerShade(alignment: Alignment): Modifier = drawBehind {
     val corner = alignment.align(IntSize.Zero, IntSize(size.width.roundToInt(), size.height.roundToInt()), layoutDirection)
         .toOffset()
     val radiusX = size.width * ShadeSpread
@@ -175,7 +192,6 @@ private fun Modifier.cornerShade(alignment: Alignment, alpha: () -> Float = { 1f
             brush = Brush.radialGradient(*ShadeStops, center = corner, radius = radiusX),
             radius = radiusX,
             center = corner,
-            alpha = shadeAlpha,
         )
     }
 }
@@ -208,30 +224,49 @@ private fun BoxScope.SelectionMark(selected: Boolean) {
 }
 
 /**
- * Only the active wallpaper is marked; the mark and its corner's shade come and go together. The shade fades
- * as it draws, not in a layer: a translucent layer would cut it off at the mark's bounds, a dark square.
+ * Nimbus round the active card, as round the connect button of OnthecrowVPN: two layers of spikes turning
+ * opposite ways, in the theme's accent and the colour that sets it off, its tertiary, both at full strength
+ * ([vivid]: the theme's tones are pastel in the dark theme, and a glow in them is white). It follows the
+ * card's shape and fills it, under the card. Nimbus needs API 26: older devices show no glow. Off, it isn't
+ * drawn at all.
  */
-@Composable
-private fun ActiveMark(isActive: Boolean, modifier: Modifier = Modifier) {
-    val shown by animateFloatAsState(targetValue = if (isActive) 1f else 0f, label = "active mark")
-    Box(
-        modifier = modifier
-            .cornerShade(Alignment.TopStart, alpha = { shown })
-            .padding(12.dp),
-    ) {
-        Icon(
-            painter = painterResource(R.drawable.ic_radio_checked),
-            contentDescription = if (isActive) stringResource(R.string.active_wallpaper) else null,
-            modifier = Modifier
-                .size(24.dp)
-                .graphicsLayer {
-                    alpha = shown
-                    scaleX = 0.6f + 0.4f * shown
-                    scaleY = 0.6f + 0.4f * shown
-                },
-            tint = ActiveColor,
-        )
-    }
+private fun Modifier.activeGlow(isActive: Boolean, accent: Color, contrast: Color): Modifier {
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return this
+    return nimbus(
+        shape = CardShape,
+        active = isActive,
+        // Back to front: the tertiary behind, the accent over it.
+        layers = listOf(
+            NimbusLayer(
+                color = contrast,
+                minSpikesCount = 4,
+                maxSpikesCount = 7,
+                maxPeakHeight = 0.12f,
+                alpha = 0.75f,
+                motionMode = NimbusMotion.RIGID,
+                rotationSpeed = -0.15f,
+            ),
+            NimbusLayer(
+                color = accent,
+                minSpikesCount = 5,
+                maxSpikesCount = 9,
+                maxPeakHeight = 0.08f,
+                alpha = 0.8f,
+                motionMode = NimbusMotion.RIGID,
+                rotationSpeed = 0.2f,
+            ),
+        ),
+        collar = 2.dp,
+        effect = NimbusEffect.GLOW,
+        activationSpec = tween(GlowMillis),
+    )
+}
+
+/** The colour's hue at full strength, and light. */
+private fun Color.vivid(): Color {
+    val hsv = FloatArray(3)
+    android.graphics.Color.colorToHSV(toArgb(), hsv)
+    return Color.hsv(hsv[0], hsv[1].coerceAtLeast(VividSaturation), hsv[2].coerceAtLeast(VividValue))
 }
 
 /** What the wallpaper is: a group, a built-in's kind, or how the user's media is kept, as it was or optimised. */
@@ -269,13 +304,22 @@ private fun WallpaperLabel(text: String, isOutlined: Boolean, modifier: Modifier
 private val BuiltInPlaceholderColor = Color(0xFF050507)
 
 /**
- * Material palette, muted: green 300 for the active wallpaper's mark, grey 400 for the actions,
- * grey 100 for the label and grey 900 for the text on the filled one.
+ * Material palette, muted: grey 400 for the actions, grey 100 for the label and grey 900 for the text on the
+ * filled one.
  */
-private val ActiveColor = Color(0xFF81C784)
 private val ActionColor = Color(0xFFBDBDBD)
 private val LabelColor = Color(0xFFF5F5F5)
 private val LabelOnFilledColor = Color(0xFF212121)
+
+/** How long the glow takes to come or go when another wallpaper becomes the active one. */
+private const val GlowMillis = 700
+
+/** The card's shape, which the glow follows: Material's default for cards. */
+private val CardShape = RoundedCornerShape(12.dp)
+
+/** The least saturation and value of the glow's colours ([vivid]). */
+private const val VividSaturation = 0.7f
+private const val VividValue = 0.9f
 
 /** How much of the accent colour covers a chosen card. */
 private const val SelectionTintAlpha = 0.45f

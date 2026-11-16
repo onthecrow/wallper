@@ -57,6 +57,9 @@ class WallpapersViewModelTest {
     private var mediaSupported = true
     private var builtInsSupported = true
     private val appSettings = MutableStateFlow(AppSettings())
+    private var wallpaperSet = false
+    private var wallpaperChecks = 0
+    private val wallpaperChanges = MutableSharedFlow<Unit>()
 
     @BeforeTest
     fun setUp() = Dispatchers.setMain(dispatcher)
@@ -81,8 +84,11 @@ class WallpapersViewModelTest {
         liveWallpaperController = object : LiveWallpaperController {
             override fun createSetWallpaperIntent(): Intent = error("not used in these tests")
             override fun isSupported(wallpaper: BuiltInWallpaper) = builtInsSupported
-            override fun isWallpaperSet(): Boolean = error("not used in these tests")
-            override fun wallpaperChanges(): Flow<Unit> = error("not used in these tests")
+            override fun isWallpaperSet(): Boolean {
+                wallpaperChecks++
+                return wallpaperSet
+            }
+            override fun wallpaperChanges(): Flow<Unit> = wallpaperChanges
         },
         builtInPreviews = previews,
         makeSeriesPictureUseCase = seriesPictures,
@@ -93,6 +99,22 @@ class WallpapersViewModelTest {
         navigator = navigator,
         dispatchersProvider = TestDispatchers(dispatcher),
     )
+
+    @Test
+    fun `the title knows whether Wallper is the wallpaper, again on resume and whenever it changes`() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+        assertEquals(false, viewModel.state.value.isWallpaperSet)
+
+        // Set in the system's picker: the screen resumes.
+        wallpaperSet = true
+        viewModel.onEvent(WallpapersEvent.OnResume)
+        assertEquals(true, viewModel.state.value.isWallpaperSet)
+
+        wallpaperSet = false
+        wallpaperChanges.emit(Unit)
+        assertEquals(false, viewModel.state.value.isWallpaperSet)
+        assertEquals(3, wallpaperChecks)
+    }
 
     @Test
     fun `a series of one shows its member's picture and edits open its members`() = runTest(dispatcher) {

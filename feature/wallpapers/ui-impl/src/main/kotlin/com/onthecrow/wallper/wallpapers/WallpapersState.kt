@@ -21,6 +21,8 @@ internal data class WallpapersState(
     val isAddDialogShown: Boolean = false,
     /** There are enough wallpapers for a series ([Wallpaper.Group.MIN_MEMBERS]): the «+» offers one. */
     val offersSeries: Boolean = false,
+    /** Whether Wallper is the phone's wallpaper, which the title writes itself for; null until known. */
+    val isWallpaperSet: Boolean? = null,
 ) : State {
 
     /**
