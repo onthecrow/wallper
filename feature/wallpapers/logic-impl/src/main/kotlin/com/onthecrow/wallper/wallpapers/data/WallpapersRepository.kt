@@ -51,6 +51,9 @@ internal class WallpapersRepository @Inject constructor(
     /** Groups that deleted members left too small to be a series ([Wallpaper.Group.MIN_MEMBERS]). */
     suspend fun deleteTooSmallGroups() = wallpaperDao.deleteGroupsUnder(Wallpaper.Group.MIN_MEMBERS)
 
+    /** The active wallpaper, a group with its members; null when none is. */
+    suspend fun getActive(): Wallpaper? = wallpaperDao.observeAll().first().firstOrNull { it.isActive }?.let { getWallpaper(it.id) }
+
     /** The ids of every group there is. */
     suspend fun groupIds(): Set<Int> = wallpaperDao.observeAll().first().filter { it.isGroup }.map { it.id }.toSet()
 }

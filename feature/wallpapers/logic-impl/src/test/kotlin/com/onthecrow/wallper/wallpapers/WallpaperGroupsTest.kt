@@ -36,7 +36,8 @@ class WallpaperGroupsTest {
     private val add = AddWallpaperUseCaseImpl(repository)
     private val saveGroup = SaveWallpaperGroupUseCaseImpl(repository, ActivateWallpaperUseCaseImpl(repository, activations), settings)
     private val picturesDirectory = createTempDirectory("series").toFile()
-    private val delete = DeleteWallpaperUseCaseImpl(storage, repository, SeriesPictures(picturesDirectory))
+    private val activate = ActivateWallpaperUseCaseImpl(repository, activations)
+    private val delete = DeleteWallpaperUseCaseImpl(storage, repository, SeriesPictures(picturesDirectory), activate)
 
     private val video = NewWallpaper.Media(
         type = MediaType.VIDEO,
@@ -135,6 +136,39 @@ class WallpaperGroupsTest {
         // Its members stay.
         assertIs<Wallpaper.ProcessedVideo>(GetWallpaperUseCaseImpl(repository)(second))
         assertIs<Wallpaper.Group>(GetWallpaperUseCaseImpl(repository)(others))
+    }
+
+    @Test
+    fun `an active series left with one member gives the screen to it`() = runTest {
+        val first = add(video)
+        val second = add(processed)
+        // A new group is the active wallpaper.
+        val two = saveGroup(null, listOf(first, second), SlideDuration.DEFAULT)
+
+        delete(first)
+
+        assertNull(GetWallpaperUseCaseImpl(repository)(two))
+        assertEquals(true, GetWallpaperUseCaseImpl(repository)(second)?.isActive)
+    }
+
+    @Test
+    fun `a series that goes while another wallpaper is active leaves that one active`() = runTest {
+        val first = add(video)
+        val second = add(processed)
+        val third = add(video)
+        val two = saveGroup(null, listOf(first, second), SlideDuration.DEFAULT)
+        val left = saveGroup(null, listOf(second, third), SlideDuration.DEFAULT)
+        activate(third)
+
+        delete(first)
+
+        assertNull(GetWallpaperUseCaseImpl(repository)(two))
+        assertEquals(true, GetWallpaperUseCaseImpl(repository)(third)?.isActive)
+        assertEquals(false, GetWallpaperUseCaseImpl(repository)(second)?.isActive)
+        // An active series that keeps two members stays active.
+        activate(left)
+        delete(add(video))
+        assertEquals(true, GetWallpaperUseCaseImpl(repository)(left)?.isActive)
     }
 
     @Test
