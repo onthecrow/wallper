@@ -25,8 +25,8 @@ internal class GroupEditorReducer @Inject constructor() : Reducer<GroupEditorSta
                 picked = if (event.id in state.picked) state.picked - event.id else state.picked + event.id,
             )
             GroupEditorEvent.OnPickConfirm -> state.confirmPick()
-            GroupEditorEvent.OnPickCancel -> state.copy(step = GroupEditorStep.ARRANGE, picked = emptySet())
-            GroupEditorEvent.OnAddClick -> state.copy(step = GroupEditorStep.PICK, picked = state.members.toSet())
+            GroupEditorEvent.OnPickCancel -> state.copy(step = GroupEditorStep.ARRANGE, stepGoesBack = true, picked = emptySet())
+            GroupEditorEvent.OnAddClick -> state.copy(step = GroupEditorStep.PICK, stepGoesBack = false, picked = state.members.toSet())
             is GroupEditorEvent.OnMemberRemove -> state.copy(members = state.members - event.id)
             is GroupEditorEvent.OnDurationPick -> state.copy(slideDuration = event.duration)
             GroupEditorEvent.OnSaveClick -> if (state.canSave) {
@@ -38,11 +38,19 @@ internal class GroupEditorReducer @Inject constructor() : Reducer<GroupEditorSta
             GroupEditorEvent.OnCloseClick -> state
         }
 
-    /** Members keep their order; the newly picked ones follow, in the list's order. */
+    /**
+     * Members keep their order; the newly picked ones follow, in the list's order. Picked to add to members, it
+     * goes back to them; a new group's first pick goes on to its members.
+     */
     private fun GroupEditorState.confirmPick(): GroupEditorState {
         if (picked.isEmpty()) return this
         val kept = members.filter { it in picked }
         val added = pickable.map { it.id }.filter { it in picked && it !in kept }
-        return copy(step = GroupEditorStep.ARRANGE, members = kept + added, picked = emptySet())
+        return copy(
+            step = GroupEditorStep.ARRANGE,
+            stepGoesBack = members.isNotEmpty(),
+            members = kept + added,
+            picked = emptySet(),
+        )
     }
 }

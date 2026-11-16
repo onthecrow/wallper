@@ -12,7 +12,9 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.OverscrollEffect
@@ -173,7 +175,14 @@ internal fun GroupEditorScreen(
     ) { padding ->
         AnimatedContent(
             targetState = state.step,
-            transitionSpec = { fadeIn() togetherWith fadeOut() },
+            // As the app's screens come and go (NavigationProviderImpl): a step that opens comes from the right.
+            transitionSpec = {
+                if (state.stepGoesBack) {
+                    slideInHorizontally(initialOffsetX = { -it }) togetherWith slideOutHorizontally(targetOffsetX = { it })
+                } else {
+                    slideInHorizontally(initialOffsetX = { it }) togetherWith slideOutHorizontally(targetOffsetX = { -it })
+                }
+            },
             modifier = Modifier.padding(padding),
             label = "group step",
         ) { step ->

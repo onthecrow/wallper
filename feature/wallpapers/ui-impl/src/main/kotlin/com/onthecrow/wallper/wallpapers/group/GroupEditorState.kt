@@ -13,6 +13,11 @@ import com.onthecrow.wallper.wallpapers.model.WallpaperItem
 internal data class GroupEditorState(
     val isNew: Boolean = true,
     val step: GroupEditorStep = GroupEditorStep.PICK,
+    /**
+     * The last change of [step] went back, as a screen closes: the steps slide the way the app's screens do
+     * when one is closed. Opening a step, or the first pick of a new group going on to its members, goes on.
+     */
+    val stepGoesBack: Boolean = false,
     /** False until an edited group is read; a new one has nothing to read. */
     val isLoaded: Boolean = isNew,
     /** Every wallpaper that can be a member, in the list's order: no groups, no built-in this device can't draw. */

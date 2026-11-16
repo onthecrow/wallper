@@ -70,7 +70,26 @@ class GroupEditorReducerTest {
 
         val state = reducer.reduce(adding, GroupEditorEvent.OnPickCancel)
 
-        assertEquals(arranged, state)
+        // Only the way it slides: back.
+        assertEquals(arranged.copy(stepGoesBack = true), state)
+    }
+
+    @Test
+    fun `steps slide on as they open and back as they close, a new group's first pick going on`() = runTest {
+        var state = reducer.reduce(listed, GroupEditorEvent.OnWallpaperClick(1))
+        state = reducer.reduce(state, GroupEditorEvent.OnPickConfirm)
+        assertEquals(GroupEditorStep.ARRANGE, state.step)
+        assertFalse(state.stepGoesBack)
+
+        state = reducer.reduce(state, GroupEditorEvent.OnAddClick)
+        assertFalse(state.stepGoesBack)
+        state = reducer.reduce(state, GroupEditorEvent.OnWallpaperClick(2))
+        state = reducer.reduce(state, GroupEditorEvent.OnPickConfirm)
+        assertTrue(state.stepGoesBack)
+
+        state = reducer.reduce(state, GroupEditorEvent.OnAddClick)
+        state = reducer.reduce(state, GroupEditorEvent.OnPickCancel)
+        assertTrue(state.stepGoesBack)
     }
 
     @Test
