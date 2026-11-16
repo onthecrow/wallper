@@ -10,15 +10,13 @@ import com.onthecrow.wallper.core.engine.WallpaperSpec
 import com.onthecrow.wallper.core.engine.impl.BuiltInWallpapers
 import com.onthecrow.wallper.core.gl.OwnGl
 import com.onthecrow.wallper.core.gl.SharedGl
-import com.onthecrow.wallper.core.model.ClipRange
-import com.onthecrow.wallper.core.model.CropRect
-import com.onthecrow.wallper.core.model.MediaInfo
 import com.onthecrow.wallper.core.model.MediaType
 import com.onthecrow.wallper.core.model.SeriesSwitch
 import com.onthecrow.wallper.core.player.WallperPlayerFactory
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import javax.inject.Inject
+import kotlin.time.Duration
 import kotlin.time.TimeSource
 
 internal class WallpaperEngineFactory @Inject constructor(
@@ -30,9 +28,9 @@ internal class WallpaperEngineFactory @Inject constructor(
 ) {
     /**
      * @param wallpaper the wallpaper to show, or null for the placeholder.
-     * @param isPreview the system picker's preview: built-ins render cheaper there, and a series cuts
-     * whatever [seriesSwitch] says: the wallpaper itself lives beside the preview, with decoders of its own.
-     * @param seriesSwitch how a series changes its slides.
+     * @param isPreview a preview, the system picker's or the app's: built-ins render cheaper there.
+     * @param seriesSwitch how a series changes its slides; the system picker's preview cuts, as the wallpaper
+     * itself lives beside it with decoders of its own.
      */
     fun create(
         baseContext: Context,
@@ -68,8 +66,7 @@ internal class WallpaperEngineFactory @Inject constructor(
                         timeSource = TimeSource.Monotonic,
                         host = host,
                         newStage = { hostOf ->
-                            val switch = if (isPreview) SeriesSwitch.CUT else seriesSwitch
-                            stage(switch, baseContext, surfaceHolder, slides, isPreview, host, hostOf, scope)
+                            stage(seriesSwitch, baseContext, surfaceHolder, wallpaper.copy(slides = slides), isPreview, host, hostOf, scope)
                         },
                     )
                 }
@@ -87,24 +84,27 @@ internal class WallpaperEngineFactory @Inject constructor(
         switch: SeriesSwitch,
         baseContext: Context,
         surfaceHolder: () -> SurfaceHolder,
-        slides: List<WallpaperSpec>,
+        series: WallpaperSpec.Series,
         isPreview: Boolean,
         host: EngineHost,
         hostOf: (slide: Int) -> EngineHost,
         scope: CoroutineScope,
     ): SlideStage = when (switch) {
-        SeriesSwitch.CUT -> CutStage(slides, hostOf) { slide, slideHost ->
+        SeriesSwitch.CUT -> CutStage(series.slides, hostOf) { slide, slideHost ->
             create(baseContext, surfaceHolder, slide, isPreview, slideHost)
         }
-        // Every slide's renderer on one GL thread that keeps the window: a change is its next frame.
+        // Every slide's renderer on one GL thread that keeps the window: a change is its next frame, or the
+        // first of the series' transition.
         SeriesSwitch.SHARED_GL -> {
-            val gl = SharedGl(surfaceHolder(), glesVersionOf(slides), host::showPlaceholder)
+            val transition = series.transition
+            val gl = SharedGl(surfaceHolder(), glesVersionOf(series.slides), host::showPlaceholder, transition)
             WarmStage(
-                slides = slides,
+                slides = series.slides,
                 hostOf = hostOf,
                 scope = scope,
                 handsOverWindow = false,
                 window = SharedGlWindow(gl),
+                handover = if (transition.isNone) Duration.ZERO else WarmStage.handoverOf(transition.durationMs),
             ) { slide, slideHost, onReady ->
                 // An optimised video goes through GL here too: nothing but GL draws on this window.
                 val drawn = if (slide is WallpaperSpec.ProcessedVideo) slide.asWholeFrame() else slide
@@ -113,7 +113,7 @@ internal class WallpaperEngineFactory @Inject constructor(
         }
         // Every slide on a GL thread of its own, which starts without the window: the slide on screen has it.
         SeriesSwitch.WARM_ENGINES -> WarmStage(
-            slides = slides,
+            slides = series.slides,
             hostOf = hostOf,
             scope = scope,
             handsOverWindow = true,
@@ -157,20 +157,6 @@ internal class WallpaperEngineFactory @Inject constructor(
         .mapNotNull { slide -> builtIns[slide.wallpaper]?.takeIf { it.isSupported() }?.glesVersion }
         .maxOrNull()
         ?: DEFAULT_GLES_VERSION
-
-    /**
-     * An optimised video as the GL engine takes one: its whole frame, a frame of one by one cropped to all
-     * of it, over the whole screen, never panned, played from end to end. Without its tint: the export put
-     * that into the frames already.
-     */
-    private fun WallpaperSpec.ProcessedVideo.asWholeFrame() = WallpaperSpec.Media(
-        type = MediaType.VIDEO,
-        sourcePath = path,
-        thumbnailPath = thumbnailPath,
-        crop = CropRect(left = 0, top = 0, right = 1, bottom = 1),
-        clip = ClipRange(startMs = 0, endMs = 0),
-        mediaInfo = MediaInfo(width = 1, height = 1, rotation = 0, durationMs = 0),
-    )
 
     private fun originalVideo(
         surfaceHolder: () -> SurfaceHolder,

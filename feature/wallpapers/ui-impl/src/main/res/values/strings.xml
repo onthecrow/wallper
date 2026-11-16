@@ -35,4 +35,20 @@
     <string name="group_duration_hours">%1$d h</string>
     <string name="group_duration_on_wake">Screen off</string>
     <string name="group_save_failed">Can\'t save the series</string>
+    <string name="group_transition_title">Transition</string>
+    <string name="group_transition_duration">Duration</string>
+    <string name="group_transition_seconds">%1$.1f s</string>
+    <string name="preview_moment_wallpaper">Wallpaper %1$d of %2$d</string>
+    <string name="preview_moment_transition">Transition %1$d → %2$d</string>
+    <string name="transition_none">None</string>
+    <string name="transition_crossfade">Crossfade</string>
+    <string name="transition_dip_to_black">Dip to black</string>
+    <string name="transition_blur">Blur</string>
+    <string name="transition_zoom">Zoom</string>
+    <string name="transition_slide_up">Slide up</string>
+    <string name="transition_luma">Luma fade</string>
+    <string name="transition_wipe">Wipe</string>
+    <string name="transition_iris">Iris</string>
+    <string name="transition_ripple">Ripple</string>
+    <string name="transition_pixelate">Pixelate</string>
 </resources>

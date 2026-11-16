@@ -7,7 +7,9 @@ import com.onthecrow.wallper.core.model.CropRect
 import com.onthecrow.wallper.core.model.MediaInfo
 import com.onthecrow.wallper.core.model.MediaType
 import com.onthecrow.wallper.core.model.SlideDuration
+import com.onthecrow.wallper.core.model.SlideTransition
 import com.onthecrow.wallper.core.model.Tint
+import com.onthecrow.wallper.core.model.TransitionEffect
 import com.onthecrow.wallper.wallpapers.data.database.WallpaperEntity
 import com.onthecrow.wallper.wallpapers.data.database.WallpaperGroupItemEntity
 import com.onthecrow.wallper.wallpapers.domain.model.NewWallpaper
@@ -38,6 +40,10 @@ internal fun WallpaperEntity.toGroup(members: List<Wallpaper>) = Wallpaper.Group
     members = members,
     slideDuration = SlideDuration(checkNotNull(slideDurationMs) { "Wallpaper $id isn't a group" }),
     isActive = isActive,
+    transition = SlideTransition(
+        effect = TransitionEffect.fromKey(transition),
+        durationMs = transitionMs?.let(SlideTransition::duration) ?: SlideTransition.DEFAULT_DURATION_MS,
+    ),
 )
 
 /**
@@ -130,11 +136,20 @@ internal fun Wallpaper.toSpec(): WallpaperSpec = when (this) {
     is Wallpaper.Group -> WallpaperSpec.Series(
         slides = members.filterNot { it is Wallpaper.Group }.map { it.toSpec() },
         slideDuration = slideDuration,
+        transition = transition,
     )
 }
 
-/** A group's row: what it shows is in its items; the media columns hold placeholders, like a built-in's. */
-internal fun groupEntity(id: Int = 0, slideDuration: SlideDuration, isActive: Boolean = false) = WallpaperEntity(
+/**
+ * A group's row: what it shows is in its items; the media columns hold placeholders, like a built-in's. No
+ * transition is stored as NULLs.
+ */
+internal fun groupEntity(
+    id: Int = 0,
+    slideDuration: SlideDuration,
+    transition: SlideTransition = SlideTransition.NONE,
+    isActive: Boolean = false,
+) = WallpaperEntity(
     id = id,
     type = MediaType.VIDEO,
     originalPath = null,
@@ -152,4 +167,6 @@ internal fun groupEntity(id: Int = 0, slideDuration: SlideDuration, isActive: Bo
     mediaDurationMs = 0,
     isActive = isActive,
     slideDurationMs = slideDuration.ms,
+    transition = transition.effect.takeUnless { transition.isNone }?.key,
+    transitionMs = transition.durationMs.takeUnless { transition.isNone },
 )

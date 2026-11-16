@@ -1,5 +1,6 @@
 package com.onthecrow.wallper.blackhole.renderer
 
+import android.opengl.GLES20
 import android.os.SystemClock
 import com.onthecrow.wallper.blackhole.physics.FrameState
 import com.onthecrow.wallper.core.gl.GLWallpaperRenderer
@@ -16,6 +17,7 @@ internal class BlackHoleGlRenderer(
 ) : GLWallpaperRenderer() {
 
     private val latest = AtomicReference<FrameState?>(null)
+    private val boundFramebuffer = IntArray(1)
     private var failureReported = false
 
     /** The last frame drew the black hole: without its shaders or lens tables a frame is black. */
@@ -29,9 +31,14 @@ internal class BlackHoleGlRenderer(
 
     override fun onSurfaceChanged(width: Int, height: Int) = renderer.onSurfaceSize(width, height)
 
+    /**
+     * Into whatever framebuffer is bound: the window, or a series' target while it blends two slides. Read
+     * first, as setting up binds others.
+     */
     override fun onDrawFrame(): Boolean {
         val frame = latest.get() ?: return false
-        val drawn = renderer.render(frame, SystemClock.elapsedRealtimeNanos())
+        GLES20.glGetIntegerv(GLES20.GL_FRAMEBUFFER_BINDING, boundFramebuffer, 0)
+        val drawn = renderer.render(frame, SystemClock.elapsedRealtimeNanos(), outputFramebuffer = boundFramebuffer[0])
         hasPicture = drawn
         val failure = renderer.failure
         if (failure != null && !failureReported) {

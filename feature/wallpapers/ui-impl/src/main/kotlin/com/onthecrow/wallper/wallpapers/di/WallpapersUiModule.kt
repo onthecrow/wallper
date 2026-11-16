@@ -1,8 +1,10 @@
 package com.onthecrow.wallper.wallpapers.di
 
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.onthecrow.wallper.core.engine.SeriesPreviews
 import com.onthecrow.wallper.core.navigation.FeatureEntry
 import com.onthecrow.wallper.core.navigation.featureEntry
 import com.onthecrow.wallper.wallpapers.WallpaperGroupDestination
@@ -11,6 +13,7 @@ import com.onthecrow.wallper.wallpapers.WallpapersScreen
 import com.onthecrow.wallper.wallpapers.WallpapersViewModel
 import com.onthecrow.wallper.wallpapers.group.GroupEditorScreen
 import com.onthecrow.wallper.wallpapers.group.GroupEditorViewModel
+import com.onthecrow.wallper.wallpapers.preview.LocalSeriesPreviews
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -36,16 +39,19 @@ internal object WallpapersUiModule {
 
     @Provides
     @IntoSet
-    fun provideWallpaperGroupEntry(): FeatureEntry<*> = featureEntry<WallpaperGroupDestination> { destination, modifier ->
-        val viewModel = hiltViewModel<GroupEditorViewModel, GroupEditorViewModel.Factory>(
-            creationCallback = { factory -> factory.create(destination) },
-        )
-        val state by viewModel.state.collectAsStateWithLifecycle()
-        GroupEditorScreen(
-            state = state,
-            eventFlow = viewModel.eventFlow,
-            onEvent = viewModel::onEvent,
-            modifier = modifier,
-        )
-    }
+    fun provideWallpaperGroupEntry(seriesPreviews: SeriesPreviews): FeatureEntry<*> =
+        featureEntry<WallpaperGroupDestination> { destination, modifier ->
+            val viewModel = hiltViewModel<GroupEditorViewModel, GroupEditorViewModel.Factory>(
+                creationCallback = { factory -> factory.create(destination) },
+            )
+            val state by viewModel.state.collectAsStateWithLifecycle()
+            CompositionLocalProvider(LocalSeriesPreviews provides seriesPreviews) {
+                GroupEditorScreen(
+                    state = state,
+                    eventFlow = viewModel.eventFlow,
+                    onEvent = viewModel::onEvent,
+                    modifier = modifier,
+                )
+            }
+        }
 }

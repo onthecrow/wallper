@@ -44,6 +44,13 @@ interface BuiltInWallpaperProvider {
         slide: SlideStart,
     ): WallpaperEngine? = null
 
+    /**
+     * The wallpaper as a scene for a series' preview, at [glesVersion]: drawn at any moment of its own time.
+     * [onChanged] is called, from any thread, when it would look different without being moved (what it
+     * loads came). Null if it can't be shown that way: the preview leaves its slide empty. Main thread.
+     */
+    fun createScene(context: Context, onChanged: () -> Unit): BuiltInScene? = null
+
     /** What the system tints its UI with. Called off the main thread. */
     @RequiresApi(Build.VERSION_CODES.O_MR1)
     fun colors(): WallpaperColors

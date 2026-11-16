@@ -7,6 +7,8 @@ import com.onthecrow.wallper.core.model.CropRect
 import com.onthecrow.wallper.core.model.MediaInfo
 import com.onthecrow.wallper.core.model.MediaType
 import com.onthecrow.wallper.core.model.SlideDuration
+import com.onthecrow.wallper.core.model.SlideTransition
+import com.onthecrow.wallper.core.model.TransitionEffect
 import com.onthecrow.wallper.settings.domain.AppSettings
 import com.onthecrow.wallper.settings.domain.AppSettingsSource
 import com.onthecrow.wallper.wallpapers.data.WallpapersRepository
@@ -84,6 +86,20 @@ class WallpaperGroupsTest {
         assertEquals(SlideDuration.ON_WAKE, spec.slideDuration)
         assertEquals(WallpaperSpec.ProcessedVideo("originals/b.mp4", "thumbnails/b"), spec.slides[1])
         assertIs<WallpaperSpec.Media>(spec.slides[0])
+    }
+
+    @Test
+    fun `a group keeps its transition, the series gets it, and an edit replaces it`() = runTest {
+        val first = add(video)
+        val second = add(processed)
+        val wipe = SlideTransition(TransitionEffect.WIPE, durationMs = 2_000)
+        val id = saveGroup(null, listOf(first, second), SlideDuration.DEFAULT, wipe)
+
+        val spec = assertIs<WallpaperSpec.Series>(ActiveWallpaperSourceImpl(repository, activations).activeWallpaperFlow.first())
+        assertEquals(wipe, spec.transition)
+
+        saveGroup(id, listOf(first, second), SlideDuration.DEFAULT, SlideTransition.NONE)
+        assertEquals(SlideTransition.NONE, assertIs<Wallpaper.Group>(GetWallpaperUseCaseImpl(repository)(id)).transition)
     }
 
     @Test

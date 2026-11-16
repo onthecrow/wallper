@@ -296,7 +296,8 @@ class WallperWallpaperService : WallpaperService() {
             }
             val shownWallpaper = wallpaper?.takeIf { it != failedWallpaper }
             wallpaperEngine = wallpaperEngineFactory
-                .create(baseContext, { surfaceHolder }, shownWallpaper, isPreview, this, seriesSwitch)
+                // The picker's preview lives beside the wallpaper itself, which has decoders of its own: it cuts.
+                .create(baseContext, { surfaceHolder }, shownWallpaper, isPreview, this, if (isPreview) SeriesSwitch.CUT else seriesSwitch)
                 .also { if (!isVisible) it.pause() }
             // From the page the launcher is on, not from the middle until the next swipe.
             dispatchOffsets()

@@ -6,6 +6,7 @@ import com.onthecrow.wallper.core.model.CropRect
 import com.onthecrow.wallper.core.model.MediaInfo
 import com.onthecrow.wallper.core.model.MediaType
 import com.onthecrow.wallper.core.model.SlideDuration
+import com.onthecrow.wallper.core.model.SlideTransition
 import com.onthecrow.wallper.core.model.Tint
 
 /** A row of the wallpapers list; any of them can be the active one. */
@@ -55,14 +56,15 @@ sealed interface Wallpaper {
 
     /**
      * A series of other wallpapers, never of groups: each of [members], in their order, shows for
-     * [slideDuration]. Deleting it leaves them; a member deleted so that fewer than [MIN_MEMBERS] are left
-     * deletes it.
+     * [slideDuration], the next one coming in through [transition]. Deleting it leaves them; a member deleted
+     * so that fewer than [MIN_MEMBERS] are left deletes it.
      */
     data class Group(
         override val id: Int,
         val members: List<Wallpaper>,
         val slideDuration: SlideDuration,
         override val isActive: Boolean,
+        val transition: SlideTransition = SlideTransition.NONE,
     ) : Wallpaper {
         companion object {
             /** A series of one wallpaper would be that wallpaper. */
