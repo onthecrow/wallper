@@ -1,13 +1,11 @@
 package com.onthecrow.wallper.wallpapers
 
 import androidx.lifecycle.viewModelScope
-import com.onthecrow.wallper.blackhole.BlackHoleSettingsDestination
 import com.onthecrow.wallper.core.coroutines.DispatchersProvider
 import com.onthecrow.wallper.core.engine.BuiltInPreviews
 import com.onthecrow.wallper.core.engine.LiveWallpaperController
 import com.onthecrow.wallper.core.model.BuiltInWallpaper
 import com.onthecrow.wallper.core.mvi.BaseViewModel
-import com.onthecrow.wallper.core.navigation.Destination
 import com.onthecrow.wallper.core.navigation.Navigator
 import com.onthecrow.wallper.editor.EditorDestination
 import com.onthecrow.wallper.editor.domain.IsMediaSupportedUseCase
@@ -139,9 +137,5 @@ internal class WallpapersViewModel @Inject constructor(
             }
             .flowOn(dispatchersProvider.io)
             .launchIn(viewModelScope)
-    }
-
-    private fun BuiltInWallpaper.settingsDestination(): Destination = when (this) {
-        BuiltInWallpaper.BLACK_HOLE -> BlackHoleSettingsDestination
     }
 }

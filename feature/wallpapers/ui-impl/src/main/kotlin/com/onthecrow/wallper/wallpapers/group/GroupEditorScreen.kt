@@ -100,6 +100,7 @@ import com.onthecrow.wallper.core.model.BuiltInWallpaper
 import com.onthecrow.wallper.core.model.SlideDuration
 import com.onthecrow.wallper.wallpapers.model.WallpaperItem
 import com.onthecrow.wallper.wallpapers.ui.R
+import com.onthecrow.wallper.wallpapers.view.CornerEditButton
 import com.onthecrow.wallper.wallpapers.view.KindLabel
 import com.onthecrow.wallper.wallpapers.view.WallpaperCard
 import com.onthecrow.wallper.wallpapers.view.WallpaperPicture
@@ -283,6 +284,12 @@ private fun ArrangeStep(state: GroupEditorState, listState: LazyListState, onEve
                 overscrollEffect = overscrollEffect?.withoutVisualEffect(),
                 onRemove = { onEvent(GroupEditorEvent.OnMemberRemove(it)) },
                 onReorder = { onEvent(GroupEditorEvent.OnMembersReorder(it)) },
+                onEdit = { member ->
+                    onEvent(
+                        member.builtIn?.let { GroupEditorEvent.OnMemberSettingsClick(it) }
+                            ?: GroupEditorEvent.OnMemberEditClick(member.id),
+                    )
+                },
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(
@@ -354,6 +361,7 @@ private fun MemberList(
     overscrollEffect: OverscrollEffect?,
     onRemove: (Int) -> Unit,
     onReorder: (List<Int>) -> Unit,
+    onEdit: (WallpaperItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val drag = rememberMemberDrag(listState)
@@ -404,6 +412,7 @@ private fun MemberList(
                 MemberRow(
                     member = member,
                     lifted = isDragged,
+                    onEditClick = { onEdit(member) },
                     // A long press picks the row up; a swipe aside without it takes the member out.
                     modifier = Modifier.pointerInput(member.id) {
                         detectDragGesturesAfterLongPress(
@@ -484,9 +493,12 @@ private fun ListEndShade(modifier: Modifier = Modifier) {
     )
 }
 
-/** A member: its picture across the whole row, the middle of it where it is taller, and what it is. */
+/**
+ * A member: its picture across the whole row, the middle of it where it is taller, what it is, and its pencil as
+ * on the list's card.
+ */
 @Composable
-private fun MemberRow(member: WallpaperItem, lifted: Boolean, modifier: Modifier = Modifier) {
+private fun MemberRow(member: WallpaperItem, lifted: Boolean, onEditClick: () -> Unit, modifier: Modifier = Modifier) {
     Card(
         elevation = CardDefaults.cardElevation(defaultElevation = if (lifted) LiftedElevation else 0.dp),
         modifier = modifier
@@ -496,6 +508,7 @@ private fun MemberRow(member: WallpaperItem, lifted: Boolean, modifier: Modifier
     ) {
         Box(modifier = Modifier.fillMaxSize()) {
             WallpaperPicture(member, Modifier.matchParentSize())
+            CornerEditButton(member, onEditClick)
             KindLabel(member)
         }
     }

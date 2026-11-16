@@ -36,7 +36,9 @@ internal class GroupEditorReducer @Inject constructor() : Reducer<GroupEditorSta
                 state
             }
             GroupEditorEvent.OnSaveFailed -> state.copy(save = null)
-            GroupEditorEvent.OnCloseClick -> state
+            GroupEditorEvent.OnCloseClick,
+            is GroupEditorEvent.OnMemberEditClick,
+            is GroupEditorEvent.OnMemberSettingsClick -> state
         }
 
     /**

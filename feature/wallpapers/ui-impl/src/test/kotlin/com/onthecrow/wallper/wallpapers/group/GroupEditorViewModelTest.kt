@@ -1,6 +1,7 @@
 package com.onthecrow.wallper.wallpapers.group
 
 import android.content.Intent
+import com.onthecrow.wallper.blackhole.BlackHoleSettingsDestination
 import com.onthecrow.wallper.core.coroutines.DispatchersProvider
 import com.onthecrow.wallper.core.engine.BuiltInPreviews
 import com.onthecrow.wallper.core.engine.LiveWallpaperController
@@ -14,6 +15,7 @@ import com.onthecrow.wallper.core.navigation.Destination
 import com.onthecrow.wallper.core.navigation.Navigator
 import com.onthecrow.wallper.settings.domain.AppSettings
 import com.onthecrow.wallper.settings.domain.AppSettingsSource
+import com.onthecrow.wallper.editor.EditorDestination
 import com.onthecrow.wallper.wallpapers.WallpaperGroupDestination
 import com.onthecrow.wallper.wallpapers.domain.GetWallpaperUseCase
 import com.onthecrow.wallper.wallpapers.domain.ObserveWallpapersUseCase
@@ -53,6 +55,7 @@ class GroupEditorViewModelTest {
     private val saves = mutableListOf<SaveCall>()
     private var saveError: Exception? = null
     private var backNavigations = 0
+    private val destinations = mutableListOf<Destination>()
     private var builtInsSupported = true
     private val appSettings = MutableStateFlow(AppSettings())
     private var hintShown = 0
@@ -97,7 +100,9 @@ class GroupEditorViewModelTest {
             override fun update(transform: (AppSettings) -> AppSettings) = appSettings.update(transform)
         },
         navigator = object : Navigator {
-            override fun navigate(destination: Destination) = Unit
+            override fun navigate(destination: Destination) {
+                destinations += destination
+            }
             override fun navigateBack() { backNavigations++ }
         },
         dispatchersProvider = object : DispatchersProvider {
@@ -201,6 +206,17 @@ class GroupEditorViewModelTest {
         viewModel.onEvent(GroupEditorEvent.OnSaveClick)
         assertEquals(1, saves.size)
         assertEquals(1, backNavigations)
+    }
+
+    @Test
+    fun `a member's pencil opens its editor, a built-in's its settings, and the series stays`() = runTest(dispatcher) {
+        val viewModel = createViewModel(groupId = 4)
+
+        viewModel.onEvent(GroupEditorEvent.OnMemberEditClick(2))
+        viewModel.onEvent(GroupEditorEvent.OnMemberSettingsClick(BuiltInWallpaper.BLACK_HOLE))
+
+        assertEquals(listOf(EditorDestination.Edit(2), BlackHoleSettingsDestination), destinations)
+        assertEquals(0, backNavigations)
     }
 
     @Test

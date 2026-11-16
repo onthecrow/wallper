@@ -16,6 +16,10 @@ internal sealed interface GroupEditorEvent : Event {
     /** Back to the pick step, the members ticked. */
     data object OnAddClick : GroupEditorEvent
     data class OnMemberRemove(val id: Int) : GroupEditorEvent
+    /** A member's pencil: its editor. */
+    data class OnMemberEditClick(val id: Int) : GroupEditorEvent
+    /** A built-in member's pencil: its settings. */
+    data class OnMemberSettingsClick(val wallpaper: BuiltInWallpaper) : GroupEditorEvent
     /** A member dragged to another place: the members in their new order. */
     data class OnMembersReorder(val memberIds: List<Int>) : GroupEditorEvent
     data class OnDurationPick(val duration: SlideDuration) : GroupEditorEvent

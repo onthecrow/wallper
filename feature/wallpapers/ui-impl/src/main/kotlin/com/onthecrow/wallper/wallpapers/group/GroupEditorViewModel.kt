@@ -8,7 +8,9 @@ import com.onthecrow.wallper.core.model.BuiltInWallpaper
 import com.onthecrow.wallper.core.mvi.BaseViewModel
 import com.onthecrow.wallper.core.navigation.Navigator
 import com.onthecrow.wallper.settings.domain.AppSettingsSource
+import com.onthecrow.wallper.editor.EditorDestination
 import com.onthecrow.wallper.wallpapers.WallpaperGroupDestination
+import com.onthecrow.wallper.wallpapers.settingsDestination
 import com.onthecrow.wallper.wallpapers.domain.GetWallpaperUseCase
 import com.onthecrow.wallper.wallpapers.domain.ObserveWallpapersUseCase
 import com.onthecrow.wallper.wallpapers.domain.SaveWallpaperGroupUseCase
@@ -63,6 +65,9 @@ internal class GroupEditorViewModel @AssistedInject constructor(
         eventFlow.onEach { event ->
             when (event) {
                 GroupEditorEvent.OnCloseClick -> navigator.navigateBack()
+                // The series waits under the editor as it is, saved or not; what the editor saves shows in it.
+                is GroupEditorEvent.OnMemberEditClick -> navigator.navigate(EditorDestination.Edit(event.id))
+                is GroupEditorEvent.OnMemberSettingsClick -> navigator.navigate(event.wallpaper.settingsDestination())
                 is GroupEditorEvent.OnWallpapersChanged -> event.items.mapNotNull { it.builtIn }.forEach(::followPreview)
                 else -> Unit
             }

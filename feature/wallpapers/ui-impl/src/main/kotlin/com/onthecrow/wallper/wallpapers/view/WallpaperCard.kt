@@ -81,18 +81,9 @@ internal fun WallpaperCard(
                         .align(Alignment.TopEnd)
                         .cornerShade(Alignment.TopEnd),
                 ) {
-                    val iconColors = IconButtonDefaults.iconButtonColors(contentColor = ActionColor)
-                    // An optimised video keeps no original to edit.
-                    if (!wallpaper.isOptimised) {
-                        IconButton(onClick = onEditClick, colors = iconColors) {
-                            Icon(
-                                painter = painterResource(DesignR.drawable.ic_edit),
-                                contentDescription = stringResource(if (wallpaper.builtIn != null) R.string.settings else DesignR.string.edit),
-                            )
-                        }
-                    }
+                    EditButton(wallpaper, onEditClick)
                     if (wallpaper.builtIn == null) {
-                        IconButton(onClick = onDeleteClick, colors = iconColors) {
+                        IconButton(onClick = onDeleteClick, colors = IconButtonDefaults.iconButtonColors(contentColor = ActionColor)) {
                             Icon(painter = painterResource(DesignR.drawable.ic_delete), contentDescription = stringResource(DesignR.string.delete))
                         }
                     }
@@ -104,6 +95,34 @@ internal fun WallpaperCard(
             }
             KindLabel(wallpaper)
         }
+    }
+}
+
+/**
+ * The pencil of a wallpaper: its editor, or a built-in's settings. An optimised video keeps no original to edit:
+ * it has none.
+ */
+@Composable
+private fun EditButton(wallpaper: WallpaperItem, onClick: () -> Unit) {
+    if (wallpaper.isOptimised) return
+    IconButton(onClick = onClick, colors = IconButtonDefaults.iconButtonColors(contentColor = ActionColor)) {
+        Icon(
+            painter = painterResource(DesignR.drawable.ic_edit),
+            contentDescription = stringResource(if (wallpaper.builtIn != null) R.string.settings else DesignR.string.edit),
+        )
+    }
+}
+
+/** The card's pencil alone, top right over its corner's shade: a series' member row. */
+@Composable
+internal fun BoxScope.CornerEditButton(wallpaper: WallpaperItem, onClick: () -> Unit) {
+    if (wallpaper.isOptimised) return
+    Box(
+        modifier = Modifier
+            .align(Alignment.TopEnd)
+            .cornerShade(Alignment.TopEnd),
+    ) {
+        EditButton(wallpaper, onClick)
     }
 }
 
