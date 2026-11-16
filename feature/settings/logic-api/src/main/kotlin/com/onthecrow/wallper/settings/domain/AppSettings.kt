@@ -28,9 +28,8 @@ data class AppSettings(
     /** Let Firebase collect usage statistics (Analytics) and crash reports (Crashlytics); only release builds have it. */
     val shareUsageAndCrashData: Boolean = true,
     /**
-     * How a series changes its slides: on the GL thread its slides share, unless a debuggable build picks
-     * another way. A build that isn't debuggable still cuts, whatever is here ([DebugBuild]): the shared
-     * thread hasn't been through enough devices yet.
+     * How a series changes its slides: on the GL thread its slides share, release builds included, unless a
+     * debuggable build picks another way in its debug settings.
      */
     val seriesSwitch: SeriesSwitch = SeriesSwitch.SHARED_GL,
 ) {

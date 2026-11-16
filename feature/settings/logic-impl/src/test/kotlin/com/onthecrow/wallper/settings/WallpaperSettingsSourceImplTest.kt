@@ -14,35 +14,33 @@ import kotlin.test.assertEquals
 
 class WallpaperSettingsSourceImplTest {
 
-    private val stored = AppSettings(
-        videoPlayback = VideoPlayback.ONCE,
-        pauseVideoToSaveBattery = false,
-        scrollVideoWithPages = false,
-        seriesSwitch = SeriesSwitch.SHARED_GL,
-    )
-
-    private fun settingsOf(isDebuggable: Boolean) = WallpaperSettingsSourceImpl(
+    private fun settingsOf(stored: AppSettings) = WallpaperSettingsSourceImpl(
         appSettings = object : AppSettingsSource {
             override val settings = MutableStateFlow(stored)
             override fun update(transform: (AppSettings) -> AppSettings) = settings.update(transform)
         },
-        debugBuild = { isDebuggable },
     ).settings
 
     @Test
     fun `the wallpaper gets its settings from the app's`() = runTest {
+        val stored = AppSettings(
+            videoPlayback = VideoPlayback.ONCE,
+            pauseVideoToSaveBattery = false,
+            scrollVideoWithPages = false,
+            seriesSwitch = SeriesSwitch.WARM_ENGINES,
+        )
         val expected = WallpaperSettings(
             playback = VideoPlayback.ONCE,
             pausesToSaveBattery = false,
             scrollsWithPages = false,
-            seriesSwitch = SeriesSwitch.SHARED_GL,
+            seriesSwitch = SeriesSwitch.WARM_ENGINES,
         )
 
-        assertEquals(expected, settingsOf(isDebuggable = true).first())
+        assertEquals(expected, settingsOf(stored).first())
     }
 
     @Test
-    fun `a build that isn't debuggable always cuts, whatever is stored`() = runTest {
-        assertEquals(SeriesSwitch.CUT, settingsOf(isDebuggable = false).first().seriesSwitch)
+    fun `a series changes on the shared GL thread unless something else is stored`() = runTest {
+        assertEquals(SeriesSwitch.SHARED_GL, settingsOf(AppSettings()).first().seriesSwitch)
     }
 }
