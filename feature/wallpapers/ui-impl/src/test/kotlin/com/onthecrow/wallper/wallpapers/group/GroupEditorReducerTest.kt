@@ -2,6 +2,8 @@ package com.onthecrow.wallper.wallpapers.group
 
 import com.onthecrow.wallper.core.model.BuiltInWallpaper
 import com.onthecrow.wallper.core.model.SlideDuration
+import com.onthecrow.wallper.core.model.SlideTransition
+import com.onthecrow.wallper.core.model.TransitionEffect
 import com.onthecrow.wallper.wallpapers.model.WallpaperItem
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -126,7 +128,7 @@ class GroupEditorReducerTest {
         val two = reducer.reduce(one.copy(members = listOf(2, 4)), GroupEditorEvent.OnDurationPick(SlideDuration.ON_WAKE))
         val saving = reducer.reduce(two, GroupEditorEvent.OnSaveClick)
 
-        assertEquals(GroupSaveRequest(listOf(2, 4), SlideDuration.ON_WAKE), saving.save)
+        assertEquals(GroupSaveRequest(listOf(2, 4), SlideDuration.ON_WAKE, SlideTransition.NONE), saving.save)
         assertFalse(saving.canSave)
         assertNull(reducer.reduce(saving, GroupEditorEvent.OnSaveFailed).save)
     }
@@ -159,5 +161,59 @@ class GroupEditorReducerTest {
         state = reducer.reduce(state, GroupEditorEvent.OnWallpapersChanged(listOf(blackHole), showsBuiltIns = true))
 
         assertEquals("previews/bh.png", state.wallpapers.single().picturePath)
+    }
+
+    @Test
+    fun `the transition's step opens only where transitions are offered, and back from it keeps the pick`() = runTest {
+        val arranging = listed.copy(step = GroupEditorStep.ARRANGE, members = listOf(1, 2))
+        assertSame(arranging, reducer.reduce(arranging, GroupEditorEvent.OnTransitionClick))
+
+        var state = reducer.reduce(arranging, GroupEditorEvent.OnTransitionsOffered(true))
+        state = reducer.reduce(state, GroupEditorEvent.OnTransitionClick)
+        assertEquals(GroupEditorStep.TRANSITION, state.step)
+        assertNull(state.previewSlides)
+
+        state = reducer.reduce(state, GroupEditorEvent.OnTransitionEffectPick(TransitionEffect.RIPPLE))
+        state = reducer.reduce(state, GroupEditorEvent.OnTransitionDurationPick(60_000))
+        state = reducer.reduce(state, GroupEditorEvent.OnTransitionClose)
+
+        assertEquals(GroupEditorStep.ARRANGE, state.step)
+        assertEquals(SlideTransition(TransitionEffect.RIPPLE, SlideTransition.MAX_DURATION_MS), state.transition)
+    }
+
+    @Test
+    fun `the transition's step slides on as it opens and back as it closes, also when it is taken away`() = runTest {
+        val arranging = listed.copy(step = GroupEditorStep.ARRANGE, members = listOf(1, 2), offersTransitions = true, stepGoesBack = true)
+
+        var state = reducer.reduce(arranging, GroupEditorEvent.OnTransitionClick)
+        assertFalse(state.stepGoesBack)
+        state = reducer.reduce(state, GroupEditorEvent.OnTransitionClose)
+        assertTrue(state.stepGoesBack)
+
+        state = reducer.reduce(reducer.reduce(state, GroupEditorEvent.OnTransitionClick), GroupEditorEvent.OnTransitionsOffered(false))
+        assertEquals(GroupEditorStep.ARRANGE, state.step)
+        assertTrue(state.stepGoesBack)
+    }
+
+    @Test
+    fun `slides read for a step that was left are dropped`() = runTest {
+        val arranging = listed.copy(step = GroupEditorStep.ARRANGE, offersTransitions = true)
+
+        val state = reducer.reduce(arranging, GroupEditorEvent.OnPreviewSlidesLoaded(emptyList()))
+
+        assertNull(state.previewSlides)
+    }
+
+    @Test
+    fun `the save takes the transition along`() = runTest {
+        val state = listed.copy(
+            step = GroupEditorStep.ARRANGE,
+            members = listOf(1, 2),
+            transition = SlideTransition(TransitionEffect.LUMA, 800),
+        )
+
+        val saving = reducer.reduce(state, GroupEditorEvent.OnSaveClick)
+
+        assertEquals(SlideTransition(TransitionEffect.LUMA, 800), saving.save?.transition)
     }
 }

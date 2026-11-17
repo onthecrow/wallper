@@ -1,5 +1,6 @@
 package com.onthecrow.wallper.wallpapers.group
 
+import com.onthecrow.wallper.core.model.SlideTransition
 import com.onthecrow.wallper.core.mvi.Reducer
 import com.onthecrow.wallper.wallpapers.model.withPreviews
 import javax.inject.Inject
@@ -19,8 +20,31 @@ internal class GroupEditorReducer @Inject constructor() : Reducer<GroupEditorSta
             is GroupEditorEvent.OnGroupLoaded -> state.copy(
                 members = event.memberIds,
                 slideDuration = event.slideDuration,
+                transition = event.transition,
                 isLoaded = true,
             )
+            is GroupEditorEvent.OnTransitionsOffered -> if (!event.offered && state.step == GroupEditorStep.TRANSITION) {
+                // The step closes under the user: back to the members.
+                state.copy(offersTransitions = false, step = GroupEditorStep.ARRANGE, stepGoesBack = true)
+            } else {
+                state.copy(offersTransitions = event.offered)
+            }
+            // The members may have changed since the last time: they are read again.
+            GroupEditorEvent.OnTransitionClick -> if (state.offersTransitions && state.step == GroupEditorStep.ARRANGE) {
+                state.copy(step = GroupEditorStep.TRANSITION, stepGoesBack = false, previewSlides = null)
+            } else {
+                state
+            }
+            GroupEditorEvent.OnTransitionClose -> if (state.step == GroupEditorStep.TRANSITION) {
+                state.copy(step = GroupEditorStep.ARRANGE, stepGoesBack = true, previewSlides = null)
+            } else {
+                state
+            }
+            is GroupEditorEvent.OnTransitionEffectPick -> state.copy(transition = state.transition.copy(effect = event.effect))
+            is GroupEditorEvent.OnTransitionDurationPick ->
+                state.copy(transition = state.transition.copy(durationMs = SlideTransition.duration(event.durationMs)))
+            is GroupEditorEvent.OnPreviewSlidesLoaded ->
+                if (state.step == GroupEditorStep.TRANSITION) state.copy(previewSlides = event.slides) else state
             is GroupEditorEvent.OnWallpaperClick -> state.copy(
                 picked = if (event.id in state.picked) state.picked - event.id else state.picked + event.id,
             )
@@ -31,7 +55,7 @@ internal class GroupEditorReducer @Inject constructor() : Reducer<GroupEditorSta
             is GroupEditorEvent.OnMembersReorder -> state.copy(members = event.memberIds)
             is GroupEditorEvent.OnDurationPick -> state.copy(slideDuration = event.duration)
             GroupEditorEvent.OnSaveClick -> if (state.canSave) {
-                state.copy(save = GroupSaveRequest(state.memberItems.map { it.id }, state.slideDuration))
+                state.copy(save = GroupSaveRequest(state.memberItems.map { it.id }, state.slideDuration, state.transition))
             } else {
                 state
             }

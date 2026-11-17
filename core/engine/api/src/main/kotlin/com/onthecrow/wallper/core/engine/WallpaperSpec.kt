@@ -6,6 +6,7 @@ import com.onthecrow.wallper.core.model.CropRect
 import com.onthecrow.wallper.core.model.MediaInfo
 import com.onthecrow.wallper.core.model.MediaType
 import com.onthecrow.wallper.core.model.SlideDuration
+import com.onthecrow.wallper.core.model.SlideTransition
 import com.onthecrow.wallper.core.model.Tint
 
 /** Everything the live wallpaper needs to render the active wallpaper. All paths are in device-protected storage. */
@@ -37,11 +38,14 @@ sealed interface WallpaperSpec {
     data class BuiltIn(val wallpaper: BuiltInWallpaper) : WallpaperSpec
 
     /**
-     * The user's group: [slides] in turn, each for [slideDuration]. A slide is never a series itself. The
-     * system's colours follow the first slide only: on Android 12+ each change re-themes the launcher and apps.
+     * The user's group: [slides] in turn, each for [slideDuration], the next one coming in through
+     * [transition] where the slides share a GL thread (it cuts elsewhere). A slide is never a series itself.
+     * The system's colours follow the first slide only: on Android 12+ each change re-themes the launcher and
+     * apps.
      */
     data class Series(
         val slides: List<WallpaperSpec>,
         val slideDuration: SlideDuration,
+        val transition: SlideTransition = SlideTransition.NONE,
     ) : WallpaperSpec
 }

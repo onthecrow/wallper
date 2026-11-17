@@ -6,10 +6,13 @@ import com.onthecrow.wallper.core.engine.WallpaperSpec
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
 import timber.log.Timber
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 
 /**
@@ -26,6 +29,8 @@ import kotlin.time.Duration.Companion.seconds
  * @param handsOverWindow each slide draws on the window by itself, and only one can: the old one lets go of
  * it before the new one takes it. False when [window] is the one producer and the slides draw through it.
  * @param window the GL thread the slides share, if they do: the stage tells it what it would tell a slide.
+ * @param handover how long a slide goes on playing, still the window's, after a switch to a slide that was
+ * ready: what the window's transition takes to blend it away. Zero for a cut: it lets go at once.
  * @param createSlide makes a slide's engine off screen, hidden; null if the slide can't be made that way.
  * `onReady` is to be called once its picture is drawn, from any thread.
  */
@@ -35,6 +40,7 @@ internal class WarmStage(
     private val scope: CoroutineScope,
     private val handsOverWindow: Boolean,
     private val window: SeriesWindow? = null,
+    private val handover: Duration = Duration.ZERO,
     private val createSlide: (slide: WallpaperSpec, host: EngineHost, onReady: () -> Unit) -> WallpaperEngine?,
 ) : SlideStage() {
 
@@ -43,6 +49,10 @@ internal class WarmStage(
 
     /** The slide prepared off screen for the next switch. */
     private var next: Slot? = null
+
+    /** The slide switched away from, playing on under the transition until [leavingRelease] lets it go. */
+    private var leaving: Slot? = null
+    private var leavingRelease: Job? = null
     private var visible = true
 
     // Replayed to each new slide's engine: the launcher doesn't send them again.
@@ -65,22 +75,39 @@ internal class WarmStage(
     }
 
     override fun switchTo(slide: Int) {
+        releaseLeaving()
         val old = current
         val prepared = next?.takeIf { it.slide == slide && !it.gaveUp }
         if (prepared == null) dropPrepared()
         next = null
-        // No more frames are expected of it: letting go of the window must not look like a hang.
-        old?.engine?.pause()
-        if (handsOverWindow) old?.engine?.onSurfaceDestroyed()
+        // Blended away by the window: it plays on under the transition, which needs the new slide's picture.
+        val blendsAway = old != null && prepared != null && prepared.isReady && handover.isPositive() && visible
+        if (!blendsAway) {
+            // No more frames are expected of it: letting go of the window must not look like a hang.
+            old?.engine?.pause()
+            if (handsOverWindow) old?.engine?.onSurfaceDestroyed()
+        }
         // Nothing prepared: the old slide's memory and decoder go before the new one's come.
         if (prepared == null) old?.engine?.release()
 
         val slot = prepared ?: create(slide)
         current = slot
-        if (slot == null) return hostOf(slide).showPlaceholder("The slide can't be made off screen")
+        if (slot == null) {
+            if (blendsAway) old?.engine?.release()
+            return hostOf(slide).showPlaceholder("The slide can't be made off screen")
+        }
         slot.engine.show()
         if (visible) slot.engine.resume() else slot.engine.pause()
-        if (prepared != null) old?.engine?.release()
+        when {
+            blendsAway -> {
+                leaving = old
+                leavingRelease = scope.launch {
+                    delay(handover)
+                    releaseLeaving()
+                }
+            }
+            prepared != null -> old?.engine?.release()
+        }
     }
 
     override fun dropPrepared() {
@@ -92,6 +119,8 @@ internal class WarmStage(
 
     override fun pause() {
         visible = false
+        // Hidden, nothing is blended: the transition is over by the time it shows again.
+        releaseLeaving()
         current?.engine?.pause()
         window?.setVisible(false)
     }
@@ -104,12 +133,14 @@ internal class WarmStage(
 
     override fun onSurfaceChanged(width: Int, height: Int) {
         dropPrepared()
+        releaseLeaving()
         current?.engine?.onSurfaceChanged(width, height)
         window?.onSurfaceChanged(width, height)
     }
 
     override fun onSurfaceDestroyed() {
         dropPrepared()
+        releaseLeaving()
         current?.engine?.onSurfaceDestroyed()
         window?.onSurfaceDestroyed()
     }
@@ -118,25 +149,41 @@ internal class WarmStage(
         offsets = xOffset to xOffsetStep
         current?.engine?.onOffsetsChanged(xOffset, xOffsetStep)
         next?.engine?.onOffsetsChanged(xOffset, xOffsetStep)
+        leaving?.engine?.onOffsetsChanged(xOffset, xOffsetStep)
     }
 
     override fun onZoomChanged(zoom: Float) {
         this.zoom = zoom
         current?.engine?.onZoomChanged(zoom)
         next?.engine?.onZoomChanged(zoom)
+        leaving?.engine?.onZoomChanged(zoom)
     }
 
     override fun release() {
         dropPrepared()
+        releaseLeaving()
         current?.engine?.release()
         current = null
         window?.release()
     }
 
+    /** Lets go of the slide switched away from, if it still plays under the transition. */
+    private fun releaseLeaving() {
+        leavingRelease?.cancel()
+        leavingRelease = null
+        val slot = leaving ?: return
+        leaving = null
+        slot.engine.pause()
+        slot.engine.release()
+    }
+
     /** A slide's engine made off screen, with the launcher's page and zoom; null if it can't be made so. */
     private fun create(slide: Int): Slot? {
         val slot = Slot(slide)
-        val engine = createSlide(slides[slide], slot) { slot.ready.complete(true) } ?: return null
+        val engine = createSlide(slides[slide], slot) {
+            slot.isReady = true
+            slot.ready.complete(true)
+        } ?: return null
         slot.engine = engine
         offsets?.let { (xOffset, xOffsetStep) -> engine.onOffsetsChanged(xOffset, xOffsetStep) }
         zoom?.let(engine::onZoomChanged)
@@ -151,7 +198,8 @@ internal class WarmStage(
                 dropPrepared()
             }
             slot === current -> hostOf(slot.slide).showPlaceholder(reason, error)
-            // Otherwise it was switched away from already.
+            // Under the transition, or switched away from already: nothing to show instead.
+            slot === leaving -> releaseLeaving()
         }
     }
 
@@ -161,6 +209,10 @@ internal class WarmStage(
 
         /** Completes with true once the picture is drawn, with false if the slide is let go of before. */
         val ready = CompletableDeferred<Boolean>()
+
+        /** Its picture is drawn: a switch to it can blend. */
+        @Volatile
+        var isReady = false
 
         /** Set at once, from the engine's thread; the rest follows on the main thread. */
         @Volatile
@@ -179,6 +231,12 @@ internal class WarmStage(
 
         /** How long a switch waits for a slide that isn't ready; with [LEAD], well under the 15 s a paused player keeps its decoder. */
         val PREPARE_TIMEOUT = 5.seconds
+
+        /**
+         * The [handover] of a transition that takes [transitionMs]: a little longer, as the blend starts on the
+         * GL thread's next frame after the switch.
+         */
+        fun handoverOf(transitionMs: Long): Duration = transitionMs.milliseconds + 500.milliseconds
     }
 }
 

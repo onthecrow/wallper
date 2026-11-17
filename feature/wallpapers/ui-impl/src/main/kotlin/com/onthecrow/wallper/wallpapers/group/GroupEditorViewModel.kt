@@ -4,7 +4,10 @@ import androidx.lifecycle.viewModelScope
 import com.onthecrow.wallper.core.coroutines.DispatchersProvider
 import com.onthecrow.wallper.core.engine.BuiltInPreviews
 import com.onthecrow.wallper.core.engine.LiveWallpaperController
+import com.onthecrow.wallper.core.engine.WallpaperSettingsSource
+import com.onthecrow.wallper.core.engine.WallpaperSpecSource
 import com.onthecrow.wallper.core.model.BuiltInWallpaper
+import com.onthecrow.wallper.core.model.SeriesSwitch
 import com.onthecrow.wallper.core.mvi.BaseViewModel
 import com.onthecrow.wallper.core.navigation.Navigator
 import com.onthecrow.wallper.settings.domain.AppSettingsSource
@@ -46,6 +49,8 @@ internal class GroupEditorViewModel @AssistedInject constructor(
     private val builtInPreviews: BuiltInPreviews,
     private val swipeHintMemory: SwipeHintMemory,
     appSettings: AppSettingsSource,
+    wallpaperSettings: WallpaperSettingsSource,
+    private val wallpaperSpecs: WallpaperSpecSource,
     private val navigator: Navigator,
     private val dispatchersProvider: DispatchersProvider,
 ) : BaseViewModel<GroupEditorEvent, GroupEditorState, GroupEditorReducer>(
@@ -98,6 +103,26 @@ internal class GroupEditorViewModel @AssistedInject constructor(
             .flowOn(dispatchersProvider.io)
             .launchIn(viewModelScope)
 
+        // Transitions come with the series that change on one GL thread: the switch as the wallpaper has it.
+        wallpaperSettings.settings
+            .map { it.seriesSwitch == SeriesSwitch.SHARED_GL }
+            .distinctUntilChanged()
+            .onEach { onEvent(GroupEditorEvent.OnTransitionsOffered(it)) }
+            .catch { Timber.e(it, "Can't read the wallpaper's settings") }
+            .launchIn(viewModelScope)
+
+        // The transition's step plays the first members as they are when it opens.
+        state.map { editor ->
+            editor.memberItems.take(GroupEditorState.PREVIEW_MEMBERS).map { it.id }
+                .takeIf { editor.step == GroupEditorStep.TRANSITION && editor.previewSlides == null }
+        }
+            .distinctUntilChanged()
+            .filterNotNull()
+            .onEach { ids -> onEvent(GroupEditorEvent.OnPreviewSlidesLoaded(wallpaperSpecs.slides(ids))) }
+            .catch { Timber.e(it, "Can't read the series' wallpapers for its preview") }
+            .flowOn(dispatchersProvider.io)
+            .launchIn(viewModelScope)
+
         // The reducer decides when a save starts, one at a time.
         state.map { it.save }.distinctUntilChanged().filterNotNull().onEach(::save).launchIn(viewModelScope)
     }
@@ -109,7 +134,7 @@ internal class GroupEditorViewModel @AssistedInject constructor(
             if (group == null) {
                 navigator.navigateBack()
             } else {
-                onEvent(GroupEditorEvent.OnGroupLoaded(group.members.map { it.id }, group.slideDuration))
+                onEvent(GroupEditorEvent.OnGroupLoaded(group.members.map { it.id }, group.slideDuration, group.transition))
             }
         }
     }
@@ -117,7 +142,7 @@ internal class GroupEditorViewModel @AssistedInject constructor(
     private fun save(request: GroupSaveRequest) {
         viewModelScope.launch(dispatchersProvider.io) {
             try {
-                saveWallpaperGroupUseCase(destination.groupId, request.memberIds, request.slideDuration)
+                saveWallpaperGroupUseCase(destination.groupId, request.memberIds, request.slideDuration, request.transition)
             } catch (cancelled: CancellationException) {
                 throw cancelled
             } catch (error: Exception) {

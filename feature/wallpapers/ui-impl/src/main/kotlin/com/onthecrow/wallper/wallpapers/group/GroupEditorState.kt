@@ -1,7 +1,9 @@
 package com.onthecrow.wallper.wallpapers.group
 
+import com.onthecrow.wallper.core.engine.WallpaperSpec
 import com.onthecrow.wallper.core.model.BuiltInWallpaper
 import com.onthecrow.wallper.core.model.SlideDuration
+import com.onthecrow.wallper.core.model.SlideTransition
 import com.onthecrow.wallper.core.mvi.State
 import com.onthecrow.wallper.wallpapers.domain.SwipeHintMemory
 import com.onthecrow.wallper.wallpapers.domain.model.Wallpaper
@@ -9,7 +11,8 @@ import com.onthecrow.wallper.wallpapers.model.WallpaperItem
 
 /**
  * A group being made or edited: first the wallpapers are picked ([GroupEditorStep.PICK]), then arranged
- * ([GroupEditorStep.ARRANGE]): taken out, more added, the time each one shows chosen.
+ * ([GroupEditorStep.ARRANGE]): taken out, more added, the time each one shows chosen. From there the
+ * transition between them is chosen on a step of its own ([GroupEditorStep.TRANSITION]), where they play.
  */
 internal data class GroupEditorState(
     val isNew: Boolean = true,
@@ -32,6 +35,15 @@ internal data class GroupEditorState(
     /** The group as it will be saved, in order. */
     val members: List<Int> = emptyList(),
     val slideDuration: SlideDuration = SlideDuration.DEFAULT,
+    /** How one member comes in after another; kept as it was read where it isn't offered. */
+    val transition: SlideTransition = SlideTransition.NONE,
+    /** Series blend their slides here: they change on one GL thread they share (`SeriesSwitch.SHARED_GL`). */
+    val offersTransitions: Boolean = false,
+    /**
+     * The first [PREVIEW_MEMBERS] members as the engines take them, which the transition step plays one into
+     * the other and back; null until they are read.
+     */
+    val previewSlides: List<WallpaperSpec>? = null,
     /**
      * Whether the members show the «swipe aside» hint: on the first few visits only ([SwipeHintMemory]). Null
      * until it is known: the members wait for it, as a list doesn't show what comes in above its first item.
@@ -60,6 +72,9 @@ internal data class GroupEditorState(
     companion object {
         const val MIN_MEMBERS = Wallpaper.Group.MIN_MEMBERS
 
+        /** A transition shows between two wallpapers: the first two, whatever follows them. */
+        const val PREVIEW_MEMBERS = 2
+
         fun initial(groupId: Int?) = GroupEditorState(
             isNew = groupId == null,
             step = if (groupId == null) GroupEditorStep.PICK else GroupEditorStep.ARRANGE,
@@ -67,6 +82,10 @@ internal data class GroupEditorState(
     }
 }
 
-internal enum class GroupEditorStep { PICK, ARRANGE }
+internal enum class GroupEditorStep { PICK, ARRANGE, TRANSITION }
 
-internal data class GroupSaveRequest(val memberIds: List<Int>, val slideDuration: SlideDuration)
+internal data class GroupSaveRequest(
+    val memberIds: List<Int>,
+    val slideDuration: SlideDuration,
+    val transition: SlideTransition,
+)

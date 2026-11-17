@@ -1,4 +1,4 @@
-package com.onthecrow.wallper.editor.crop
+package com.onthecrow.wallper.core.designsystem.component.phoneframe
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -18,12 +18,13 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
 /**
- * A phone drawn in outline around the crop: the body, two volume buttons on the left, the power button on
+ * A phone drawn in outline around a wallpaper: the body, two volume buttons on the left, the power button on
  * the right and the camera cut-out. It fills its bounds with the body; the buttons stand out past its sides.
- * The cut-out keeps its size whatever the body's proportions; the buttons follow the body's height.
+ * The cut-out keeps its size whatever the body's proportions; the buttons follow the body's height. Its
+ * place around a screen of given proportions is [FrameBounds]; [PhoneFramedScreen] puts content in it.
  */
 @Composable
-internal fun PhoneFrame(
+fun PhoneFrame(
     modifier: Modifier = Modifier,
     color: Color = MaterialTheme.colorScheme.primary,
 ) {
@@ -65,23 +66,23 @@ internal fun PhoneFrame(
 
 /** The body: a see-through rounded rectangle with a thick outline. */
 @Composable
-internal fun PhoneFrameBody(color: Color, modifier: Modifier = Modifier) {
+private fun PhoneFrameBody(color: Color, modifier: Modifier = Modifier) {
     Box(modifier.border(PhoneFrameDefaults.BorderWidth, color, RoundedCornerShape(PhoneFrameDefaults.CornerRadius)))
 }
 
 /** A side button: a rounded bar. */
 @Composable
-internal fun PhoneFrameButton(color: Color, modifier: Modifier = Modifier) {
+private fun PhoneFrameButton(color: Color, modifier: Modifier = Modifier) {
     Box(modifier.background(color, RoundedCornerShape(percent = 50)))
 }
 
 /** The camera cut-out: a pill at the top of the screen. */
 @Composable
-internal fun PhoneFrameNotch(color: Color, modifier: Modifier = Modifier) {
+private fun PhoneFrameNotch(color: Color, modifier: Modifier = Modifier) {
     Box(modifier.background(color, RoundedCornerShape(percent = 50)))
 }
 
-internal object PhoneFrameDefaults {
+object PhoneFrameDefaults {
     val BorderWidth = 8.dp
     val CornerRadius = 32.dp
 

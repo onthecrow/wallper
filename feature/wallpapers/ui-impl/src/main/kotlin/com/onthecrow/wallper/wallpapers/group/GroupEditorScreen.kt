@@ -20,7 +20,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.OverscrollEffect
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
-import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -43,14 +43,12 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.overscroll
 import androidx.compose.foundation.rememberOverscrollEffect
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.withoutVisualEffect
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -74,17 +72,13 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.layout.positionInParent
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -99,6 +93,7 @@ import androidx.compose.ui.zIndex
 import com.onthecrow.wallper.core.designsystem.component.FAB
 import com.onthecrow.wallper.core.model.BuiltInWallpaper
 import com.onthecrow.wallper.core.model.SlideDuration
+import com.onthecrow.wallper.core.model.TransitionEffect
 import com.onthecrow.wallper.wallpapers.model.WallpaperItem
 import com.onthecrow.wallper.wallpapers.ui.R
 import com.onthecrow.wallper.wallpapers.view.CornerEditButton
@@ -109,12 +104,12 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.emptyFlow
-import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 
 /**
- * Makes or edits a series: the pick step (the list's cards, ticked ones tinted) and the arrange step (the
- * members in order, swiped aside to take them out; on a panel below them, the time each shows and save).
+ * Makes or edits a series: the pick step (the list's cards, ticked ones tinted), the arrange step (the
+ * members in order, swiped aside to take them out; on a panel below them, the time each shows, the transition
+ * where there are any, and save) and the transition's step ([TransitionStep]).
  */
 @Composable
 internal fun GroupEditorScreen(
@@ -137,9 +132,14 @@ internal fun GroupEditorScreen(
     // the members are where they were.
     val memberListState = rememberLazyListState()
 
-    // Back from adding goes back to the members; otherwise it leaves, like the arrow.
+    // Back from adding, or from the transition, goes back to the members; otherwise it leaves, like the arrow.
     val backCancelsPick = state.step == GroupEditorStep.PICK && state.members.isNotEmpty()
-    BackHandler(enabled = backCancelsPick) { onEvent(GroupEditorEvent.OnPickCancel) }
+    val backEvent = when {
+        backCancelsPick -> GroupEditorEvent.OnPickCancel
+        state.step == GroupEditorStep.TRANSITION -> GroupEditorEvent.OnTransitionClose
+        else -> null
+    }
+    BackHandler(enabled = backEvent != null) { backEvent?.let(onEvent) }
 
     Scaffold(
         modifier = modifier,
@@ -150,6 +150,7 @@ internal fun GroupEditorScreen(
                         text = stringResource(
                             when {
                                 state.step == GroupEditorStep.PICK -> R.string.group_pick_title
+                                state.step == GroupEditorStep.TRANSITION -> R.string.group_transition_title
                                 state.isNew -> R.string.group_new_title
                                 else -> R.string.group_edit_title
                             }
@@ -158,9 +159,7 @@ internal fun GroupEditorScreen(
                 },
                 navigationIcon = {
                     IconButton(
-                        onClick = {
-                            onEvent(if (backCancelsPick) GroupEditorEvent.OnPickCancel else GroupEditorEvent.OnCloseClick)
-                        },
+                        onClick = { onEvent(backEvent ?: GroupEditorEvent.OnCloseClick) },
                     ) {
                         Icon(painter = painterResource(R.drawable.ic_arrow_back), contentDescription = stringResource(R.string.back))
                     }
@@ -209,6 +208,7 @@ internal fun GroupEditorScreen(
                     onClick = { onEvent(GroupEditorEvent.OnWallpaperClick(it)) },
                 )
                 GroupEditorStep.ARRANGE -> ArrangeStep(state = state, listState = memberListState, onEvent = onEvent)
+                GroupEditorStep.TRANSITION -> TransitionStep(state = state, onEvent = onEvent)
             }
         }
     }
@@ -345,6 +345,7 @@ private fun ArrangeStep(state: GroupEditorState, listState: LazyListState, onEve
         }
         ArrangePanel(
             slideDuration = state.slideDuration,
+            transition = state.transition.effect.takeIf { state.offersTransitions },
             memberCount = state.memberItems.size,
             canSave = state.canSave,
             // An edited group's time is known once it is read.
@@ -363,6 +364,7 @@ private fun ArrangeStep(state: GroupEditorState, listState: LazyListState, onEve
                 }
             },
             onDurationPick = { onEvent(GroupEditorEvent.OnDurationPick(it)) },
+            onTransitionClick = { onEvent(GroupEditorEvent.OnTransitionClick) },
             onSave = { onEvent(GroupEditorEvent.OnSaveClick) },
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -544,8 +546,8 @@ private fun MemberRow(member: WallpaperItem, lifted: Boolean, onEditClick: () ->
 }
 
 /**
- * The time each member shows beside its title ([DurationChips], the chosen one in the middle once
- * [centresChoice]), then save;
+ * The time each member shows beside its title ([ChoiceChipRow], the chosen one in the middle once
+ * [centresChoice]), the [transition] where series have one (null where not), which opens its step, then save;
  * save waits for [GroupEditorState.MIN_MEMBERS]. Its top edge has
  * [cradle] cut into it, null for none. It is read while drawing, so the cradle follows the button through
  * every scroll without recomposing the panel.
@@ -553,11 +555,13 @@ private fun MemberRow(member: WallpaperItem, lifted: Boolean, onEditClick: () ->
 @Composable
 private fun ArrangePanel(
     slideDuration: SlideDuration,
+    transition: TransitionEffect?,
     memberCount: Int,
     canSave: Boolean,
     centresChoice: Boolean,
     cradle: () -> CradleGeometry?,
     onDurationPick: (SlideDuration) -> Unit,
+    onTransitionClick: () -> Unit,
     onSave: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -583,13 +587,18 @@ private fun ArrangePanel(
                     maxLines = 1,
                     modifier = Modifier.padding(start = 20.dp),
                 )
-                DurationChips(
+                ChoiceChipRow(
+                    choices = SlideDuration.CHOICES,
                     selected = slideDuration,
+                    label = { it.label() },
                     centresChoice = centresChoice,
                     edgeColor = panelColor,
                     onPick = onDurationPick,
                     modifier = Modifier.weight(1f),
                 )
+            }
+            if (transition != null) {
+                TransitionRow(transition = transition, onClick = onTransitionClick)
             }
             if (memberCount < GroupEditorState.MIN_MEMBERS) {
                 Text(
@@ -613,6 +622,36 @@ private fun ArrangePanel(
                 Text(text = stringResource(R.string.group_save))
             }
         }
+    }
+}
+
+/** «Transition» and the one chosen, across the panel: a press opens the transition's step. */
+@Composable
+private fun TransitionRow(transition: TransitionEffect, onClick: () -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(top = 4.dp)
+            .clickable(onClick = onClick)
+            .padding(start = 20.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
+    ) {
+        Text(
+            text = stringResource(R.string.group_transition_title),
+            style = MaterialTheme.typography.titleSmall,
+            modifier = Modifier.weight(1f),
+        )
+        Text(
+            text = transition.label(),
+            style = MaterialTheme.typography.bodyMedium,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+        Icon(
+            painter = painterResource(R.drawable.ic_chevron_right),
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+            modifier = Modifier.padding(start = 4.dp),
+        )
     }
 }
 
@@ -703,83 +742,6 @@ private fun rememberAddButtonPlacement(listState: LazyListState): AddButtonPlace
     return placement
 }
 
-/**
- * The times to pick from, in a row that scrolls. Once [centresChoice] turns true, the row scrolls the chosen
- * one to its middle, as far as it goes: once, at the start, so that the user's own picks don't move it.
- *
- * Each end fades into [edgeColor], the panel's, where chips go on beyond it: the fade comes in over the first
- * [EdgeFadeWidth] of scrolling, so there is none at an end the row has reached.
- */
-@Composable
-private fun DurationChips(
-    selected: SlideDuration,
-    centresChoice: Boolean,
-    edgeColor: Color,
-    onPick: (SlideDuration) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val scroll = rememberScrollState()
-    val density = LocalDensity.current
-    var viewportWidth by remember { mutableIntStateOf(0) }
-    // The chosen chip and the middle of it in the row's content, once it is placed.
-    var placedChoice by remember { mutableStateOf<Pair<SlideDuration, Float>?>(null) }
-    LaunchedEffect(centresChoice) {
-        if (!centresChoice) return@LaunchedEffect
-        val middle = snapshotFlow { placedChoice }.filterNotNull().first { (choice, _) -> choice == selected }.second
-        val width = snapshotFlow { viewportWidth }.first { it > 0 }
-        // Beyond the ends scrollTo stops at them.
-        scroll.scrollTo((middle - width / 2f).roundToInt())
-    }
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        modifier = modifier
-            .onSizeChanged { viewportWidth = it.width }
-            // Drawn over the chips, outside the scroll: read while drawing, it follows the scroll without
-            // recomposing.
-            .drawWithContent {
-                drawContent()
-                val fade = EdgeFadeWidth.toPx()
-                val start = (scroll.value / fade).coerceIn(0f, 1f)
-                val end = ((scroll.maxValue - scroll.value) / fade).coerceIn(0f, 1f)
-                if (start > 0f) {
-                    drawRect(
-                        brush = Brush.horizontalGradient(listOf(edgeColor, Color.Transparent), endX = fade),
-                        size = Size(fade, size.height),
-                        alpha = start,
-                    )
-                }
-                if (end > 0f) {
-                    drawRect(
-                        brush = Brush.horizontalGradient(listOf(Color.Transparent, edgeColor), startX = size.width - fade, endX = size.width),
-                        topLeft = Offset(size.width - fade, 0f),
-                        size = Size(fade, size.height),
-                        alpha = end,
-                    )
-                }
-            }
-            .horizontalScroll(scroll)
-            .padding(horizontal = ChipsPadding),
-    ) {
-        SlideDuration.CHOICES.forEach { choice ->
-            FilterChip(
-                selected = choice == selected,
-                onClick = { onPick(choice) },
-                label = { Text(text = choice.label()) },
-                modifier = if (choice == selected) {
-                    // Placed in the row inside its padding, which the scrolled content starts with.
-                    Modifier.onPlaced { chip ->
-                        val start = with(density) { ChipsPadding.toPx() } + chip.positionInParent().x
-                        placedChoice = choice to start + chip.size.width / 2f
-                    }
-                } else {
-                    Modifier
-                },
-            )
-        }
-    }
-}
-
 @Composable
 private fun SlideDuration.label(): String = when {
     isOnWake -> stringResource(R.string.group_duration_on_wake)
@@ -828,21 +790,15 @@ private val CradleFilletRadius = 8.dp
 private val CradleDepth = CradleRadius - CradleLift
 
 /** Round the panel: it keeps this much from the screen's edges, and the list's end stops this far above it. */
-private val PanelMargin = 16.dp
-private val PanelCornerRadius = 28.dp
-private val PanelElevation = 6.dp
+internal val PanelMargin = 16.dp
+internal val PanelCornerRadius = 28.dp
+internal val PanelElevation = 6.dp
 
 /** The panel's content starts below the cradle. */
 private val PanelContentTop = CradleDepth + 6.dp
 
 /** How far the list runs on behind the panel: a little below the cradle, to show through it and nowhere else. */
 private val ListReachIntoPanel = CradleDepth + 4.dp
-
-/** Before the first chip and after the last. */
-private val ChipsPadding = 16.dp
-
-/** How wide the chips' row fades at an end with more beyond it. */
-private val EdgeFadeWidth = 32.dp
 
 /** The shade over the list's end starts this far above the panel, above the pinned button. */
 private val ShadeHeight = 56.dp

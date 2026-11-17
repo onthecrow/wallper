@@ -14,8 +14,8 @@ import com.onthecrow.wallper.core.model.MediaType
  * clip and media columns hold zeros, like a built-in's. Rows from before v4 may have both paths; they are
  * processed videos that still keep the original.
  *
- * A group (a series) has [slideDurationMs] and placeholders in the media columns, like a built-in; its
- * members are in [WallpaperGroupItemEntity].
+ * A group (a series) has [slideDurationMs], maybe a [transition], and placeholders in the media columns,
+ * like a built-in; its members are in [WallpaperGroupItemEntity].
  */
 @Entity(tableName = "wallpapers", indices = [Index(value = ["built_in"], unique = true)])
 internal data class WallpaperEntity(
@@ -51,6 +51,13 @@ internal data class WallpaperEntity(
      * processed video has it in its frames already: there it is kept for the thumbnail.
      */
     @ColumnInfo(name = "tint") val tint: Int? = null,
+    /**
+     * Set for a group only: [com.onthecrow.wallper.core.model.TransitionEffect.key] of how it blends one slide
+     * into the next, null for none; since v8.
+     */
+    @ColumnInfo(name = "transition") val transition: String? = null,
+    /** How long that transition takes; null for the default. Since v8. */
+    @ColumnInfo(name = "transition_ms") val transitionMs: Long? = null,
 )
 
 /** The files of the row in device-protected storage. Empty paths are placeholders: a built-in's, a picture's thumbnail. */

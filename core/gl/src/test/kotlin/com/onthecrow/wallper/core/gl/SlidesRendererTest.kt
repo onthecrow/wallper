@@ -1,5 +1,7 @@
 package com.onthecrow.wallper.core.gl
 
+import com.onthecrow.wallper.core.model.SlideTransition
+import com.onthecrow.wallper.core.model.TransitionEffect
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
@@ -219,6 +221,183 @@ class SlidesRendererTest {
 
         assertTrue("a disposed" in journal)
         assertTrue("b disposed" in journal)
+    }
+
+    // Transitions: a renderer with a canvas, a clock and a count of the frames it asks for.
+
+    private var nowMs = 0L
+    private var renderRequests = 0
+    private val canvas = FakeCanvas()
+    private val blending = SlidesRenderer(
+        resetState = { _, _ -> journal += "reset" },
+        width = 1080,
+        height = 2400,
+        transition = SlideTransition(TransitionEffect.CROSSFADE, durationMs = 1_000),
+        canvas = canvas,
+        requestRender = { renderRequests++ },
+        nowNanos = { nowMs * 1_000_000 },
+    )
+
+    /** A on screen with its picture, then B shown over it. */
+    private fun blendFromAToB(bHasPicture: Boolean = true) {
+        a.hasPicture = true
+        b.hasPicture = bHasPicture
+        blending.show(slideA)
+        blending.onDrawFrame()
+        blending.warm(slideB)
+        blending.show(slideB)
+        journal.clear()
+    }
+
+    @Test
+    fun `a slide shown over another blends with it, each drawn into a target of its own`() {
+        blendFromAToB()
+
+        blending.onDrawFrame()
+
+        assertEquals(
+            listOf(
+                // It warmed last: the context is still its own.
+                "b draw",
+                "reset", "target 0", "a draw", "reset", "target 1", "b draw", "reset", "blend 0.0",
+            ),
+            journal,
+        )
+        assertTrue(blending.hasPicture)
+        assertEquals(1, renderRequests)
+    }
+
+    @Test
+    fun `the blend goes by the clock from its first frame, and then the slide is alone`() {
+        blendFromAToB()
+        nowMs = 5_000
+        blending.onDrawFrame()
+
+        nowMs += 500
+        journal.clear()
+        blending.onDrawFrame()
+        assertEquals("blend 0.5", journal.last())
+
+        nowMs += 600
+        journal.clear()
+        blending.onDrawFrame()
+        assertEquals(listOf("blend 1.0", "targets released"), journal.takeLast(2))
+        assertEquals(2, renderRequests)
+
+        journal.clear()
+        blending.onDrawFrame()
+        assertEquals(listOf("reset", "b draw"), journal)
+    }
+
+    @Test
+    fun `until the slide coming in has its picture the one leaving stays on screen and goes on`() {
+        blendFromAToB(bHasPicture = false)
+
+        blending.onDrawFrame()
+
+        assertEquals(listOf("b draw", "reset", "a draw"), journal)
+        assertTrue(blending.hasPicture)
+
+        b.hasPicture = true
+        nowMs = 2_000
+        journal.clear()
+        blending.onDrawFrame()
+        assertEquals("blend 0.0", journal.last())
+    }
+
+    @Test
+    fun `removing the slide leaving ends the transition`() {
+        blendFromAToB()
+        blending.onDrawFrame()
+
+        blending.remove(slideA)
+        journal.clear()
+        blending.onDrawFrame()
+
+        assertTrue("targets released" in canvas.calls)
+        assertEquals(listOf("reset", "b draw"), journal)
+    }
+
+    @Test
+    fun `a slide that never had its picture is cut away from`() {
+        b.hasPicture = true
+        blending.show(slideA)
+        blending.onDrawFrame()
+        blending.warm(slideB)
+        blending.show(slideB)
+        journal.clear()
+
+        blending.onDrawFrame()
+
+        assertEquals(listOf("b draw"), journal)
+    }
+
+    @Test
+    fun `a canvas that fails is given up on, and the slides cut from then on`() {
+        blendFromAToB()
+        canvas.failsToBlend = true
+
+        blending.onDrawFrame()
+
+        assertEquals(listOf("reset", "b draw"), journal.takeLast(2))
+        assertTrue("canvas disposed" in canvas.calls)
+        assertFalse("a failed" in journal || "b failed" in journal)
+
+        blending.show(slideA)
+        journal.clear()
+        blending.onDrawFrame()
+        assertEquals(listOf("reset", "a draw"), journal)
+    }
+
+    @Test
+    fun `the slide leaving that throws fails alone and the one coming in is drawn`() {
+        blendFromAToB()
+        a.throws = true
+
+        blending.onDrawFrame()
+
+        assertTrue("a failed" in journal)
+        assertEquals(listOf("reset", "b draw"), journal.takeLast(2))
+    }
+
+    @Test
+    fun `a lost context drops the transition`() {
+        blendFromAToB()
+        blending.onDrawFrame()
+
+        blending.onContextLost()
+        journal.clear()
+        blending.onDrawFrame()
+
+        assertTrue("canvas lost" in canvas.calls)
+        assertEquals(listOf("reset", "b created", "b changed 1080x2400", "b draw"), journal)
+    }
+
+    private inner class FakeCanvas : TransitionCanvas {
+        val calls = mutableListOf<String>()
+        var failsToBlend = false
+
+        override fun bindTarget(slot: Int, width: Int, height: Int) {
+            journal += "target $slot"
+        }
+
+        override fun composite(progress: Float, width: Int, height: Int) {
+            check(!failsToBlend) { "The blend failed" }
+            journal += "blend $progress"
+        }
+
+        override fun releaseTargets() {
+            journal += "targets released"
+            calls += "targets released"
+        }
+
+        override fun onContextLost() {
+            calls += "canvas lost"
+        }
+
+        override fun dispose() {
+            calls += "canvas disposed"
+        }
     }
 
     private inner class FakeRenderer(val name: String) : GLWallpaperRenderer() {

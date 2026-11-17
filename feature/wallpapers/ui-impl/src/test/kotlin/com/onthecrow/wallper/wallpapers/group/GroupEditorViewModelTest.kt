@@ -5,12 +5,19 @@ import com.onthecrow.wallper.blackhole.BlackHoleSettingsDestination
 import com.onthecrow.wallper.core.coroutines.DispatchersProvider
 import com.onthecrow.wallper.core.engine.BuiltInPreviews
 import com.onthecrow.wallper.core.engine.LiveWallpaperController
+import com.onthecrow.wallper.core.engine.WallpaperSettings
+import com.onthecrow.wallper.core.engine.WallpaperSettingsSource
+import com.onthecrow.wallper.core.engine.WallpaperSpec
+import com.onthecrow.wallper.core.engine.WallpaperSpecSource
 import com.onthecrow.wallper.core.model.BuiltInWallpaper
 import com.onthecrow.wallper.core.model.ClipRange
 import com.onthecrow.wallper.core.model.CropRect
 import com.onthecrow.wallper.core.model.MediaInfo
 import com.onthecrow.wallper.core.model.MediaType
+import com.onthecrow.wallper.core.model.SeriesSwitch
 import com.onthecrow.wallper.core.model.SlideDuration
+import com.onthecrow.wallper.core.model.SlideTransition
+import com.onthecrow.wallper.core.model.TransitionEffect
 import com.onthecrow.wallper.core.navigation.Destination
 import com.onthecrow.wallper.core.navigation.Navigator
 import com.onthecrow.wallper.settings.domain.AppSettings
@@ -44,13 +51,19 @@ import kotlin.test.assertTrue
 @OptIn(ExperimentalCoroutinesApi::class)
 class GroupEditorViewModelTest {
 
-    private data class SaveCall(val id: Int?, val memberIds: List<Int>, val slideDuration: SlideDuration)
+    private data class SaveCall(
+        val id: Int?,
+        val memberIds: List<Int>,
+        val slideDuration: SlideDuration,
+        val transition: SlideTransition = SlideTransition.NONE,
+    )
 
     private val dispatcher = UnconfinedTestDispatcher()
     private val first = media(1)
     private val second = media(2)
     private val blackHole = Wallpaper.BuiltIn(3, BuiltInWallpaper.BLACK_HOLE, isActive = false)
-    private val group = Wallpaper.Group(4, listOf(second, first), SlideDuration(30_000), isActive = true)
+    private val iris = SlideTransition(TransitionEffect.IRIS, durationMs = 1_500)
+    private val group = Wallpaper.Group(4, listOf(second, first), SlideDuration(30_000), isActive = true, transition = iris)
     private val wallpapers = MutableStateFlow<List<Wallpaper>>(listOf(blackHole, first, second, group))
     private val saves = mutableListOf<SaveCall>()
     private var saveError: Exception? = null
@@ -59,6 +72,8 @@ class GroupEditorViewModelTest {
     private var builtInsSupported = true
     private val appSettings = MutableStateFlow(AppSettings())
     private var hintShown = 0
+    private val wallpaperSettings = MutableStateFlow(WallpaperSettings(seriesSwitch = SeriesSwitch.SHARED_GL))
+    private val specRequests = mutableListOf<List<Int>>()
 
     @BeforeTest
     fun setUp() = Dispatchers.setMain(dispatcher)
@@ -76,9 +91,14 @@ class GroupEditorViewModelTest {
             override suspend fun invoke(id: Int) = wallpapers.value.firstOrNull { it.id == id }
         },
         saveWallpaperGroupUseCase = object : SaveWallpaperGroupUseCase {
-            override suspend fun invoke(id: Int?, memberIds: List<Int>, slideDuration: SlideDuration): Int {
+            override suspend fun invoke(
+                id: Int?,
+                memberIds: List<Int>,
+                slideDuration: SlideDuration,
+                transition: SlideTransition,
+            ): Int {
                 saveError?.let { throw it }
-                saves += SaveCall(id, memberIds, slideDuration)
+                saves += SaveCall(id, memberIds, slideDuration, transition)
                 return id ?: 10
             }
         },
@@ -98,6 +118,15 @@ class GroupEditorViewModelTest {
         appSettings = object : AppSettingsSource {
             override val settings = appSettings
             override fun update(transform: (AppSettings) -> AppSettings) = appSettings.update(transform)
+        },
+        wallpaperSettings = object : WallpaperSettingsSource {
+            override val settings = wallpaperSettings
+        },
+        wallpaperSpecs = object : WallpaperSpecSource {
+            override suspend fun slides(ids: List<Int>): List<WallpaperSpec> {
+                specRequests += ids
+                return ids.map { WallpaperSpec.ProcessedVideo("video-$it", thumbnailPath = "") }
+            }
         },
         navigator = object : Navigator {
             override fun navigate(destination: Destination) {
@@ -187,7 +216,7 @@ class GroupEditorViewModelTest {
 
         viewModel.onEvent(GroupEditorEvent.OnSaveClick)
 
-        assertEquals(listOf(SaveCall(4, listOf(2, 1), SlideDuration(30_000))), saves)
+        assertEquals(listOf(SaveCall(4, listOf(2, 1), SlideDuration(30_000), iris)), saves)
     }
 
     @Test
@@ -218,6 +247,64 @@ class GroupEditorViewModelTest {
 
         assertEquals(listOf(EditorDestination.Edit(2), BlackHoleSettingsDestination), destinations)
         assertEquals(0, backNavigations)
+    }
+
+    @Test
+    fun `the transition's step plays the members as they are, and its pick is saved`() = runTest(dispatcher) {
+        val viewModel = createViewModel(groupId = 4)
+        assertTrue(viewModel.state.value.offersTransitions)
+        assertEquals(iris, viewModel.state.value.transition)
+
+        viewModel.onEvent(GroupEditorEvent.OnMemberRemove(1))
+        viewModel.onEvent(GroupEditorEvent.OnTransitionClick)
+        assertEquals(GroupEditorStep.TRANSITION, viewModel.state.value.step)
+        assertEquals(listOf(listOf(2)), specRequests)
+        assertEquals(listOf(WallpaperSpec.ProcessedVideo("video-2", "")), viewModel.state.value.previewSlides)
+
+        viewModel.onEvent(GroupEditorEvent.OnTransitionEffectPick(TransitionEffect.WIPE))
+        viewModel.onEvent(GroupEditorEvent.OnTransitionDurationPick(2_000))
+        viewModel.onEvent(GroupEditorEvent.OnTransitionClose)
+        viewModel.onEvent(GroupEditorEvent.OnTransitionClick)
+        assertEquals(listOf(listOf(2), listOf(2)), specRequests)
+
+        viewModel.onEvent(GroupEditorEvent.OnTransitionClose)
+        viewModel.onEvent(GroupEditorEvent.OnAddClick)
+        viewModel.onEvent(GroupEditorEvent.OnWallpaperClick(3))
+        viewModel.onEvent(GroupEditorEvent.OnPickConfirm)
+        viewModel.onEvent(GroupEditorEvent.OnSaveClick)
+        assertEquals(
+            listOf(SaveCall(4, listOf(2, 3), SlideDuration(30_000), SlideTransition(TransitionEffect.WIPE, 2_000))),
+            saves,
+        )
+    }
+
+    @Test
+    fun `the transition's step plays only the first two members`() = runTest(dispatcher) {
+        val viewModel = createViewModel(groupId = 4)
+        viewModel.onEvent(GroupEditorEvent.OnAddClick)
+        viewModel.onEvent(GroupEditorEvent.OnWallpaperClick(3))
+        viewModel.onEvent(GroupEditorEvent.OnPickConfirm)
+        assertEquals(listOf(2, 1, 3), viewModel.state.value.members)
+
+        viewModel.onEvent(GroupEditorEvent.OnTransitionClick)
+
+        assertEquals(listOf(listOf(2, 1)), specRequests)
+    }
+
+    @Test
+    fun `transitions come and go with the series that change on one GL thread`() = runTest(dispatcher) {
+        val viewModel = createViewModel(groupId = 4)
+        viewModel.onEvent(GroupEditorEvent.OnTransitionClick)
+
+        wallpaperSettings.value = WallpaperSettings(seriesSwitch = SeriesSwitch.CUT)
+
+        assertEquals(false, viewModel.state.value.offersTransitions)
+        assertEquals(GroupEditorStep.ARRANGE, viewModel.state.value.step)
+        viewModel.onEvent(GroupEditorEvent.OnTransitionClick)
+        assertEquals(GroupEditorStep.ARRANGE, viewModel.state.value.step)
+        // What the group had stays.
+        viewModel.onEvent(GroupEditorEvent.OnSaveClick)
+        assertEquals(iris, saves.single().transition)
     }
 
     @Test

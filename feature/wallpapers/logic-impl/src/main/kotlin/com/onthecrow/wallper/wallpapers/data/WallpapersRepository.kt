@@ -1,6 +1,7 @@
 package com.onthecrow.wallper.wallpapers.data
 
 import com.onthecrow.wallper.core.model.SlideDuration
+import com.onthecrow.wallper.core.model.SlideTransition
 import com.onthecrow.wallper.wallpapers.data.database.WallpaperDao
 import com.onthecrow.wallper.wallpapers.data.database.WallpaperEntity
 import com.onthecrow.wallper.wallpapers.domain.model.Wallpaper
@@ -41,12 +42,17 @@ internal class WallpapersRepository @Inject constructor(
     suspend fun activate(id: Int) = wallpaperDao.activate(id)
 
     /** Returns the new group's id. */
-    suspend fun insertGroup(memberIds: List<Int>, slideDuration: SlideDuration): Int =
-        wallpaperDao.insertGroup(groupEntity(slideDuration = slideDuration), memberIds).toInt()
+    suspend fun insertGroup(memberIds: List<Int>, slideDuration: SlideDuration, transition: SlideTransition): Int =
+        wallpaperDao.insertGroup(groupEntity(slideDuration = slideDuration, transition = transition), memberIds).toInt()
 
     /** Group [id], [isActive] as it was. */
-    suspend fun updateGroup(id: Int, memberIds: List<Int>, slideDuration: SlideDuration, isActive: Boolean) =
-        wallpaperDao.updateGroup(groupEntity(id, slideDuration, isActive), memberIds)
+    suspend fun updateGroup(
+        id: Int,
+        memberIds: List<Int>,
+        slideDuration: SlideDuration,
+        transition: SlideTransition,
+        isActive: Boolean,
+    ) = wallpaperDao.updateGroup(groupEntity(id, slideDuration, transition, isActive), memberIds)
 
     /** Groups that deleted members left too small to be a series ([Wallpaper.Group.MIN_MEMBERS]). */
     suspend fun deleteTooSmallGroups() = wallpaperDao.deleteGroupsUnder(Wallpaper.Group.MIN_MEMBERS)

@@ -3,6 +3,7 @@ package com.onthecrow.wallper.core.gl
 import android.os.Handler
 import android.os.HandlerThread
 import android.view.SurfaceHolder
+import com.onthecrow.wallper.core.model.SlideTransition
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
@@ -17,12 +18,16 @@ import java.util.concurrent.CopyOnWriteArrayList
  * as for any wallpaper ([RestartableGl]) and every slide makes its renderer anew; when that doesn't help,
  * the series as a whole hears [onGiveUp].
  *
+ * A slide put on screen while another one shows comes in through [transition]: the one it replaces is drawn
+ * until the blend is over, so its engine has to keep it going that long ([SlidesRenderer]).
+ *
  * @param glesVersion the highest version a slide's renderer asks for.
  */
 class SharedGl(
     private val holder: SurfaceHolder,
     private val glesVersion: Int,
     onGiveUp: (reason: String, error: Throwable?) -> Unit,
+    private val transition: SlideTransition = SlideTransition.NONE,
 ) : GlHost {
 
     /** The heartbeat and the restarts of the thread. */
@@ -34,8 +39,15 @@ class SharedGl(
     private var shown: Link<*>? = null
 
     private inner class Session : RestartableGl.Session {
-        val slides = SlidesRenderer(GlState::reset, holder.surfaceFrame.width(), holder.surfaceFrame.height())
-        override val thread = WallpaperGLThread(
+        val slides = SlidesRenderer(
+            resetState = GlState::reset,
+            width = holder.surfaceFrame.width(),
+            height = holder.surfaceFrame.height(),
+            transition = transition,
+            canvas = if (transition.isNone) null else GlTransitionCanvas(transition.effect),
+            requestRender = { thread.requestRender() },
+        )
+        override val thread: WallpaperGLThread = WallpaperGLThread(
             surfaceHolder = holder,
             renderer = slides,
             renderGuardListener = { stall -> gl.restart(this, "unrecoverable $stall") },

@@ -16,6 +16,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.milliseconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class WarmStageTest {
@@ -45,7 +47,11 @@ class WarmStageTest {
         }
     }
 
-    private fun TestScope.stage(handsOverWindow: Boolean = true, shared: Boolean = false) = WarmStage(
+    private fun TestScope.stage(
+        handsOverWindow: Boolean = true,
+        shared: Boolean = false,
+        handover: Duration = Duration.ZERO,
+    ) = WarmStage(
         slides = slides,
         hostOf = { slide ->
             object : EngineHost {
@@ -57,6 +63,7 @@ class WarmStageTest {
         scope = backgroundScope + UnconfinedTestDispatcher(testScheduler),
         handsOverWindow = handsOverWindow,
         window = window.takeIf { shared },
+        handover = handover,
         createSlide = { slide, host, onReady ->
             if (slide == unmakeable) null else FakeSlide(slide, host, onReady, journal).also(engines::add)
         },
@@ -100,6 +107,80 @@ class WarmStageTest {
         stage.switchTo(1)
 
         assertEquals(listOf("a pause", "b show", "b resume", "a release"), journal)
+    }
+
+    @Test
+    fun `under a transition the old slide plays on for the handover, then goes`() = runTest {
+        val stage = stage(handsOverWindow = false, shared = true, handover = 1_500.milliseconds)
+        stage.switchTo(0)
+        prepare(stage, 1)
+        engines[1].ready()
+        journal.clear()
+
+        stage.switchTo(1)
+        assertEquals(listOf("b show", "b resume"), journal)
+
+        advanceTimeBy(1_499.milliseconds)
+        assertFalse(engines[0].released)
+        advanceTimeBy(2.milliseconds)
+        assertEquals(listOf("b show", "b resume", "a pause", "a release"), journal)
+    }
+
+    @Test
+    fun `the old slide under a transition follows the launcher's pages`() = runTest {
+        val stage = stage(handsOverWindow = false, shared = true, handover = 1_500.milliseconds)
+        stage.switchTo(0)
+        prepare(stage, 1)
+        engines[1].ready()
+        stage.switchTo(1)
+
+        stage.onOffsetsChanged(0.25f, 0.5f)
+
+        assertEquals(0.25f to 0.5f, engines[0].offsets)
+    }
+
+    @Test
+    fun `a slide that isn't ready yet, or a hidden wallpaper, cuts despite the transition`() = runTest {
+        val stage = stage(handsOverWindow = false, shared = true, handover = 1_500.milliseconds)
+        stage.switchTo(0)
+        prepare(stage, 1)
+        journal.clear()
+        advanceTimeBy(WarmStage.PREPARE_TIMEOUT)
+
+        stage.switchTo(1)
+        assertEquals(listOf("a pause", "b show", "b resume", "a release"), journal)
+
+        prepare(stage, 2)
+        engines[2].ready()
+        stage.pause()
+        journal.clear()
+        stage.switchTo(2)
+        assertEquals(listOf("b pause", "c show", "c pause", "b release"), journal)
+    }
+
+    @Test
+    fun `hiding the wallpaper, a new switch or a release let the old slide go at once`() = runTest {
+        val stage = stage(handsOverWindow = false, shared = true, handover = 1_500.milliseconds)
+        stage.switchTo(0)
+        prepare(stage, 1)
+        engines[1].ready()
+        stage.switchTo(1)
+
+        stage.pause()
+        assertTrue(engines[0].released)
+
+        stage.resume()
+        prepare(stage, 2)
+        engines[2].ready()
+        stage.switchTo(2)
+        stage.switchTo(0)
+        assertTrue(engines[1].released)
+
+        prepare(stage, 1)
+        engines.last().ready()
+        stage.switchTo(1)
+        stage.release()
+        assertTrue(engines.all { it.released })
     }
 
     @Test

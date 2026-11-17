@@ -7,7 +7,10 @@ import androidx.sqlite.execSQL
 import com.onthecrow.wallper.core.model.BuiltInWallpaper
 import com.onthecrow.wallper.core.model.MediaType
 import com.onthecrow.wallper.core.model.SlideDuration
+import com.onthecrow.wallper.core.model.SlideTransition
+import com.onthecrow.wallper.core.model.TransitionEffect
 import com.onthecrow.wallper.wallpapers.mapper.groupEntity
+import com.onthecrow.wallper.wallpapers.mapper.toGroup
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -262,6 +265,38 @@ class WallpapersMigrationTest {
         assertEquals(media, rows.single { it.id == 1 })
         assertEquals(null, rows.single { it.id == 1 }.tint)
         assertEquals(tint, rows.single { it.originalPath == "originals/b" }.tint)
+        assertBuiltInsSeeded(rows)
+    }
+
+    @Test
+    fun `migration 7 to 8 keeps the groups without a transition, and a new one keeps its own`() = runTest {
+        createDatabase(version = 7) { connection ->
+            connection.execSQL(
+                """
+                INSERT INTO wallpapers (id, type, original_path, processed_path, thumbnail_path,
+                    crop_left, crop_top, crop_right, crop_bottom, crop_rotation, clip_start_ms, clip_end_ms,
+                    media_width, media_height, media_rotation, media_duration_ms, is_active, built_in,
+                    slide_duration_ms, tint)
+                VALUES (1, 'VIDEO', NULL, NULL, '', 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, NULL, 30000, NULL)
+                """.trimIndent()
+            )
+        }
+        val transition = SlideTransition(TransitionEffect.IRIS, durationMs = 1_700)
+
+        val rows = withDatabase { database ->
+            val dao = database.wallpaperDao()
+            dao.insertGroup(groupEntity(slideDuration = SlideDuration(60_000), transition = transition), emptyList())
+            dao.observeAll().first()
+        }
+
+        val old = rows.single { it.id == 1 }
+        assertEquals(30_000L, old.slideDurationMs)
+        assertEquals(SlideTransition.NONE, old.toGroup(emptyList()).transition)
+        assertEquals(null, old.transition)
+        assertEquals(null, old.transitionMs)
+        val new = rows.single { it.slideDurationMs == 60_000L }
+        assertEquals("iris", new.transition)
+        assertEquals(transition, new.toGroup(emptyList()).transition)
         assertBuiltInsSeeded(rows)
     }
 

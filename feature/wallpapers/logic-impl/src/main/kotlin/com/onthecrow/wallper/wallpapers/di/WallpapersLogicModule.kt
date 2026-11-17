@@ -2,8 +2,10 @@ package com.onthecrow.wallper.wallpapers.di
 
 import android.content.Context
 import com.onthecrow.wallper.core.engine.ActiveWallpaperSource
+import com.onthecrow.wallper.core.engine.WallpaperSpecSource
 import com.onthecrow.wallper.wallpapers.ActivateWallpaperUseCaseImpl
 import com.onthecrow.wallper.wallpapers.ActiveWallpaperSourceImpl
+import com.onthecrow.wallper.wallpapers.WallpaperSpecSourceImpl
 import com.onthecrow.wallper.wallpapers.AddWallpaperUseCaseImpl
 import com.onthecrow.wallper.wallpapers.DeleteWallpaperUseCaseImpl
 import com.onthecrow.wallper.wallpapers.GetWallpaperUseCaseImpl
@@ -65,6 +67,9 @@ internal abstract class WallpapersLogicModule {
 
     @Binds
     abstract fun bindActiveWallpaperSource(impl: ActiveWallpaperSourceImpl): ActiveWallpaperSource
+
+    @Binds
+    abstract fun bindWallpaperSpecSource(impl: WallpaperSpecSourceImpl): WallpaperSpecSource
 
     @Binds
     abstract fun bindMakeSeriesPicture(impl: MakeSeriesPictureUseCaseImpl): MakeSeriesPictureUseCase

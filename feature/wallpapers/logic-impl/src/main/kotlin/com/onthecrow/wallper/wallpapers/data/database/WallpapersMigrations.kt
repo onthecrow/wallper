@@ -89,3 +89,11 @@ internal val MIGRATION_6_7 = object : Migration(6, 7) {
         connection.execSQL("ALTER TABLE `wallpapers` ADD COLUMN `tint` INTEGER")
     }
 }
+
+/** v8: a group's `transition` between its slides and how long it takes (`transition_ms`); the groups so far have none. */
+internal val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(connection: SQLiteConnection) {
+        connection.execSQL("ALTER TABLE `wallpapers` ADD COLUMN `transition` TEXT")
+        connection.execSQL("ALTER TABLE `wallpapers` ADD COLUMN `transition_ms` INTEGER")
+    }
+}

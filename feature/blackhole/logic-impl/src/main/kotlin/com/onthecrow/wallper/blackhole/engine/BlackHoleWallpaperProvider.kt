@@ -11,6 +11,7 @@ import androidx.core.content.getSystemService
 import com.onthecrow.wallper.blackhole.data.AutoQualityMemory
 import com.onthecrow.wallper.blackhole.data.BlackHoleSettingsStore
 import com.onthecrow.wallper.blackhole.data.LensTablesRepository
+import com.onthecrow.wallper.core.engine.BuiltInScene
 import com.onthecrow.wallper.core.engine.BuiltInWallpaperProvider
 import com.onthecrow.wallper.core.engine.EngineHost
 import com.onthecrow.wallper.core.engine.SlideStart
@@ -57,6 +58,9 @@ internal class BlackHoleWallpaperProvider @Inject constructor(
     ): WallpaperEngine = BlackHoleWallpaperEngine(
         context, surfaceHolder, isPreview, host, settingsStore, tablesRepository, autoQuality, slide,
     )
+
+    override fun createScene(context: Context, onChanged: () -> Unit): BuiltInScene =
+        BlackHolePreviewScene(context, settingsStore, tablesRepository, onChanged)
 
     /** Almost black with a warm amber accent, dark theme friendly (BLACKHOLE_TZ.md §11.4). */
     @RequiresApi(Build.VERSION_CODES.O_MR1)
