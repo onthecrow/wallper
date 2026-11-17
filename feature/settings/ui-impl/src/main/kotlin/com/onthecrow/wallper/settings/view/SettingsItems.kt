@@ -1,6 +1,8 @@
 package com.onthecrow.wallper.settings.view
 
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -17,13 +19,22 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.isSpecified
+import androidx.compose.ui.input.pointer.PointerEventPass
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.LayoutCoordinates
+import androidx.compose.ui.layout.onPlaced
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.center
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.toOffset
 
 /** A section's title, as in Pixel's settings: small, in the accent colour, a heading for screen readers. */
 @Composable
@@ -77,6 +88,9 @@ internal fun ClickableItem(
 /**
  * One of [options], as Pixel's settings ask it: a tap picks it and closes the dialog, Cancel or back
  * keeps the current one.
+ *
+ * @param onSelect gets the option and where it was pressed, in screen coordinates ([Offset.Unspecified] if
+ * unknown): the theme's reveal starts there.
  */
 @Composable
 internal fun <T> ChoiceDialog(
@@ -85,7 +99,7 @@ internal fun <T> ChoiceDialog(
     selected: T,
     label: @Composable (T) -> String,
     description: @Composable (T) -> String?,
-    onSelect: (T) -> Unit,
+    onSelect: (option: T, pressOnScreen: Offset) -> Unit,
     onDismiss: () -> Unit,
 ) {
     AlertDialog(
@@ -103,7 +117,7 @@ internal fun <T> ChoiceDialog(
                         label = label(option),
                         description = description(option),
                         selected = option == selected,
-                        onClick = { onSelect(option) },
+                        onClick = { pressOnScreen -> onSelect(option, pressOnScreen) },
                     )
                 }
             }
@@ -112,12 +126,19 @@ internal fun <T> ChoiceDialog(
 }
 
 @Composable
-private fun ChoiceRow(label: String, description: String?, selected: Boolean, onClick: () -> Unit) {
+private fun ChoiceRow(label: String, description: String?, selected: Boolean, onClick: (pressOnScreen: Offset) -> Unit) {
+    val press = remember { PressTracker() }
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .heightIn(min = 56.dp)
-            .selectable(selected = selected, role = Role.RadioButton, onClick = onClick)
+            .onPlaced { press.coordinates = it }
+            .pointerInput(Unit) {
+                awaitEachGesture {
+                    press.position = awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial).position
+                }
+            }
+            .selectable(selected = selected, role = Role.RadioButton, onClick = { onClick(press.positionOnScreen()) })
             .padding(vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -132,5 +153,18 @@ private fun ChoiceRow(label: String, description: String?, selected: Boolean, on
                 )
             }
         }
+    }
+}
+
+/** The last press on a row, so that its click can tell where it happened on the screen. */
+private class PressTracker {
+    var coordinates: LayoutCoordinates? = null
+    var position: Offset = Offset.Unspecified
+
+    fun positionOnScreen(): Offset {
+        val coordinates = coordinates?.takeIf { it.isAttached } ?: return Offset.Unspecified
+        // A click without a touch (keyboard, accessibility) starts from the row's centre.
+        val local = if (position.isSpecified) position else coordinates.size.center.toOffset()
+        return coordinates.localToScreen(local)
     }
 }
