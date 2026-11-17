@@ -62,6 +62,8 @@ internal class StorageViewModel @Inject constructor(
             StorageItem(wallpaper.id, wallpaper.originalPath, StorageItem.Kind.PICTURE, bytes)
         }
         is Wallpaper.ProcessedVideo -> StorageItem(wallpaper.id, wallpaper.thumbnailPath, StorageItem.Kind.OPTIMISED_VIDEO, bytes)
-        is Wallpaper.BuiltIn -> null
+        // Neither keeps files of its own; the storage list has none of them anyway.
+        is Wallpaper.BuiltIn,
+        is Wallpaper.Group -> null
     }
 }

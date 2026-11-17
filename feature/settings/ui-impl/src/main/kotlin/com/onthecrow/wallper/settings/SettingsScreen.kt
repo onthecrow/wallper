@@ -20,6 +20,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -28,7 +29,6 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -64,11 +64,11 @@ import com.onthecrow.wallper.settings.view.ClickableItem
 import com.onthecrow.wallper.settings.view.SectionHeader
 import com.onthecrow.wallper.settings.view.SignatureFooter
 import com.onthecrow.wallper.settings.view.SwitchItem
+import java.io.File
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emptyFlow
 import timber.log.Timber
-import java.io.File
 
 @Composable
 internal fun SettingsScreen(
@@ -108,7 +108,7 @@ internal fun SettingsScreen(
     Scaffold(
         modifier = modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
         topBar = {
-            TopAppBar(
+            CenterAlignedTopAppBar(
                 title = { Text(text = stringResource(R.string.settings_title)) },
                 navigationIcon = {
                     IconButton(onClick = { onEvent(SettingsEvent.OnBackClick) }) {

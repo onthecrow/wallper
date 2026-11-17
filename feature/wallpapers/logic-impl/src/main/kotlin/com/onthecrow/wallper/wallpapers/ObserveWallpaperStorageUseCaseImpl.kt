@@ -15,6 +15,7 @@ internal class ObserveWallpaperStorageUseCaseImpl @Inject constructor(
     private val mediaStorage: MediaStorage,
 ) : ObserveWallpaperStorageUseCase {
     override fun invoke(): Flow<List<WallpaperStorage>> = wallpapersRepository.observeAll().map { entities ->
+        // Built-ins and groups keep no files of their own: toDomain skips the groups.
         entities.filter { it.builtIn == null }.mapNotNull { entity ->
             entity.toDomain()?.let { wallpaper -> WallpaperStorage(wallpaper, entity.files.sumOf(mediaStorage::sizeOf)) }
         }

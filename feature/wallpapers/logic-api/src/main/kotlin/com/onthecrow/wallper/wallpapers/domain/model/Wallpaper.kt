@@ -5,6 +5,7 @@ import com.onthecrow.wallper.core.model.ClipRange
 import com.onthecrow.wallper.core.model.CropRect
 import com.onthecrow.wallper.core.model.MediaInfo
 import com.onthecrow.wallper.core.model.MediaType
+import com.onthecrow.wallper.core.model.SlideDuration
 
 /** A row of the wallpapers list; any of them can be the active one. */
 sealed interface Wallpaper {
@@ -43,4 +44,21 @@ sealed interface Wallpaper {
         val wallpaper: BuiltInWallpaper,
         override val isActive: Boolean,
     ) : Wallpaper
+
+    /**
+     * A series of other wallpapers, never of groups: each of [members], in their order, shows for
+     * [slideDuration]. Deleting it leaves them; a member deleted so that fewer than [MIN_MEMBERS] are left
+     * deletes it.
+     */
+    data class Group(
+        override val id: Int,
+        val members: List<Wallpaper>,
+        val slideDuration: SlideDuration,
+        override val isActive: Boolean,
+    ) : Wallpaper {
+        companion object {
+            /** A series of one wallpaper would be that wallpaper. */
+            const val MIN_MEMBERS = 2
+        }
+    }
 }

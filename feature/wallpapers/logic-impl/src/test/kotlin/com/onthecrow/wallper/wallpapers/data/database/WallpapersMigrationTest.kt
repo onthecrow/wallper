@@ -6,6 +6,8 @@ import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import androidx.sqlite.execSQL
 import com.onthecrow.wallper.core.model.BuiltInWallpaper
 import com.onthecrow.wallper.core.model.MediaType
+import com.onthecrow.wallper.core.model.SlideDuration
+import com.onthecrow.wallper.wallpapers.mapper.groupEntity
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
 import kotlinx.serialization.json.Json
@@ -178,6 +180,40 @@ class WallpapersMigrationTest {
 
         assertEquals(media, rows.single { it.id == 1 })
         assertEquals(-12.5f, rows.single { it.originalPath == "originals/b" }.cropRotation)
+        assertBuiltInsSeeded(rows)
+    }
+
+    @Test
+    fun `migration 5 to 6 keeps the wallpapers out of groups, and a group's items go with its rows`() = runTest {
+        createDatabase(version = 5) { connection ->
+            listOf(1, 2).forEach { id ->
+                connection.execSQL(
+                    """
+                    INSERT INTO wallpapers (id, type, original_path, processed_path, thumbnail_path,
+                        crop_left, crop_top, crop_right, crop_bottom, crop_rotation, clip_start_ms, clip_end_ms,
+                        media_width, media_height, media_rotation, media_duration_ms, is_active, built_in)
+                    VALUES ($id, 'VIDEO', 'originals/$id', NULL, 'thumbnails/$id',
+                        10, 20, 110, 220, 0, 500, 1500, 1920, 1080, 90, 3000, 0, NULL)
+                    """.trimIndent()
+                )
+            }
+        }
+
+        val (before, after) = withDatabase { database ->
+            val dao = database.wallpaperDao()
+            val rows = dao.observeAll().first()
+            val group = groupEntity(slideDuration = SlideDuration(30_000))
+            val groupId = dao.insertGroup(group, listOf(2, 1)).toInt()
+            val members = dao.getGroupMembers(groupId).map { it.id }
+            // The foreign keys are on: deleting a member deletes its item.
+            dao.delete(dao.get(2)!!)
+            Pair(rows to members, dao.observeGroupItems().first())
+        }
+
+        val (rows, members) = before
+        assertEquals(listOf(null, null), rows.filter { it.builtIn == null }.map { it.slideDurationMs })
+        assertEquals(listOf(2, 1), members)
+        assertEquals(listOf(1), after.map { it.wallpaperId })
         assertBuiltInsSeeded(rows)
     }
 

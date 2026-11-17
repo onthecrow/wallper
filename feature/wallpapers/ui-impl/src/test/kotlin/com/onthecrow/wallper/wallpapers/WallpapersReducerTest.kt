@@ -59,11 +59,52 @@ class WallpapersReducerTest {
     }
 
     @Test
+    fun `the plus asks what to add, and any answer closes the question`() = runTest {
+        val asked = reducer.reduce(WallpapersState(), WallpapersEvent.OnAddClick)
+        assertEquals(true, asked.isAddDialogShown)
+
+        listOf(WallpapersEvent.OnAddDismiss, WallpapersEvent.OnAddMediaClick, WallpapersEvent.OnAddSeriesClick).forEach {
+            assertEquals(false, reducer.reduce(asked, it).isAddDialogShown)
+        }
+    }
+
+    @Test
+    fun `a series' picture waits for its cover's previews, and its made picture survives list updates`() = runTest {
+        val group = WallpaperItem(
+            5, null, false, isGroup = true,
+            cover = listOf(WallpaperItem(1, null, false, BuiltInWallpaper.BLACK_HOLE), WallpaperItem(2, "a", false)),
+        )
+        val listed = reducer.reduce(WallpapersState(), WallpapersEvent.OnWallpapersChanged(listOf(group)))
+        assertEquals(emptyMap(), listed.seriesCovers())
+
+        val loaded = reducer.reduce(listed, WallpapersEvent.OnBuiltInPreviewLoaded(BuiltInWallpaper.BLACK_HOLE, "previews/bh.png"))
+        assertEquals(mapOf(5 to listOf<String?>("previews/bh.png", "a")), loaded.seriesCovers())
+
+        val made = reducer.reduce(loaded, WallpapersEvent.OnSeriesPictureMade(5, "series/5.webp"))
+        assertEquals("series/5.webp", made.items.single().picturePath)
+
+        val updated = reducer.reduce(made, WallpapersEvent.OnWallpapersChanged(listOf(group.copy(isActive = true))))
+        assertEquals("series/5.webp", updated.items.single().picturePath)
+        assertEquals(made.seriesCovers(), updated.seriesCovers())
+    }
+
+    @Test
+    fun `a built-in that can't be rendered leaves its part of a series empty`() = runTest {
+        val group = WallpaperItem(5, null, false, isGroup = true, cover = listOf(WallpaperItem(1, null, false, BuiltInWallpaper.BLACK_HOLE)))
+        val listed = reducer.reduce(WallpapersState(), WallpapersEvent.OnWallpapersChanged(listOf(group)))
+
+        val loaded = reducer.reduce(listed, WallpapersEvent.OnBuiltInPreviewLoaded(BuiltInWallpaper.BLACK_HOLE, null))
+
+        assertEquals(mapOf(5 to listOf<String?>(null)), loaded.seriesCovers())
+    }
+
+    @Test
     fun `user actions do not touch the state`() = runTest {
         val initial = WallpapersState()
 
         assertSame(initial, reducer.reduce(initial, WallpapersEvent.OnWallpaperClick(1)))
         assertSame(initial, reducer.reduce(initial, WallpapersEvent.OnEditClick(1)))
+        assertSame(initial, reducer.reduce(initial, WallpapersEvent.OnGroupEditClick(1)))
         assertSame(initial, reducer.reduce(initial, WallpapersEvent.OnMediaPicked("content://x")))
         assertSame(initial, reducer.reduce(initial, WallpapersEvent.OnBuiltInSettingsClick(BuiltInWallpaper.BLACK_HOLE)))
     }

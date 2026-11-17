@@ -61,3 +61,24 @@ internal val MIGRATION_4_5 = object : Migration(4, 5) {
         connection.execSQL("ALTER TABLE `wallpapers` ADD COLUMN `crop_rotation` REAL NOT NULL DEFAULT 0")
     }
 }
+
+/**
+ * v6: groups (series). A group is a row of `wallpapers` with `slide_duration_ms`; its members are in
+ * `wallpaper_group_items`, which goes with either of its rows.
+ */
+internal val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(connection: SQLiteConnection) {
+        connection.execSQL("ALTER TABLE `wallpapers` ADD COLUMN `slide_duration_ms` INTEGER")
+        connection.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `wallpaper_group_items` (`group_id` INTEGER NOT NULL,
+                `position` INTEGER NOT NULL, `wallpaper_id` INTEGER NOT NULL, PRIMARY KEY(`group_id`, `position`),
+                FOREIGN KEY(`group_id`) REFERENCES `wallpapers`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE ,
+                FOREIGN KEY(`wallpaper_id`) REFERENCES `wallpapers`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE )
+            """.trimIndent()
+        )
+        connection.execSQL(
+            "CREATE INDEX IF NOT EXISTS `index_wallpaper_group_items_wallpaper_id` ON `wallpaper_group_items` (`wallpaper_id`)"
+        )
+    }
+}

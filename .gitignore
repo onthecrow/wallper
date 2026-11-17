@@ -18,3 +18,10 @@ local.properties
 /app/release/
 /singning/
 /app/google-services.json
+
+# Working notes, plans and research: kept locally, not in the repository.
+/*_PLAN.md
+/*_RESEARCH.md
+/*_TZ.md
+/*_DESIGN.md
+/CODE_REVIEW.md

@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.os.PowerManager
 import androidx.core.content.ContextCompat
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.channels.awaitClose
@@ -13,6 +14,11 @@ import javax.inject.Inject
 
 /** Emits each time the screen turns off: whatever shows next is a new look at the phone. */
 internal class ScreenOffs @Inject constructor(@param:ApplicationContext private val context: Context) {
+
+    private val powerManager by lazy { context.getSystemService(PowerManager::class.java) }
+
+    /** Whether the screen is on, for the user: false from the screen-off broadcast on, through its animation. */
+    val isScreenOn: Boolean get() = powerManager?.isInteractive ?: true
 
     val events: Flow<Unit> = callbackFlow {
         val receiver = object : BroadcastReceiver() {
