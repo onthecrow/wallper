@@ -8,6 +8,8 @@
     <string name="editor_set_trim_end">End here</string>
     <string name="editor_reset">Undo all changes</string>
     <string name="editor_tint">Tint</string>
+    <string name="editor_turn_screen">Turn the screen</string>
+    <string name="editor_turned_own_crop">The turned screen has a crop of its own</string>
     <string name="editor_tint_enabled">Tint enabled</string>
     <string name="editor_tint_disabled">Tint disabled</string>
     <string name="editor_original">Original</string>

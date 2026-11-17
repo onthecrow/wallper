@@ -7,7 +7,7 @@ import android.view.SurfaceHolder
 import com.onthecrow.wallper.core.engine.SeriesPreview
 import com.onthecrow.wallper.core.engine.WallpaperSpec
 import com.onthecrow.wallper.core.engine.impl.BuiltInWallpapers
-import com.onthecrow.wallper.core.engine.impl.engine.asWholeFrame
+import com.onthecrow.wallper.core.engine.impl.engine.asMedia
 import com.onthecrow.wallper.core.gl.PreviewFrame
 import com.onthecrow.wallper.core.gl.SeriesPreviewGl
 import com.onthecrow.wallper.core.model.MediaType
@@ -179,7 +179,7 @@ internal class SeriesPreviewImpl(
                 MediaType.IMAGE -> PicturePreviewSlide(wallpaper, width, height, decoder, gl::requestRender)
             }
             is WallpaperSpec.ProcessedVideo ->
-                VideoPreviewSlide(context, wallpaper.asWholeFrame(), width, height, gl::requestRender)
+                VideoPreviewSlide(context, wallpaper.asMedia(), width, height, gl::requestRender)
             is WallpaperSpec.BuiltIn -> builtIns[wallpaper.wallpaper]
                 ?.takeIf { it.isSupported() }
                 ?.createScene(context, onChanged = gl::requestRender)

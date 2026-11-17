@@ -33,6 +33,10 @@ class VideoWallpaperRenderer(
     /** The texture of a lost context. The player may still decode into it; released on the first new frame. */
     private var retired: OpenGLExternalTexture? = null
 
+    /** The surface's size, for a scene made after a lost context. */
+    private var surfaceWidth = renderParams.width
+    private var surfaceHeight = renderParams.height
+
     /**
      * Where the launcher is between its pages, 0 (the first) to 1 (the last), or null to show the crop as
      * chosen ([PageScroll]). Any thread; request a render after it.
@@ -50,10 +54,10 @@ class VideoWallpaperRenderer(
         GLES20.glDisable(GLES20.GL_BLEND) // nothing here is translucent
         GLES20.glDisable(GLES20.GL_DITHER)
         val newScene = OpenGLScene(
-            sceneHeight = renderParams.height,
-            sceneWidth = renderParams.width,
             mediaInfo = renderParams.mediaInfo,
-            rect = renderParams.crop,
+            framing = renderParams.framing,
+            width = surfaceWidth,
+            height = surfaceHeight,
             tint = renderParams.tint,
         )
         val newTexture = newScene.createTexture().apply {
@@ -64,8 +68,12 @@ class VideoWallpaperRenderer(
         callbackHandler.post { listener.onVideoSurfaceCreated(newTexture.surface) }
     }
 
+    /** A launcher that turns changes the surface's proportions: the window follows them. */
     override fun onSurfaceChanged(width: Int, height: Int) {
         Timber.d("Surface changed: $width x $height")
+        surfaceWidth = width
+        surfaceHeight = height
+        scene?.resize(width, height)
     }
 
     override fun onDrawFrame(): Boolean {

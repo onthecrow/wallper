@@ -35,6 +35,7 @@ fun PhoneFramedScreen(
 ) {
     val density = LocalDensity.current
     val layoutDirection = LocalLayoutDirection.current
+    val screenShape = rememberScreenShape()
     BoxWithConstraints(modifier) {
         val area = Size(constraints.maxWidth.toFloat(), constraints.maxHeight.toFloat())
         val bounds = remember(area, padding, density, layoutDirection, aspectRatio) {
@@ -48,13 +49,14 @@ fun PhoneFramedScreen(
         Box(
             Modifier
                 .placedAt(bounds.screen.left, bounds.screen.top, bounds.screen.width, bounds.screen.height)
-                .clip(RoundedCornerShape(PhoneFrameDefaults.ScreenCornerRadius))
+                .clip(RoundedCornerShape(screenShape.screenCornerRadius(bounds.screen.size, density)))
         ) {
             screen()
         }
         PhoneFrame(
             modifier = Modifier.placedAt(bounds.body.left, bounds.body.top, bounds.body.width, bounds.body.height),
             color = color,
+            screen = screenShape,
         )
     }
 }

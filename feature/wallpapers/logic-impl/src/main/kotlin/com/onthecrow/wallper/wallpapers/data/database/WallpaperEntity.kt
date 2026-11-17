@@ -5,14 +5,16 @@ import androidx.room.Entity
 import androidx.room.Index
 import androidx.room.PrimaryKey
 import com.onthecrow.wallper.core.model.BuiltInWallpaper
+import com.onthecrow.wallper.core.model.CropRect
 import com.onthecrow.wallper.core.model.MediaType
 
 /**
  * One row per built-in at most: [builtIn] is unique (NULLs, the media rows, don't clash in SQLite).
  *
- * A row of the user's media has [originalPath] or [processedPath]. A processed video plays as is: its crop,
- * clip and media columns hold zeros, like a built-in's. Rows from before v4 may have both paths; they are
- * processed videos that still keep the original.
+ * A row of the user's media has [originalPath] or [processedPath]. A processed video plays as is: its clip
+ * columns hold zeros, and since v9 its media size is the export's and its crops are its windows in it, one for
+ * each way the screen can be turned; before, those held zeros too, like a built-in's (all of the export is
+ * shown). Rows from before v4 may have both paths; they are processed videos that still keep the original.
  *
  * A group (a series) has [slideDurationMs], maybe a [transition], and placeholders in the media columns,
  * like a built-in; its members are in [WallpaperGroupItemEntity].
@@ -58,7 +60,27 @@ internal data class WallpaperEntity(
     @ColumnInfo(name = "transition") val transition: String? = null,
     /** How long that transition takes; null for the default. Since v8. */
     @ColumnInfo(name = "transition_ms") val transitionMs: Long? = null,
+    /**
+     * The crop for the screen turned the other way than [cropLeft] and the others were made for
+     * ([com.onthecrow.wallper.core.model.Framing.turned]), all NULL to derive it; since v9. An optimised
+     * video's is its second window in the export.
+     */
+    @ColumnInfo(name = "turned_crop_left") val turnedCropLeft: Int? = null,
+    @ColumnInfo(name = "turned_crop_top") val turnedCropTop: Int? = null,
+    @ColumnInfo(name = "turned_crop_right") val turnedCropRight: Int? = null,
+    @ColumnInfo(name = "turned_crop_bottom") val turnedCropBottom: Int? = null,
+    @ColumnInfo(name = "turned_crop_rotation") val turnedCropRotation: Float? = null,
 )
+
+/** [WallpaperEntity.turnedCropLeft] and the others as a crop, null unless all of them are there. */
+internal val WallpaperEntity.turnedCrop: CropRect?
+    get() = CropRect(
+        left = turnedCropLeft ?: return null,
+        top = turnedCropTop ?: return null,
+        right = turnedCropRight ?: return null,
+        bottom = turnedCropBottom ?: return null,
+        rotation = turnedCropRotation ?: return null,
+    )
 
 /** The files of the row in device-protected storage. Empty paths are placeholders: a built-in's, a picture's thumbnail. */
 internal val WallpaperEntity.files: Set<String>

@@ -15,6 +15,8 @@ import com.onthecrow.wallper.wallpapers.ObserveWallpapersUseCaseImpl
 import com.onthecrow.wallper.wallpapers.SaveWallpaperGroupUseCaseImpl
 import com.onthecrow.wallper.wallpapers.SwipeHintMemoryImpl
 import com.onthecrow.wallper.wallpapers.UpdateWallpaperUseCaseImpl
+import com.onthecrow.wallper.wallpapers.ExtractorVideoFrameSizes
+import com.onthecrow.wallper.wallpapers.VideoFrameSizes
 import com.onthecrow.wallper.wallpapers.data.database.WallpaperDao
 import com.onthecrow.wallper.wallpapers.data.database.WallpapersDatabase
 import com.onthecrow.wallper.wallpapers.series.SeriesPictures
@@ -40,6 +42,9 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 internal abstract class WallpapersLogicModule {
+
+    @Binds
+    abstract fun bindVideoFrameSizes(impl: ExtractorVideoFrameSizes): VideoFrameSizes
 
     @Binds
     abstract fun bindObserveWallpapers(impl: ObserveWallpapersUseCaseImpl): ObserveWallpapersUseCase

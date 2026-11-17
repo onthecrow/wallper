@@ -1,6 +1,7 @@
 package com.onthecrow.wallper.editor.export
 
 import android.content.Context
+import android.media.MediaCodecList
 import android.media.MediaMetadataRetriever
 import android.os.SystemClock
 import androidx.annotation.OptIn
@@ -105,6 +106,11 @@ internal class TransformerVideoExporter @Inject constructor(
             transformer.cancel()
         }
     }.flowOn(dispatchersProvider.main)
+
+    override fun canEncode(width: Int, height: Int): Boolean =
+        MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos
+            .filter { it.isEncoder && VIDEO_MIME_TYPE in it.supportedTypes }
+            .any { it.getCapabilitiesForType(VIDEO_MIME_TYPE).videoCapabilities?.isSizeSupported(width, height) == true }
 
     @OptIn(UnstableApi::class)
     private fun getTransformer(

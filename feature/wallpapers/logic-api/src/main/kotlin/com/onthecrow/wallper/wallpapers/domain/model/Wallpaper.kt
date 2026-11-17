@@ -16,7 +16,8 @@ sealed interface Wallpaper {
 
     /**
      * The user's media as it was picked: cropped and trimmed while it plays. The original is kept, so it can
-     * be edited again.
+     * be edited again. [crop] is for the screen the way it was made, [turnedCrop] for the screen turned, null
+     * to derive it ([com.onthecrow.wallper.core.model.Framing]).
      */
     data class Media(
         override val id: Int,
@@ -29,11 +30,16 @@ sealed interface Wallpaper {
         override val isActive: Boolean,
         /** What it is seen through while it is drawn, and its picture wherever that is shown; null for none. */
         val tint: Tint? = null,
+        val turnedCrop: CropRect? = null,
     ) : Wallpaper
 
     /**
      * A video the editor exported already cropped and trimmed ("additional processing"): it plays as is.
      * Nothing else is kept, so it can't be edited, only deleted.
+     *
+     * The export is [frameWidth] x [frameHeight] and holds a window for each way the screen can be turned:
+     * [crop] for the way it was made, [turnedCrop] for the other (null to derive it). Exports from before
+     * schema v9 have none of these: all of the export is shown.
      */
     data class ProcessedVideo(
         override val id: Int,
@@ -45,6 +51,10 @@ sealed interface Wallpaper {
          * shows the thumbnail adds the tint to it.
          */
         val tint: Tint? = null,
+        val frameWidth: Int = 0,
+        val frameHeight: Int = 0,
+        val crop: CropRect? = null,
+        val turnedCrop: CropRect? = null,
     ) : Wallpaper
 
     /** Ships with the app: it has settings instead of media and can't be deleted. */

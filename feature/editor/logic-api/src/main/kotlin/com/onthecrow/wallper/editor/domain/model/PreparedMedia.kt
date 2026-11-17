@@ -2,6 +2,7 @@ package com.onthecrow.wallper.editor.domain.model
 
 import com.onthecrow.wallper.core.model.ClipRange
 import com.onthecrow.wallper.core.model.CropRect
+import com.onthecrow.wallper.core.model.Framing
 import com.onthecrow.wallper.core.model.MediaInfo
 import com.onthecrow.wallper.core.model.MediaType
 import com.onthecrow.wallper.core.model.Tint
@@ -15,11 +16,17 @@ data class PreparedMedia(
     val edited: EditedWallpaper? = null,
 )
 
-/** The saved wallpaper being edited: the editor starts from its crop, trim and tint, and saving replaces it. */
+/**
+ * The saved wallpaper being edited: the editor starts from its crops, trim and tint, and saving replaces it.
+ * [turnedCrop] is the crop for the screen turned, null where it is derived.
+ */
 data class EditedWallpaper(
     val id: Int,
     val thumbnailPath: String,
     val crop: CropRect,
     val clip: ClipRange,
     val tint: Tint? = null,
-)
+    val turnedCrop: CropRect? = null,
+) {
+    val framing: Framing get() = Framing(crop, turnedCrop)
+}

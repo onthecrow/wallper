@@ -99,6 +99,13 @@ class WallpaperGLThread(
     private var surfaceCreatedDelivered = false
     private var pendingSizeChange = false
 
+    /**
+     * The window changed size under a surface the thread draws on: the EGL surface is made anew, as
+     * GLSurfaceView does. A driver may have taken the next buffer at the last swap, of the old size, and a
+     * still frame drawn into it stays wrong: a picture turned with the launcher showed in a corner.
+     */
+    private var windowResized = false
+
     /** Creating the EGL surface failed; don't retry in a loop, wait for a repair. */
     private var surfaceBroken = false
 
@@ -131,6 +138,7 @@ class WallpaperGLThread(
     /** The engine's surface was created or changed size. */
     fun onSurfaceCreatedOrChanged(width: Int, height: Int) {
         synchronized(lock) {
+            if (hasSurface && !offWindow && (width != surfaceWidth || height != surfaceHeight)) windowResized = true
             hasSurface = true
             offWindow = false
             surfaceWidth = width
@@ -297,6 +305,10 @@ class WallpaperGLThread(
                 val onPbuffer = offWindow && !hasSurface && hasSize && !pbufferBroken
                 // Nothing is taken in the turn that makes the surface: if that fails, a task taken would be lost.
                 if (onWindow && !hasWindowSurface()) return Work(emptyList(), draw = false, NewSurface.WINDOW)
+                if (onWindow && windowResized) {
+                    windowResized = false
+                    return Work(emptyList(), draw = false, NewSurface.WINDOW)
+                }
                 if (onPbuffer && !hasEglSurface()) return Work(emptyList(), draw = false, NewSurface.PBUFFER)
 
                 val canRender = onWindow || onPbuffer

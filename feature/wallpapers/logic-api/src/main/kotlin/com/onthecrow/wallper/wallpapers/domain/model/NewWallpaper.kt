@@ -19,6 +19,7 @@ sealed interface NewWallpaper {
         val clip: ClipRange,
         val mediaInfo: MediaInfo,
         val tint: Tint? = null,
+        val turnedCrop: CropRect? = null,
     ) : NewWallpaper
 
     /** See [Wallpaper.ProcessedVideo]. */
@@ -27,5 +28,9 @@ sealed interface NewWallpaper {
         override val thumbnailPath: String,
         /** Already in the video's frames; kept for its thumbnail. */
         val tint: Tint? = null,
+        val frameWidth: Int = 0,
+        val frameHeight: Int = 0,
+        val crop: CropRect? = null,
+        val turnedCrop: CropRect? = null,
     ) : NewWallpaper
 }

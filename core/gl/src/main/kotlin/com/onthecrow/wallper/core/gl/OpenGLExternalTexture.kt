@@ -7,26 +7,13 @@ import android.opengl.GLES20
 import android.opengl.Matrix
 import android.os.Handler
 import android.view.Surface
-import java.nio.ByteBuffer
-import java.nio.ByteOrder
 import java.nio.FloatBuffer
 
 /** An OES texture with the SurfaceTexture and Surface a player decodes into. GL thread only. */
 @SuppressLint("Recycle")
-internal class OpenGLExternalTexture(
-    private val textureWidth: Int,
-    private val textureHeight: Int,
-    verticesData: FloatArray,
-) {
+internal class OpenGLExternalTexture {
     private val mMVPMatrix = FloatArray(16)
     private val mTexMatrix = FloatArray(16)
-    private val verticesBuffer: FloatBuffer = ByteBuffer.allocateDirect(
-        verticesData.size * FLOAT_SIZE_BYTES
-    ).order(
-        ByteOrder.nativeOrder()
-    ).asFloatBuffer().also {
-        it.put(verticesData).position(0)
-    }
 
     private val textureId: Int
     private val surfaceTexture: SurfaceTexture
@@ -96,8 +83,11 @@ internal class OpenGLExternalTexture(
         aTextureCoordHandler: Int,
         uTexHandler: Int,
         uMvpHandler: Int,
+        vertices: FloatBuffer,
+        viewportWidth: Int,
+        viewportHeight: Int,
     ) {
-        GLES20.glViewport(0, 0, textureWidth, textureHeight)
+        GLES20.glViewport(0, 0, viewportWidth, viewportHeight)
 
         // Maps upright frame coordinates onto the decoder's buffer: the video's rotation (the decoder
         // applies it through the buffer transform), the vertical flip and the decoder's own crop.
@@ -106,28 +96,28 @@ internal class OpenGLExternalTexture(
         GLES20.glActiveTexture(GLES20.GL_TEXTURE0)
         GLES20.glBindTexture(GLES11Ext.GL_TEXTURE_EXTERNAL_OES, textureId)
 
-        verticesBuffer.position(TRIANGLE_VERTICES_DATA_POS_OFFSET)
+        vertices.position(TRIANGLE_VERTICES_DATA_POS_OFFSET)
         GLES20.glVertexAttribPointer(
             aPositionHandle,
             3,
             GLES20.GL_FLOAT,
             false,
             TRIANGLE_VERTICES_DATA_STRIDE_BYTES,
-            verticesBuffer
+            vertices
         )
 
         GLErrorUtils.checkGlError("glVertexAttribPointer aPositionHandle")
         GLES20.glEnableVertexAttribArray(aPositionHandle)
         GLErrorUtils.checkGlError("glEnableVertexAttribArray aPositionHandle")
 
-        verticesBuffer.position(TRIANGLE_VERTICES_DATA_UV_OFFSET)
+        vertices.position(TRIANGLE_VERTICES_DATA_UV_OFFSET)
         GLES20.glVertexAttribPointer(
             aTextureCoordHandler,
             2,
             GLES20.GL_FLOAT,
             false,
             TRIANGLE_VERTICES_DATA_STRIDE_BYTES,
-            verticesBuffer
+            vertices
         )
         GLErrorUtils.checkGlError("glVertexAttribPointer aTextureCoordHandler")
         GLES20.glEnableVertexAttribArray(aTextureCoordHandler)

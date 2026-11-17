@@ -3,7 +3,7 @@ package com.onthecrow.wallper.editor
 import com.onthecrow.wallper.core.designsystem.component.colorpicker.HsvColor
 import com.onthecrow.wallper.core.designsystem.component.trimbar.TrimBarDefaults.MIN_DURATION_MS
 import com.onthecrow.wallper.core.model.ClipRange
-import com.onthecrow.wallper.core.model.CropRect
+import com.onthecrow.wallper.core.model.Framing
 import com.onthecrow.wallper.core.model.Tint
 import com.onthecrow.wallper.core.mvi.State
 import com.onthecrow.wallper.editor.domain.model.ExportStatus
@@ -93,7 +93,7 @@ internal data class ProcessingInfo(val optimisesOnConfirm: Boolean = false)
 
 internal data class SaveRequest(
     val media: PreparedMedia,
-    val crop: CropRect,
+    val framing: Framing,
     val trim: ClipRange,
     val isOptimised: Boolean,
     val tint: Tint?,

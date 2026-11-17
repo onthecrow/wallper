@@ -33,6 +33,7 @@ internal class PrepareSavedMediaUseCaseImpl @Inject constructor(
                     crop = wallpaper.crop,
                     clip = wallpaper.clip,
                     tint = wallpaper.tint,
+                    turnedCrop = wallpaper.turnedCrop,
                 ),
             )
         }.onFailure(Timber::e)

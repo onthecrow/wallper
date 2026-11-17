@@ -3,6 +3,7 @@ package com.onthecrow.wallper.core.gl
 import com.onthecrow.wallper.core.model.CropRect
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class PictureRegionTest {
@@ -13,6 +14,29 @@ class PictureRegionTest {
         val region = PictureRegion(1000, 1000, CropRect(375, 0, 625, 1000))
 
         assertEquals(listOf(310, 0, 690, 1000), listOf(region.left, region.top, region.right, region.bottom))
+    }
+
+    @Test
+    fun `the windows of both ways the screen can be turned share one region`() {
+        val portrait = CropRect(375, 0, 625, 1000)
+        val landscape = CropRect(0, 400, 1000, 600)
+
+        val both = PictureRegion(1000, 1000, listOf(portrait, landscape))
+
+        assertTrue(PictureRegion(1000, 1000, portrait) in both)
+        assertTrue(PictureRegion(1000, 1000, landscape) in both)
+        assertFalse(both in PictureRegion(1000, 1000, portrait))
+    }
+
+    @Test
+    fun `several windows are subsampled only as far as each still has a pixel for the screen's`() {
+        val region = PictureRegion(4000, 4000, CropRect(0, 0, 4000, 4000))
+        // The landscape window on a phone held sideways has fewer pixels for the screen's than the portrait one.
+        val portrait = CropRect(0, 0, 2400, 4000)
+        val landscape = CropRect(0, 0, 2400, 1080)
+
+        assertEquals(2, region.sampleSize(listOf(portrait), 1080, 1920, maxTextureSize = 8192))
+        assertEquals(1, region.sampleSize(listOf(portrait, landscape), 1080, 1920, maxTextureSize = 8192))
     }
 
     @Test

@@ -97,3 +97,18 @@ internal val MIGRATION_7_8 = object : Migration(7, 8) {
         connection.execSQL("ALTER TABLE `wallpapers` ADD COLUMN `transition_ms` INTEGER")
     }
 }
+
+/**
+ * v9: `turned_crop_*`, the crop for the screen turned the other way; the rows so far derive it (NULLs). An
+ * optimised video's media size and crops are its export's and its windows in it from now on; the rows so far
+ * keep their zeros, all of the export.
+ */
+internal val MIGRATION_8_9 = object : Migration(8, 9) {
+    override fun migrate(connection: SQLiteConnection) {
+        connection.execSQL("ALTER TABLE `wallpapers` ADD COLUMN `turned_crop_left` INTEGER")
+        connection.execSQL("ALTER TABLE `wallpapers` ADD COLUMN `turned_crop_top` INTEGER")
+        connection.execSQL("ALTER TABLE `wallpapers` ADD COLUMN `turned_crop_right` INTEGER")
+        connection.execSQL("ALTER TABLE `wallpapers` ADD COLUMN `turned_crop_bottom` INTEGER")
+        connection.execSQL("ALTER TABLE `wallpapers` ADD COLUMN `turned_crop_rotation` REAL")
+    }
+}

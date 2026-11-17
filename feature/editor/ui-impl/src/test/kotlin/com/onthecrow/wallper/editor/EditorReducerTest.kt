@@ -3,6 +3,7 @@ package com.onthecrow.wallper.editor
 import com.onthecrow.wallper.core.designsystem.component.colorpicker.HsvColor
 import com.onthecrow.wallper.core.model.ClipRange
 import com.onthecrow.wallper.core.model.CropRect
+import com.onthecrow.wallper.core.model.Framing
 import com.onthecrow.wallper.core.model.MediaInfo
 import com.onthecrow.wallper.core.model.MediaType
 import com.onthecrow.wallper.core.model.Tint
@@ -136,7 +137,7 @@ class EditorReducerTest {
     fun `toggle, prepared media and export status land in the state`() = runTest {
         var state = reducer.reduce(EditorState(isProcessingInfoSeen = true), EditorEvent.OnOptimisedToggle)
         state = reducer.reduce(state, EditorEvent.OnMediaPrepared(media))
-        state = reducer.reduce(state, EditorEvent.OnSaveClick(crop))
+        state = reducer.reduce(state, EditorEvent.OnSaveClick(Framing(crop)))
         state = reducer.reduce(state, EditorEvent.OnExportStatusChanged(ExportStatus.InProgress(40)))
 
         assertEquals(true, state.isOptimised)
@@ -154,12 +155,12 @@ class EditorReducerTest {
     @Test
     fun `save starts right away, original or optimised`() = runTest {
         assertEquals(
-            SaveRequest(media, crop, ClipRange(0, 16_000), isOptimised = false, tint = null),
-            reducer.reduce(prepared, EditorEvent.OnSaveClick(crop)).save,
+            SaveRequest(media, Framing(crop), ClipRange(0, 16_000), isOptimised = false, tint = null),
+            reducer.reduce(prepared, EditorEvent.OnSaveClick(Framing(crop))).save,
         )
         assertEquals(
-            SaveRequest(media, crop, ClipRange(0, 16_000), isOptimised = true, tint = null),
-            reducer.reduce(prepared.copy(isOptimised = true), EditorEvent.OnSaveClick(crop)).save,
+            SaveRequest(media, Framing(crop), ClipRange(0, 16_000), isOptimised = true, tint = null),
+            reducer.reduce(prepared.copy(isOptimised = true), EditorEvent.OnSaveClick(Framing(crop))).save,
         )
     }
 
@@ -325,36 +326,36 @@ class EditorReducerTest {
     @Test
     fun `the tint is saved with the wallpaper, and none while it is off`() = runTest {
         val tinted = reducer.reduce(prepared, EditorEvent.OnTintColorChange(green))
-        assertEquals(Tint(0x8000FF00.toInt()), reducer.reduce(tinted, EditorEvent.OnSaveClick(crop)).save?.tint)
+        assertEquals(Tint(0x8000FF00.toInt()), reducer.reduce(tinted, EditorEvent.OnSaveClick(Framing(crop))).save?.tint)
 
         val off = reducer.reduce(tinted, EditorEvent.OnTintToggle)
-        assertNull(reducer.reduce(off, EditorEvent.OnSaveClick(crop)).save?.tint)
+        assertNull(reducer.reduce(off, EditorEvent.OnSaveClick(Framing(crop))).save?.tint)
     }
 
     @Test
     fun `nothing is saved before the media is ready, or twice`() = runTest {
         val loading = EditorState()
-        assertSame(loading, reducer.reduce(loading, EditorEvent.OnSaveClick(crop)))
+        assertSame(loading, reducer.reduce(loading, EditorEvent.OnSaveClick(Framing(crop))))
 
-        val saving = reducer.reduce(prepared, EditorEvent.OnSaveClick(crop))
-        assertSame(saving, reducer.reduce(saving, EditorEvent.OnSaveClick(CropRect(0, 0, 2, 2))))
+        val saving = reducer.reduce(prepared, EditorEvent.OnSaveClick(Framing(crop)))
+        assertSame(saving, reducer.reduce(saving, EditorEvent.OnSaveClick(Framing(CropRect(0, 0, 2, 2)))))
     }
 
     @Test
     fun `a failed save can be tried again, a successful one stays done`() = runTest {
-        val saving = reducer.reduce(prepared, EditorEvent.OnSaveClick(crop))
+        val saving = reducer.reduce(prepared, EditorEvent.OnSaveClick(Framing(crop)))
 
         val failed = reducer.reduce(saving, EditorEvent.OnExportStatusChanged(ExportStatus.Error(IllegalStateException("encoder"))))
         assertNull(failed.save)
 
         val saved = reducer.reduce(saving, EditorEvent.OnExportStatusChanged(ExportStatus.Success))
         assertEquals(saving.save, saved.save)
-        assertSame(saved, reducer.reduce(saved, EditorEvent.OnSaveClick(crop)))
+        assertSame(saved, reducer.reduce(saved, EditorEvent.OnSaveClick(Framing(crop))))
     }
 
     @Test
     fun `a cancelled export closes its dialog for good and the save can start again`() = runTest {
-        val saving = reducer.reduce(prepared.copy(isOptimised = true), EditorEvent.OnSaveClick(crop))
+        val saving = reducer.reduce(prepared.copy(isOptimised = true), EditorEvent.OnSaveClick(Framing(crop)))
         val exporting = reducer.reduce(saving, EditorEvent.OnExportStatusChanged(ExportStatus.InProgress(30)))
 
         val cancelled = reducer.reduce(exporting, EditorEvent.OnExportCancel)
@@ -364,12 +365,12 @@ class EditorReducerTest {
         // What the export sent before it stopped.
         assertSame(cancelled, reducer.reduce(cancelled, EditorEvent.OnExportStatusChanged(ExportStatus.InProgress(31))))
         assertSame(cancelled, reducer.reduce(cancelled, EditorEvent.OnExportStatusChanged(ExportStatus.Success)))
-        assertEquals(saving.save, reducer.reduce(cancelled, EditorEvent.OnSaveClick(crop)).save)
+        assertEquals(saving.save, reducer.reduce(cancelled, EditorEvent.OnSaveClick(Framing(crop))).save)
     }
 
     @Test
     fun `only an export under way can be cancelled`() = runTest {
-        val saving = reducer.reduce(prepared, EditorEvent.OnSaveClick(crop))
+        val saving = reducer.reduce(prepared, EditorEvent.OnSaveClick(Framing(crop)))
         val saved = reducer.reduce(saving, EditorEvent.OnExportStatusChanged(ExportStatus.Success))
 
         assertSame(saving, reducer.reduce(saving, EditorEvent.OnExportCancel))

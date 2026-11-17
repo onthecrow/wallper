@@ -56,10 +56,11 @@ internal class GLWallpaperEngine(
 ) : WallpaperEngine() {
 
     private val holder = surfaceHolder()
+    private val pansWithPages = wallpaper.pansWithPages
 
     // The video size and rotation were stored with the wallpaper when it was created.
     private val renderParams = VideoRenderParams(
-        holder.surfaceFrame.width(), holder.surfaceFrame.height(), wallpaper.crop, wallpaper.mediaInfo, wallpaper.tint,
+        holder.surfaceFrame.width(), holder.surfaceFrame.height(), wallpaper.framing, wallpaper.mediaInfo, wallpaper.tint,
     )
 
     private val player = playerFactory.create(
@@ -124,7 +125,7 @@ internal class GLWallpaperEngine(
 
     /** On the main thread, and from there straight to the renderer: a thread in between only makes the picture later. */
     override fun onOffsetsChanged(xOffset: Float, xOffsetStep: Float) {
-        val offset = xOffset.takeIf { xOffsetStep > 0f }
+        val offset = xOffset.takeIf { xOffsetStep > 0f && pansWithPages }
         if (offset == pageOffset) return
         pageOffset = offset
         gl.renderer.pageOffset = offset
