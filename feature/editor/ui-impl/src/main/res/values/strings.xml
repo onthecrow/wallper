@@ -1,4 +1,7 @@
 <resources>
+    <string name="editor_new_title">New wallpaper</string>
+    <string name="editor_edit_title">Wallpaper</string>
+    <string name="editor_back">Back</string>
     <string name="editor_play">Play</string>
     <string name="editor_pause">Pause</string>
     <string name="editor_set_trim_start">Start here</string>

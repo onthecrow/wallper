@@ -29,6 +29,8 @@ internal sealed interface EditorEvent : Event {
     data object OnTintClick : EditorEvent
     /** Back while the tint's picker is on screen: it goes. */
     data object OnTintClose : EditorEvent
+    /** The bar's back: out of the editor, without saving. */
+    data object OnCloseClick : EditorEvent
     /** The tint's switch. */
     data object OnTintToggle : EditorEvent
     /** A touch on the picker: it also switches the tint on, or the colour would change unseen. */

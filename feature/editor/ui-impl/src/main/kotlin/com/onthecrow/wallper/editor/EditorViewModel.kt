@@ -39,7 +39,10 @@ internal class EditorViewModel @AssistedInject constructor(
     private val processingInfoMemory: ProcessingInfoMemory,
     private val navigator: Navigator,
     private val haptics: Haptics,
-) : BaseViewModel<EditorEvent, EditorState, EditorReducer>(EditorState(), reducer) {
+) : BaseViewModel<EditorEvent, EditorState, EditorReducer>(
+    EditorState(isNew = destination is EditorDestination.New),
+    reducer,
+) {
 
     @AssistedFactory
     interface Factory {
@@ -54,6 +57,7 @@ internal class EditorViewModel @AssistedInject constructor(
             when (event) {
                 // A failed export can be saved again; a file that can't be read or played can't.
                 EditorEvent.OnErrorDismiss -> if (isMediaBroken) navigator.navigateBack()
+                EditorEvent.OnCloseClick -> navigator.navigateBack()
                 is EditorEvent.OnPreviewFailed -> isMediaBroken = true
                 EditorEvent.OnCropSnapped -> haptics.tick()
                 else -> Unit

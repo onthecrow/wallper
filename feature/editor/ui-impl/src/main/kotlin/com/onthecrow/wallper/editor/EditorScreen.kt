@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.CenterAlignedTopAppBar
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.FilledTonalIconButton
@@ -100,7 +101,20 @@ internal fun EditorScreen(
     // Back from the tint's picker is back to the trim bar and the save row, not out of the editor.
     BackHandler(enabled = state.isTintOpen) { onEvent(EditorEvent.OnTintClose) }
 
-    Scaffold(modifier = modifier) { padding ->
+    Scaffold(
+        modifier = modifier,
+        topBar = {
+            CenterAlignedTopAppBar(
+                title = { Text(stringResource(if (state.isNew) R.string.editor_new_title else R.string.editor_edit_title)) },
+                navigationIcon = {
+                    // As the system's back: the tint's picker closes first.
+                    IconButton(onClick = { onEvent(if (state.isTintOpen) EditorEvent.OnTintClose else EditorEvent.OnCloseClick) }) {
+                        Icon(painter = painterResource(R.drawable.ic_arrow_back), contentDescription = stringResource(R.string.editor_back))
+                    }
+                },
+            )
+        },
+    ) { padding ->
         Box {
             val contentModifier = Modifier
                 .fillMaxSize()

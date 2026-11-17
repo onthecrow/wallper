@@ -33,6 +33,7 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertIs
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
@@ -108,6 +109,18 @@ class EditorViewModelTest {
             override fun navigateBack() { backNavigations++ }
         },
     )
+
+    @Test
+    fun `the bar's back leaves without saving, and the bar says whether the wallpaper is new`() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+        assertTrue(viewModel.state.value.isNew)
+
+        viewModel.onEvent(EditorEvent.OnCloseClick)
+
+        assertEquals(1, backNavigations)
+        assertEquals(null, viewModel.state.value.save)
+        assertFalse(createViewModel(EditorDestination.Edit(wallpaperId = 7)).state.value.isNew)
+    }
 
     @Test
     fun `the picture snapping level ticks`() = runTest(dispatcher) {
