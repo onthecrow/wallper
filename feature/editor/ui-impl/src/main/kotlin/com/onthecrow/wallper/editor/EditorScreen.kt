@@ -64,7 +64,6 @@ import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.util.lerp
 import com.onthecrow.wallper.core.designsystem.component.colorpicker.ColorPicker
 import com.onthecrow.wallper.core.designsystem.component.colorpicker.ColorPickerDefaults
 import com.onthecrow.wallper.core.designsystem.component.colorpicker.HsvColor
@@ -151,10 +150,10 @@ internal fun EditorScreen(
                 val durationMs = media.mediaInfo.durationMs
 
                 // From the trim bar and the save row under the buttons, 0, to the tint's picker there, 1. Only
-                // the layout reads it, so the way between them recomposes nothing.
+                // the layout reads it, while placing, so the way between them recomposes nothing.
                 val tintProgress = animateFloatAsState(
                     targetValue = if (state.isTintOpen) 1f else 0f,
-                    animationSpec = tween(TINT_PANEL_MS, easing = FastOutSlowInEasing),
+                    animationSpec = tween(TintPanelMotion.DURATION_MS, easing = FastOutSlowInEasing),
                     label = "tint panel",
                 )
                 // The picker is there only while any of it shows.
@@ -361,8 +360,9 @@ private fun PlaybackControls(
 
 /**
  * The editor from top to bottom: the [crop], the [controls], and under them the trim bar with the save row
- * ([bottom]) or the tint's picker ([tintPanel]), [tintProgress] of the way from the first to the second, the
- * picker rising from the bottom edge as the other fades.
+ * ([bottom]) or the tint's picker ([tintPanel]), [tintProgress] of the way from the first to the second: the
+ * one sinks and fades as the other rises from under the bottom edge, and back ([TintPanelMotion]). The progress
+ * is read only while placing, so a step of the way neither recomposes nor measures anything.
  *
  * The crop is always laid out for the room it has over [bottom]. When the picker leaves it less, it is drawn
  * smaller as a whole, by [cropScale], in the middle of the room that is left: nothing inside it is laid out
@@ -394,18 +394,28 @@ private fun EditorLayout(
         val tintPlaceables = tintMeasurables.map { it.measure(wide) }
         val controlsHeight = controlsPlaceables.maxOfOrNull { it.height } ?: 0
         val bottomHeight = bottomPlaceables.maxOfOrNull { it.height } ?: 0
+        val tintHeight = tintPlaceables.maxOfOrNull { it.height }
 
-        // Without a picker to show there is no way to go.
-        val progress = if (tintPlaceables.isEmpty()) 0f else tintProgress().coerceIn(0f, 1f)
-        val tintHeight = tintPlaceables.maxOfOrNull { it.height } ?: bottomHeight
-        val underHeight = lerp(bottomHeight, tintHeight, progress)
-
-        val fullHeight = (height - controlsHeight - bottomHeight).coerceAtLeast(0)
-        val visibleHeight = (height - controlsHeight - underHeight).coerceAtLeast(0)
+        val fullHeight = TintPanelMotion.fullCropHeight(height, controlsHeight, bottomHeight)
         val cropPlaceables = cropMeasurables.map { it.measure(Constraints.fixed(width, fullHeight)) }
-        val scale = if (visibleHeight >= fullHeight) 1f else cropScale(IntSize(width, fullHeight), visibleHeight)
+        val density: Density = this
 
         layout(width, height) {
+            // The progress is read here, so each step of the way only places. Without a picker to show there
+            // is no way to go.
+            val motion = TintPanelMotion(
+                height = height,
+                controlsHeight = controlsHeight,
+                bottomHeight = bottomHeight,
+                tintHeight = tintHeight ?: bottomHeight,
+                progress = if (tintHeight == null) 0f else tintProgress(),
+            )
+            val visibleHeight = motion.cropHeight
+            val scale = if (visibleHeight >= fullHeight) {
+                1f
+            } else {
+                density.cropScale(IntSize(width, fullHeight), visibleHeight)
+            }
             // Its middle in the middle of the room it has; a layer is scaled about its middle.
             cropPlaceables.forEach { placeable ->
                 placeable.placeWithLayer(0, (visibleHeight - fullHeight) / 2) {
@@ -413,13 +423,16 @@ private fun EditorLayout(
                     scaleY = scale
                 }
             }
-            controlsPlaceables.forEach { it.place(0, visibleHeight) }
-            val underTop = visibleHeight + controlsHeight
-            // One goes before the other comes; what is unseen isn't placed, so it takes no touches either.
-            val bottomAlpha = 1f - (progress / PANEL_CROSSOVER).coerceIn(0f, 1f)
-            val tintAlpha = ((progress - PANEL_CROSSOVER) / (1f - PANEL_CROSSOVER)).coerceIn(0f, 1f)
-            if (bottomAlpha > 0f) bottomPlaceables.forEach { it.placeWithLayer(0, underTop) { alpha = bottomAlpha } }
-            if (tintAlpha > 0f) tintPlaceables.forEach { it.placeWithLayer(0, underTop) { alpha = tintAlpha } }
+            controlsPlaceables.forEach { it.place(0, motion.controlsTop) }
+            // What is unseen isn't placed, so it takes no touches either.
+            val bottomAlpha = motion.bottomAlpha
+            val tintAlpha = motion.tintAlpha
+            if (bottomAlpha > 0f) {
+                bottomPlaceables.forEach { it.placeWithLayer(0, motion.bottomTop) { alpha = bottomAlpha } }
+            }
+            if (tintAlpha > 0f) {
+                tintPlaceables.forEach { it.placeWithLayer(0, motion.tintTop) { alpha = tintAlpha } }
+            }
         }
     }
 }
@@ -536,12 +549,6 @@ private fun TintPanel(
 
 /** The same as the crop frame's ([com.onthecrow.wallper.editor.crop.CropEditorDefaults.FramePadding]). */
 private val TintPanelPadding = 24.dp
-
-/** How long the tint's picker takes to come or go. */
-private const val TINT_PANEL_MS = 320
-
-/** How far along that way the trim bar and the save row are gone and the picker starts to show. */
-private const val PANEL_CROSSOVER = 0.3f
 
 /** Undoes every change: crop, trim, tint and the original / optimised choice. Appears once there is one. */
 @Composable
