@@ -7,6 +7,7 @@ import com.onthecrow.wallper.core.designsystem.component.colorpicker.HsvColor
 import com.onthecrow.wallper.core.haptics.Haptics
 import com.onthecrow.wallper.core.model.ClipRange
 import com.onthecrow.wallper.core.model.CropRect
+import com.onthecrow.wallper.core.model.Framing
 import com.onthecrow.wallper.core.model.MediaInfo
 import com.onthecrow.wallper.core.model.MediaType
 import com.onthecrow.wallper.core.model.Tint
@@ -90,12 +91,12 @@ class EditorViewModelTest {
         saveWallpaperUseCase = object : SaveWallpaperUseCase {
             override fun invoke(
                 media: PreparedMedia,
-                crop: CropRect,
+                framing: Framing,
                 clip: ClipRange,
                 process: Boolean,
                 tint: Tint?,
             ): Flow<ExportStatus> {
-                saveCalls += SaveCall(media, crop, clip, process, tint)
+                saveCalls += SaveCall(media, framing.crop, clip, process, tint)
                 return exportStatuses
             }
         },
@@ -201,7 +202,7 @@ class EditorViewModelTest {
         val viewModel = createViewModel()
         viewModel.onEvent(EditorEvent.OnTrimChange(ClipRange(1_000, 5_000)))
 
-        viewModel.onEvent(EditorEvent.OnSaveClick(crop))
+        viewModel.onEvent(EditorEvent.OnSaveClick(Framing(crop)))
 
         assertEquals(SaveCall(media, crop, ClipRange(1_000, 5_000), process = false), saveCalls.single())
         assertEquals(ExportStatus.Success, viewModel.state.value.exportStatus)
@@ -212,7 +213,7 @@ class EditorViewModelTest {
     fun `save without moving the handles keeps the whole video`() = runTest(dispatcher) {
         val viewModel = createViewModel()
 
-        viewModel.onEvent(EditorEvent.OnSaveClick(crop))
+        viewModel.onEvent(EditorEvent.OnSaveClick(Framing(crop)))
 
         assertEquals(ClipRange(0, 10_000), saveCalls.single().clip)
     }
@@ -221,7 +222,7 @@ class EditorViewModelTest {
     fun `an edit saves over the wallpaper it opened`() = runTest(dispatcher) {
         val viewModel = createViewModel(EditorDestination.Edit(4))
 
-        viewModel.onEvent(EditorEvent.OnSaveClick(crop))
+        viewModel.onEvent(EditorEvent.OnSaveClick(Framing(crop)))
 
         assertEquals(SaveCall(savedMedia, crop, ClipRange(2_000, 6_000), process = false), saveCalls.single())
         assertEquals(1, backNavigations)
@@ -233,7 +234,7 @@ class EditorViewModelTest {
         viewModel.onEvent(EditorEvent.OnTintClick)
         viewModel.onEvent(EditorEvent.OnTintColorChange(HsvColor(hue = 240f, saturation = 1f, value = 1f, alpha = 0.2f)))
 
-        viewModel.onEvent(EditorEvent.OnSaveClick(crop))
+        viewModel.onEvent(EditorEvent.OnSaveClick(Framing(crop)))
 
         assertEquals(Tint(0x330000FF), saveCalls.single().tint)
     }
@@ -244,13 +245,13 @@ class EditorViewModelTest {
         val tinted = savedMedia.copy(edited = savedMedia.edited?.copy(tint = tint))
         prepareSavedResult = tinted
 
-        createViewModel(EditorDestination.Edit(4)).onEvent(EditorEvent.OnSaveClick(crop))
+        createViewModel(EditorDestination.Edit(4)).onEvent(EditorEvent.OnSaveClick(Framing(crop)))
         assertEquals(tint, saveCalls.single().tint)
 
         saveCalls.clear()
         val viewModel = createViewModel(EditorDestination.Edit(4))
         viewModel.onEvent(EditorEvent.OnTintToggle)
-        viewModel.onEvent(EditorEvent.OnSaveClick(crop))
+        viewModel.onEvent(EditorEvent.OnSaveClick(Framing(crop)))
         assertNull(saveCalls.single().tint)
     }
 
@@ -265,7 +266,7 @@ class EditorViewModelTest {
         assertEquals(1, memory.marks)
 
         viewModel.onEvent(EditorEvent.OnProcessingInfoConfirm)
-        viewModel.onEvent(EditorEvent.OnSaveClick(crop))
+        viewModel.onEvent(EditorEvent.OnSaveClick(Framing(crop)))
 
         assertNull(viewModel.state.value.processingInfo)
         assertEquals(SaveCall(media, crop, ClipRange(0, 10_000), process = true), saveCalls.single())
@@ -278,7 +279,7 @@ class EditorViewModelTest {
         viewModel.onEvent(EditorEvent.OnOptimisedToggle)
 
         viewModel.onEvent(EditorEvent.OnProcessingInfoDismiss)
-        viewModel.onEvent(EditorEvent.OnSaveClick(crop))
+        viewModel.onEvent(EditorEvent.OnSaveClick(Framing(crop)))
 
         assertNull(viewModel.state.value.processingInfo)
         assertEquals(false, saveCalls.single().process)
@@ -317,7 +318,7 @@ class EditorViewModelTest {
         exportStatuses = flowOf(ExportStatus.Error(IllegalStateException("encoder")))
         val viewModel = createViewModel()
 
-        viewModel.onEvent(EditorEvent.OnSaveClick(crop))
+        viewModel.onEvent(EditorEvent.OnSaveClick(Framing(crop)))
 
         assertIs<ExportStatus.Error>(viewModel.state.value.exportStatus)
         assertEquals(0, backNavigations)
@@ -326,7 +327,7 @@ class EditorViewModelTest {
 
         assertNull(viewModel.state.value.exportStatus)
         assertEquals(0, backNavigations)
-        viewModel.onEvent(EditorEvent.OnSaveClick(crop))
+        viewModel.onEvent(EditorEvent.OnSaveClick(Framing(crop)))
         assertEquals(2, saveCalls.size)
     }
 
@@ -338,7 +339,7 @@ class EditorViewModelTest {
         }
         val viewModel = createViewModel()
 
-        viewModel.onEvent(EditorEvent.OnSaveClick(crop))
+        viewModel.onEvent(EditorEvent.OnSaveClick(Framing(crop)))
 
         assertIs<ExportStatus.Error>(viewModel.state.value.exportStatus)
         assertNull(viewModel.state.value.save)
@@ -357,7 +358,7 @@ class EditorViewModelTest {
             }
         }
         val viewModel = createViewModel()
-        viewModel.onEvent(EditorEvent.OnSaveClick(crop))
+        viewModel.onEvent(EditorEvent.OnSaveClick(Framing(crop)))
         assertEquals(ExportStatus.InProgress(10), viewModel.state.value.exportStatus)
 
         viewModel.onEvent(EditorEvent.OnExportCancel)

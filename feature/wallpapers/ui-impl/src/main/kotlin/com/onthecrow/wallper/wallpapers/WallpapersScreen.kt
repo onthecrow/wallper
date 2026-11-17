@@ -10,6 +10,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -131,10 +132,13 @@ internal fun WallpapersScreen(
         }
     ) {
         // The grid goes on under the bar and the system's navigation, so that the active card's glow does too
-        // instead of ending in a line at the grid's edge.
+        // instead of ending in a line at the grid's edge. It fills the screen even with a row or two: a lazy grid
+        // is only as tall as its content otherwise, and clips the glow below the last row.
         LazyVerticalGrid(
             state = gridState,
-            modifier = Modifier.hazeSource(hazeState),
+            modifier = Modifier
+                .fillMaxSize()
+                .hazeSource(hazeState),
             // At the end the last row stops above the «+», not under it.
             contentPadding = PaddingValues(
                 start = 8.dp,

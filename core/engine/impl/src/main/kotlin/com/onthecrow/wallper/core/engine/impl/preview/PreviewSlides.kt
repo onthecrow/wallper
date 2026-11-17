@@ -70,7 +70,7 @@ internal class VideoPreviewSlide(
     }
 
     override val renderer = VideoWallpaperRenderer(
-        renderParams = VideoRenderParams(width, height, wallpaper.crop, wallpaper.mediaInfo, wallpaper.tint),
+        renderParams = VideoRenderParams(width, height, wallpaper.framing, wallpaper.mediaInfo, wallpaper.tint),
         callbackHandler = Handler(Looper.getMainLooper()),
         listener = object : VideoWallpaperRenderer.Listener {
             override fun onFrameAvailable() = onFrame()
@@ -111,7 +111,7 @@ internal class PicturePreviewSlide(
         path = wallpaper.sourcePath,
         frameWidth = wallpaper.mediaInfo.displayWidth,
         frameHeight = wallpaper.mediaInfo.displayHeight,
-        crop = wallpaper.crop,
+        framing = wallpaper.framing,
         screenWidth = width,
         screenHeight = height,
         onFailed = { error -> Timber.w(error, "The preview can't decode %s", wallpaper.sourcePath) },

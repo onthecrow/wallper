@@ -2,16 +2,24 @@ package com.onthecrow.wallper.core.gl
 
 import android.opengl.GLES20
 import com.onthecrow.wallper.core.model.CropRect
+import com.onthecrow.wallper.core.model.Framing
 import com.onthecrow.wallper.core.model.MediaInfo
 import com.onthecrow.wallper.core.model.Tint
 import timber.log.Timber
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
+import java.nio.FloatBuffer
 
-/** The shader program, crop geometry and tint shared by all video slots. GL thread only. */
+/**
+ * The shader program, crop geometry and tint of a video. The window it shows is the [framing]'s for the
+ * screen's proportions, chosen again whenever the screen changes size ([resize]): a launcher that turns gets
+ * the crop made for its orientation, or one derived from the other, never a stretched one. GL thread only.
+ */
 internal class OpenGLScene(
-    private val sceneWidth: Int,
-    private val sceneHeight: Int,
     private val mediaInfo: MediaInfo,
-    rect: CropRect,
+    private val framing: Framing,
+    width: Int,
+    height: Int,
     private val tint: Tint? = null,
 ) {
     private val programId: Int
@@ -50,11 +58,18 @@ internal class OpenGLScene(
         }
     """.trimIndent()
 
-    private val verticesData = getVerticesData(UVCoords.fromRect(mediaInfo.displayWidth, mediaInfo.displayHeight, rect))
-    private val pageScroll = PageScroll(mediaInfo.displayWidth, mediaInfo.displayHeight, rect)
+    private var viewportWidth = width
+    private var viewportHeight = height
+
+    /** X, Y, Z, U, V of the four corners, for a triangle strip. */
+    private val vertices: FloatBuffer = ByteBuffer.allocateDirect(VERTEX_COUNT * VERTEX_FLOATS * FLOAT_BYTES)
+        .order(ByteOrder.nativeOrder())
+        .asFloatBuffer()
+    private lateinit var pageScroll: PageScroll
 
     init {
-        GLES20.glViewport(0, 0, sceneWidth, sceneHeight)
+        resize(width, height)
+        GLES20.glViewport(0, 0, width, height)
 
         GLES20.glDisable(GLES20.GL_DEPTH_TEST)
         GLES20.glDisable(GLES20.GL_STENCIL_TEST)
@@ -103,11 +118,21 @@ internal class OpenGLScene(
         }
     }
 
-    fun createTexture() = OpenGLExternalTexture(
-        textureWidth = sceneWidth,
-        textureHeight = sceneHeight,
-        verticesData = verticesData,
-    )
+    fun createTexture() = OpenGLExternalTexture()
+
+    /** The screen is [width] x [height] now: the framing's window for it, panned from there. */
+    fun resize(width: Int, height: Int) {
+        viewportWidth = width
+        viewportHeight = height
+        showWindow(framing.forScreen(width, height, mediaInfo.displayWidth, mediaInfo.displayHeight))
+    }
+
+    private fun showWindow(window: CropRect) {
+        val uv = UVCoords.fromRect(mediaInfo.displayWidth, mediaInfo.displayHeight, window)
+        vertices.position(0)
+        vertices.put(getVerticesData(uv)).position(0)
+        pageScroll = PageScroll(mediaInfo.displayWidth, mediaInfo.displayHeight, window)
+    }
 
     /** @param deleteProgram false when the EGL context is already gone. */
     fun release(deleteProgram: Boolean = true) {
@@ -131,6 +156,9 @@ internal class OpenGLScene(
             aTextureCoordHandler = aTextureCoordHandler,
             uTexHandler = uTexMatrixHandle,
             uMvpHandler = uMVPMatrixHandle,
+            vertices = vertices,
+            viewportWidth = viewportWidth,
+            viewportHeight = viewportHeight,
         )
     }
 
@@ -150,5 +178,11 @@ internal class OpenGLScene(
             Timber.e("$op: glError $error")
             throw RuntimeException("$op: glError $error")
         }
+    }
+
+    private companion object {
+        const val VERTEX_COUNT = 4
+        const val VERTEX_FLOATS = 5
+        const val FLOAT_BYTES = 4
     }
 }

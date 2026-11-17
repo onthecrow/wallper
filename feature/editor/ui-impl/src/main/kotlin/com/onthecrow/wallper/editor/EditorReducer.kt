@@ -1,6 +1,6 @@
 package com.onthecrow.wallper.editor
 
-import com.onthecrow.wallper.core.model.CropRect
+import com.onthecrow.wallper.core.model.Framing
 import com.onthecrow.wallper.core.mvi.Reducer
 import com.onthecrow.wallper.editor.domain.model.ExportStatus
 import javax.inject.Inject
@@ -25,7 +25,7 @@ internal class EditorReducer @Inject constructor() : Reducer<EditorState, Editor
                 processingInfo = null,
                 isOptimised = state.isOptimised || state.processingInfo?.optimisesOnConfirm == true,
             )
-            is EditorEvent.OnSaveClick -> state.requestSave(event.crop)
+            is EditorEvent.OnSaveClick -> state.requestSave(event.framing)
             EditorEvent.OnProcessingInfoDismiss -> state.copy(processingInfo = null)
             is EditorEvent.OnProcessingInfoSeenLoaded ->
                 state.copy(isProcessingInfoSeen = state.isProcessingInfoSeen || event.isSeen)
@@ -66,10 +66,10 @@ internal class EditorReducer @Inject constructor() : Reducer<EditorState, Editor
         }
 
     /** Starts a save once the media is ready, one at a time. */
-    private fun EditorState.requestSave(crop: CropRect): EditorState {
+    private fun EditorState.requestSave(framing: Framing): EditorState {
         val media = media ?: return this
         if (save != null) return this
-        return copy(save = SaveRequest(media, crop, trim, isOptimised, tint.tint))
+        return copy(save = SaveRequest(media, framing, trim, isOptimised, tint.tint))
     }
 
     /** Shown is seen: a later switch to optimised doesn't wait for it. */

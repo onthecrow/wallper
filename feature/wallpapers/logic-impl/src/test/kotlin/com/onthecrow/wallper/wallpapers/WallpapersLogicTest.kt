@@ -76,6 +76,26 @@ class WallpapersLogicTest {
     }
 
     @Test
+    fun `an optimised video keeps its windows in the export, and an old one gets its export's size`() = runTest {
+        val window = CropRect(left = 660, top = 0, right = 1740, bottom = 2400)
+        val turned = CropRect(left = 0, top = 660, right = 2400, bottom = 1740)
+        add(processed.copy(frameWidth = 2400, frameHeight = 2400, crop = window, turnedCrop = turned))
+        add(processed.copy(path = "processed/old.mp4"))
+        val sizes = VideoFrameSizes { path -> VideoFrameSizes.FrameSize(1080, 2400).takeIf { path == "processed/old.mp4" } }
+
+        ActivateWallpaperUseCaseImpl(repository, activations)(1)
+        assertEquals(
+            WallpaperSpec.ProcessedVideo("originals/b.mp4", "thumbnails/b", null, 2400, 2400, window, turned),
+            ActiveWallpaperSourceImpl(repository, activations, sizes).activeWallpaperFlow.first(),
+        )
+        ActivateWallpaperUseCaseImpl(repository, activations)(2)
+        assertEquals(
+            WallpaperSpec.ProcessedVideo("processed/old.mp4", "thumbnails/b", frameWidth = 1080, frameHeight = 2400),
+            ActiveWallpaperSourceImpl(repository, activations, sizes).activeWallpaperFlow.first(),
+        )
+    }
+
+    @Test
     fun `a tint is saved with the media and reaches the engine`() = runTest {
         val tint = Tint(0xCC3366FF.toInt())
         add(media.copy(tint = tint))

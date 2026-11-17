@@ -66,4 +66,32 @@ class FrameBoundsTest {
         assertEquals(0f, bounds.screen.width)
         assertEquals(0f, bounds.screen.height)
     }
+
+    @Test
+    fun `a turned phone lies across the zone about the same centre, scaled whole to fit`() {
+        val area = Size(400f, 540f)
+        val bounds = FrameBounds.fit(area, padding, border = 5f, aspectRatio = 0.5f)
+
+        val turned = bounds.turned(area, padding)
+
+        // The body, 255 x 500, turned: 500 wide must fit the zone's 380.
+        val scale = 380f / 500f
+        assertEquals(scale, bounds.turnScale(area, padding), 1e-6f)
+        assertEquals(380f, turned.body.width, 1e-3f)
+        assertEquals(255f * scale, turned.body.height, 1e-3f)
+        assertEquals(bounds.body.center, turned.body.center)
+        assertEquals(2f, turned.screen.width / turned.screen.height, 1e-6f)
+        assertEquals(bounds.screen.height * scale, turned.screen.width, 1e-3f)
+    }
+
+    @Test
+    fun `a phone shown either way keeps the scale at which both fit`() {
+        val full = Size(400f, 540f)
+        val visible = Size(400f, 300f)
+
+        val either = FrameBounds.scaleToFitTurned(full, visible, padding, border = 5f, aspectRatio = 0.5f)
+
+        assertEquals(FrameBounds.scaleToFit(full, visible, padding, border = 5f, aspectRatio = 0.5f), either)
+        assertEquals(260f / 500f, either, 1e-6f)
+    }
 }

@@ -111,6 +111,17 @@ internal class CropState(
         settleTarget = null
     }
 
+    /**
+     * Puts the picture where [crop] shows it, as if the editor had opened with it, without springing: a crop
+     * derived from the other way the screen can be turned, until the user moves it.
+     */
+    fun seat(crop: CropRect) {
+        settling?.cancel()
+        settleTarget = null
+        untouchedCrop = crop
+        geometry?.let { placement = it.fromCrop(crop) }
+    }
+
     fun onGestureStart() {
         settling?.cancel()
         settleTarget = null

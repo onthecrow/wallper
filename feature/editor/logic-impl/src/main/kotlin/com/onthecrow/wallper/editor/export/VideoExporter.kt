@@ -12,4 +12,7 @@ import kotlinx.coroutines.flow.Flow
  */
 internal interface VideoExporter {
     fun export(inputPath: String, outputPath: String, crop: CropRect, clip: ClipRange, tint: Tint?): Flow<ExportStatus>
+
+    /** Whether an encoder here takes frames of [width] x [height]; an export that it doesn't falls back to less. */
+    fun canEncode(width: Int, height: Int): Boolean = true
 }

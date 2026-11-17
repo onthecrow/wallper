@@ -18,6 +18,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -59,6 +60,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Constraints
 import androidx.compose.ui.unit.Density
@@ -74,7 +76,8 @@ import com.onthecrow.wallper.core.model.ClipRange
 import com.onthecrow.wallper.core.model.MediaType
 import com.onthecrow.wallper.editor.crop.CropEditor
 import com.onthecrow.wallper.editor.crop.CropEditorDefaults
-import com.onthecrow.wallper.editor.crop.rememberCropState
+import com.onthecrow.wallper.editor.crop.FramingState
+import com.onthecrow.wallper.editor.crop.rememberFramingState
 import com.onthecrow.wallper.editor.domain.model.ExportStatus
 import com.onthecrow.wallper.editor.preview.EditorPlayer
 import com.onthecrow.wallper.editor.preview.PictureImage
@@ -119,12 +122,12 @@ internal fun EditorScreen(
                 .fillMaxSize()
                 .padding(bottom = padding.calculateBottomPadding(), top = padding.calculateTopPadding())
             val media = state.media
-            // The preview shows the media upright, so the crop works in those pixels too.
+            // The preview shows the media upright, so the crops work in those pixels too.
             val cropState = media?.let {
-                rememberCropState(
+                rememberFramingState(
                     mediaSize = IntSize(it.mediaInfo.displayWidth, it.mediaInfo.displayHeight),
                     screenAspectRatio = screenAspectRatio,
-                    initialCrop = it.edited?.crop,
+                    start = it.edited?.framing,
                 )
             }
 
@@ -186,21 +189,23 @@ internal fun EditorScreen(
                         }
                     },
                     controls = {
-                        // The tint button sits on the left of the playback buttons and the reset button on
-                        // their right; a picture has only the two.
-                        Box(
+                        // The playback buttons in the middle; the tint and turn buttons share the room on their
+                        // left evenly, the reset button sits on their right. A picture has only those: its
+                        // tint and turn buttons share the left half.
+                        Row(
                             modifier = Modifier
                                 .fillMaxWidth()
                                 .padding(bottom = 12.dp)
                                 .heightIn(min = 48.dp),
+                            verticalAlignment = Alignment.CenterVertically,
                         ) {
-                            TintButton(
-                                isOpen = state.isTintOpen,
-                                onClick = { onEvent(EditorEvent.OnTintClick) },
-                                modifier = Modifier
-                                    .align(Alignment.CenterStart)
-                                    .padding(start = 16.dp),
-                            )
+                            Row(
+                                modifier = Modifier.weight(1f),
+                                horizontalArrangement = Arrangement.SpaceEvenly,
+                            ) {
+                                TintButton(isOpen = state.isTintOpen, onClick = { onEvent(EditorEvent.OnTintClick) })
+                                TurnButton(state = cropState)
+                            }
                             if (player != null) {
                                 PlaybackControls(
                                     player = player,
@@ -210,19 +215,18 @@ internal fun EditorScreen(
                                     onPlayPauseClick = { onEvent(EditorEvent.OnPlayPauseClick) },
                                     onSetTrimStartClick = { onEvent(EditorEvent.OnSetTrimStartClick(player.positionMs)) },
                                     onSetTrimEndClick = { onEvent(EditorEvent.OnSetTrimEndClick(player.positionMs)) },
-                                    modifier = Modifier.align(Alignment.Center),
                                 )
                             }
-                            ResetButton(
-                                visible = state.hasEdits || cropState.isChanged,
-                                onClick = {
-                                    cropState.reset(scope)
-                                    onEvent(EditorEvent.OnResetClick)
-                                },
-                                modifier = Modifier
-                                    .align(Alignment.CenterEnd)
-                                    .padding(end = 16.dp),
-                            )
+                            Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
+                                ResetButton(
+                                    visible = state.hasEdits || cropState.isChanged,
+                                    onClick = {
+                                        cropState.reset(scope)
+                                        onEvent(EditorEvent.OnResetClick)
+                                    },
+                                    modifier = Modifier.padding(end = 16.dp),
+                                )
+                            }
                         }
                     },
                     bottom = {
@@ -256,7 +260,7 @@ internal fun EditorScreen(
                                 // Only a video is ever optimised: a picture is always kept as it is.
                                 isOptimised = state.isOptimised.takeIf { media.type == MediaType.VIDEO },
                                 onEvent = onEvent,
-                                onSaveClick = { onEvent(EditorEvent.OnSaveClick(cropState.crop())) },
+                                onSaveClick = { onEvent(EditorEvent.OnSaveClick(cropState.framing())) },
                             )
                         }
                     },
@@ -316,8 +320,8 @@ private fun PlaybackControls(
     val canSetStart by remember(player, trim) { derivedStateOf { trim?.withStartAt(player.positionMs) != null } }
     val canSetEnd by remember(player, trim) { derivedStateOf { trim?.withEndAt(player.positionMs) != null } }
     Row(
-        modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.CenterHorizontally),
+        modifier = modifier,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         if (trim != null) {
@@ -498,6 +502,46 @@ private fun TintButton(isOpen: Boolean, onClick: () -> Unit, modifier: Modifier 
         )
     }
 }
+
+/**
+ * Turns the crop's phone to the other way the screen can be turned, and back. A plain icon button like the tint
+ * button beside it, in the accent while turned; a dot at the icon's corner says the turned screen has a crop of
+ * its own, not one derived from the other.
+ */
+@Composable
+private fun TurnButton(state: FramingState, modifier: Modifier = Modifier) {
+    val iconColor by animateColorAsState(
+        targetValue = if (state.isTurned) MaterialTheme.colorScheme.primary else LocalContentColor.current,
+        label = "turn button",
+    )
+    val hasOwnTurned = state.hasOwnTurned
+    val ownDescription = stringResource(R.string.editor_turned_own_crop)
+    IconButton(
+        onClick = state::turn,
+        modifier = modifier.semantics {
+            selected = state.isTurned
+            if (hasOwnTurned) stateDescription = ownDescription
+        },
+    ) {
+        Box {
+            Icon(
+                painter = painterResource(R.drawable.ic_rotate_screen),
+                contentDescription = stringResource(R.string.editor_turn_screen),
+                tint = iconColor,
+            )
+            if (hasOwnTurned) {
+                Canvas(
+                    Modifier
+                        .align(Alignment.BottomEnd)
+                        .size(TurnDotSize)
+                ) { drawCircle(iconColor) }
+            }
+        }
+    }
+}
+
+/** The turn button's dot: small, at the very corner of the icon. */
+private val TurnDotSize = 4.dp
 
 /**
  * The tint's colour and its switch, whose row says «Tint enabled» or «Tint disabled»: what the tint button puts

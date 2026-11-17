@@ -29,7 +29,7 @@ internal class PictureWallpaperEngine(
         path = wallpaper.sourcePath,
         frameWidth = wallpaper.mediaInfo.displayWidth,
         frameHeight = wallpaper.mediaInfo.displayHeight,
-        crop = wallpaper.crop,
+        framing = wallpaper.framing,
         screenWidth = holder.surfaceFrame.width(),
         screenHeight = holder.surfaceFrame.height(),
         // On the GL thread: the host posts to the main thread, which then releases this engine.

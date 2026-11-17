@@ -5,11 +5,18 @@ import androidx.sqlite.SQLiteConnection
 import androidx.sqlite.driver.bundled.BundledSQLiteDriver
 import androidx.sqlite.execSQL
 import com.onthecrow.wallper.core.model.BuiltInWallpaper
+import com.onthecrow.wallper.core.model.ClipRange
+import com.onthecrow.wallper.core.model.CropRect
+import com.onthecrow.wallper.core.model.MediaInfo
 import com.onthecrow.wallper.core.model.MediaType
 import com.onthecrow.wallper.core.model.SlideDuration
 import com.onthecrow.wallper.core.model.SlideTransition
 import com.onthecrow.wallper.core.model.TransitionEffect
+import com.onthecrow.wallper.wallpapers.domain.model.NewWallpaper
+import com.onthecrow.wallper.wallpapers.domain.model.Wallpaper
 import com.onthecrow.wallper.wallpapers.mapper.groupEntity
+import com.onthecrow.wallper.wallpapers.mapper.toDomain
+import com.onthecrow.wallper.wallpapers.mapper.toEntity
 import com.onthecrow.wallper.wallpapers.mapper.toGroup
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.test.runTest
@@ -22,6 +29,8 @@ import org.junit.rules.TemporaryFolder
 import java.io.File
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertIs
+import kotlin.test.assertNull
 
 /**
  * Migrations on the JVM: the old database is created from the exported schema, then opened by the app's
@@ -297,6 +306,52 @@ class WallpapersMigrationTest {
         val new = rows.single { it.slideDurationMs == 60_000L }
         assertEquals("iris", new.transition)
         assertEquals(transition, new.toGroup(emptyList()).transition)
+        assertBuiltInsSeeded(rows)
+    }
+
+    @Test
+    fun `migration 8 to 9 derives the turned crops so far, and a new one keeps its own`() = runTest {
+        createDatabase(version = 8) { connection ->
+            connection.execSQL(
+                """
+                INSERT INTO wallpapers (id, type, original_path, processed_path, thumbnail_path,
+                    crop_left, crop_top, crop_right, crop_bottom, crop_rotation, clip_start_ms, clip_end_ms,
+                    media_width, media_height, media_rotation, media_duration_ms, is_active, built_in,
+                    slide_duration_ms, tint, transition, transition_ms)
+                VALUES (1, 'VIDEO', 'originals/a', NULL, 'thumbnails/a',
+                    10, 20, 110, 220, -12.5, 500, 1500, 1920, 1080, 90, 3000, 1, NULL, NULL, NULL, NULL, NULL),
+                    (2, 'VIDEO', NULL, 'processed/b', 'thumbnails/b',
+                    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, NULL, NULL, NULL, NULL, NULL)
+                """.trimIndent()
+            )
+        }
+        val turned = CropRect(left = 0, top = 300, right = 1920, bottom = 780, rotation = 5f)
+
+        val rows = withDatabase { database ->
+            val dao = database.wallpaperDao()
+            dao.insert(
+                NewWallpaper.Media(
+                    type = MediaType.VIDEO,
+                    originalPath = "originals/c",
+                    thumbnailPath = "thumbnails/c",
+                    crop = CropRect(10, 20, 110, 220),
+                    clip = ClipRange(0, 1000),
+                    mediaInfo = MediaInfo(1920, 1080, 0, 1000),
+                    turnedCrop = turned,
+                ).toEntity()
+            )
+            dao.observeAll().first()
+        }
+
+        val media = assertIs<Wallpaper.Media>(rows.single { it.id == 1 }.toDomain())
+        assertEquals(CropRect(10, 20, 110, 220, -12.5f), media.crop)
+        assertNull(media.turnedCrop)
+        val processed = assertIs<Wallpaper.ProcessedVideo>(rows.single { it.id == 2 }.toDomain())
+        assertEquals(0, processed.frameWidth)
+        assertNull(processed.crop)
+        assertNull(processed.turnedCrop)
+        val new = assertIs<Wallpaper.Media>(rows.single { it.originalPath == "originals/c" }.toDomain())
+        assertEquals(turned, new.turnedCrop)
         assertBuiltInsSeeded(rows)
     }
 

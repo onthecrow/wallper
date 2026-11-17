@@ -12,6 +12,7 @@ import com.onthecrow.wallper.core.model.Tint
 import com.onthecrow.wallper.core.model.TransitionEffect
 import com.onthecrow.wallper.wallpapers.data.database.WallpaperEntity
 import com.onthecrow.wallper.wallpapers.data.database.WallpaperGroupItemEntity
+import com.onthecrow.wallper.wallpapers.data.database.turnedCrop
 import com.onthecrow.wallper.wallpapers.domain.model.NewWallpaper
 import com.onthecrow.wallper.wallpapers.domain.model.Wallpaper
 
@@ -62,6 +63,11 @@ internal fun WallpaperEntity.toDomain(): Wallpaper? = when {
         thumbnailPath = thumbnailPath,
         isActive = isActive,
         tint = tint?.let(::Tint),
+        // Zeros before v9: all of the export.
+        frameWidth = mediaWidth,
+        frameHeight = mediaHeight,
+        crop = CropRect(cropLeft, cropTop, cropRight, cropBottom, cropRotation).takeIf { it.width > 0 && it.height > 0 },
+        turnedCrop = turnedCrop,
     )
     originalPath != null -> Wallpaper.Media(
         id = id,
@@ -73,6 +79,7 @@ internal fun WallpaperEntity.toDomain(): Wallpaper? = when {
         mediaInfo = MediaInfo(mediaWidth, mediaHeight, mediaRotation, mediaDurationMs),
         isActive = isActive,
         tint = tint?.let(::Tint),
+        turnedCrop = turnedCrop,
     )
     else -> null
 }
@@ -98,6 +105,11 @@ internal fun NewWallpaper.toEntity(id: Int = 0, isActive: Boolean = false) = whe
         mediaDurationMs = mediaInfo.durationMs,
         isActive = isActive,
         tint = tint?.argb,
+        turnedCropLeft = turnedCrop?.left,
+        turnedCropTop = turnedCrop?.top,
+        turnedCropRight = turnedCrop?.right,
+        turnedCropBottom = turnedCrop?.bottom,
+        turnedCropRotation = turnedCrop?.rotation,
     )
     is NewWallpaper.ProcessedVideo -> WallpaperEntity(
         id = id,
@@ -105,18 +117,25 @@ internal fun NewWallpaper.toEntity(id: Int = 0, isActive: Boolean = false) = whe
         originalPath = null,
         processedPath = path,
         thumbnailPath = thumbnailPath,
-        cropLeft = 0,
-        cropTop = 0,
-        cropRight = 0,
-        cropBottom = 0,
+        // The export's size and its windows in it; zeros for all of it.
+        cropLeft = crop?.left ?: 0,
+        cropTop = crop?.top ?: 0,
+        cropRight = crop?.right ?: 0,
+        cropBottom = crop?.bottom ?: 0,
+        cropRotation = crop?.rotation ?: 0f,
         clipStartMs = 0,
         clipEndMs = 0,
-        mediaWidth = 0,
-        mediaHeight = 0,
+        mediaWidth = frameWidth,
+        mediaHeight = frameHeight,
         mediaRotation = 0,
         mediaDurationMs = 0,
         isActive = isActive,
         tint = tint?.argb,
+        turnedCropLeft = turnedCrop?.left,
+        turnedCropTop = turnedCrop?.top,
+        turnedCropRight = turnedCrop?.right,
+        turnedCropBottom = turnedCrop?.bottom,
+        turnedCropRotation = turnedCrop?.rotation,
     )
 }
 
@@ -130,8 +149,17 @@ internal fun Wallpaper.toSpec(): WallpaperSpec = when (this) {
         clip = clip,
         mediaInfo = mediaInfo,
         tint = tint,
+        turnedCrop = turnedCrop,
     )
-    is Wallpaper.ProcessedVideo -> WallpaperSpec.ProcessedVideo(path = path, thumbnailPath = thumbnailPath, tint = tint)
+    is Wallpaper.ProcessedVideo -> WallpaperSpec.ProcessedVideo(
+        path = path,
+        thumbnailPath = thumbnailPath,
+        tint = tint,
+        frameWidth = frameWidth,
+        frameHeight = frameHeight,
+        crop = crop,
+        turnedCrop = turnedCrop,
+    )
     is Wallpaper.BuiltIn -> WallpaperSpec.BuiltIn(wallpaper)
     is Wallpaper.Group -> WallpaperSpec.Series(
         slides = members.filterNot { it is Wallpaper.Group }.map { it.toSpec() },

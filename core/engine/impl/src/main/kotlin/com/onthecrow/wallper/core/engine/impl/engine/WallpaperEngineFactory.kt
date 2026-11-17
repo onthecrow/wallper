@@ -44,7 +44,8 @@ internal class WallpaperEngineFactory @Inject constructor(
         is WallpaperSpec.BuiltIn -> builtIns[wallpaper.wallpaper]
             ?.createEngine(baseContext, surfaceHolder, isPreview, host)
             ?: PlaceholderWallpaperEngine(baseContext, surfaceHolder)
-        is WallpaperSpec.ProcessedVideo -> optimisedVideo(surfaceHolder, wallpaper, host)
+        // Through GL like an original: the export may hold a window for each way the screen can be turned.
+        is WallpaperSpec.ProcessedVideo -> originalVideo(surfaceHolder, wallpaper.asMedia(), host)
         is WallpaperSpec.Media -> when (wallpaper.type) {
             MediaType.VIDEO -> originalVideo(surfaceHolder, wallpaper, host)
             MediaType.IMAGE -> PictureWallpaperEngine(surfaceHolder = surfaceHolder, wallpaper = wallpaper, host = host)
@@ -106,9 +107,7 @@ internal class WallpaperEngineFactory @Inject constructor(
                 window = SharedGlWindow(gl),
                 handover = if (transition.isNone) Duration.ZERO else WarmStage.handoverOf(transition.durationMs),
             ) { slide, slideHost, onReady ->
-                // An optimised video goes through GL here too: nothing but GL draws on this window.
-                val drawn = if (slide is WallpaperSpec.ProcessedVideo) slide.asWholeFrame() else slide
-                slide(baseContext, surfaceHolder, drawn, isPreview, slideHost, SlideStart(gl, onReady))
+                slide(baseContext, surfaceHolder, slide, isPreview, slideHost, SlideStart(gl, onReady))
             }
         }
         // Every slide on a GL thread of its own, which starts without the window: the slide on screen has it.
@@ -118,13 +117,8 @@ internal class WallpaperEngineFactory @Inject constructor(
             scope = scope,
             handsOverWindow = true,
         ) { slide, slideHost, onReady ->
-            if (slide is WallpaperSpec.ProcessedVideo) {
-                // Straight onto the window, as outside a series: no GL pass for a video that needs no crop.
-                optimisedVideo(surfaceHolder, slide, slideHost, onReady)
-            } else {
-                val start = SlideStart(OwnGl(surfaceHolder(), offWindow = true), onReady)
-                slide(baseContext, surfaceHolder, slide, isPreview, slideHost, start)
-            }
+            val start = SlideStart(OwnGl(surfaceHolder(), offWindow = true), onReady)
+            slide(baseContext, surfaceHolder, slide, isPreview, slideHost, start)
         }
     }
 
@@ -141,11 +135,12 @@ internal class WallpaperEngineFactory @Inject constructor(
             MediaType.VIDEO -> originalVideo(surfaceHolder, slide, host, start)
             MediaType.IMAGE -> PictureSlideEngine(surfaceHolder, slide, host, start)
         }
+        is WallpaperSpec.ProcessedVideo -> originalVideo(surfaceHolder, slide.asMedia(), host, start)
         is WallpaperSpec.BuiltIn -> builtIns[slide.wallpaper]
             ?.takeIf { it.isSupported() }
             ?.createSlide(baseContext, surfaceHolder, isPreview, host, start)
-        // An optimised video is the stage's to place; a series holds no series.
-        is WallpaperSpec.ProcessedVideo, is WallpaperSpec.Series -> null
+        // A series holds no series.
+        is WallpaperSpec.Series -> null
     }
 
     /**
@@ -172,22 +167,6 @@ internal class WallpaperEngineFactory @Inject constructor(
         screenOffs = screenOffs.events,
         host = host,
         slide = slide,
-    )
-
-    private fun optimisedVideo(
-        surfaceHolder: () -> SurfaceHolder,
-        wallpaper: WallpaperSpec.ProcessedVideo,
-        host: EngineHost,
-        onReady: (() -> Unit)? = null,
-    ) = VideoWallpaperEngine(
-        surfaceHolder = surfaceHolder,
-        processedPath = wallpaper.path,
-        playerFactory = playerFactory,
-        settings = wallpaperSettings.settings,
-        savingPower = powerSaving.isSaving,
-        screenOffs = screenOffs.events,
-        host = host,
-        onReady = onReady,
     )
 
     private companion object {

@@ -103,7 +103,7 @@ internal class EditorViewModel @AssistedInject constructor(
     }
 
     private fun save(request: SaveRequest): Flow<ExportStatus> =
-        saveWallpaperUseCase(request.media, request.crop, request.trim, request.isOptimised, request.tint)
+        saveWallpaperUseCase(request.media, request.framing, request.trim, request.isOptimised, request.tint)
             .onEach { status ->
                 onEvent(EditorEvent.OnExportStatusChanged(status))
                 if (status is ExportStatus.Success) {

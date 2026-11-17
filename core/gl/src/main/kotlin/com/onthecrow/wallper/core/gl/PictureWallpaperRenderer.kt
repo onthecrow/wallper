@@ -8,6 +8,7 @@ import android.opengl.GLES20
 import android.opengl.GLUtils
 import android.os.Build
 import com.onthecrow.wallper.core.model.CropRect
+import com.onthecrow.wallper.core.model.Framing
 import com.onthecrow.wallper.core.model.Tint
 import timber.log.Timber
 import java.io.IOException
@@ -26,7 +27,12 @@ import java.util.concurrent.atomic.AtomicReference
  * A still frame: it draws when asked to, and says it put no new frame on screen. GL methods run on the GL
  * thread; so does [onFailed], once, when the picture can't be decoded.
  *
- * @param frameWidth the picture's width as stored, [frameHeight] its height; [crop] is in its pixels.
+ * The window is the [framing]'s for the screen's proportions, chosen again whenever the screen changes size,
+ * and the texture holds the windows of both ways the screen can be turned: a launcher that turns needs no new
+ * decoding. A screen of other proportions (a foldable unfolded) has what it needs decoded again.
+ *
+ * @param frameWidth the picture's width as stored, [frameHeight] its height; the [framing]'s crops are in its
+ * pixels.
  * @param screenWidth the surface's size until the GL thread reports it, [screenHeight] too.
  * @param decodeOn runs the decoding it is given somewhere else than the GL thread, which may be drawing
  * another wallpaper meanwhile, and asks for a frame afterwards: that frame makes the texture. Null decodes
@@ -35,9 +41,9 @@ import java.util.concurrent.atomic.AtomicReference
  */
 class PictureWallpaperRenderer(
     private val path: String,
-    frameWidth: Int,
-    frameHeight: Int,
-    private val crop: CropRect,
+    private val frameWidth: Int,
+    private val frameHeight: Int,
+    private val framing: Framing,
     private var screenWidth: Int,
     private var screenHeight: Int,
     private val onFailed: (Throwable?) -> Unit,
@@ -52,10 +58,16 @@ class PictureWallpaperRenderer(
     @Volatile
     var pageOffset: Float? = null
 
-    private val region = PictureRegion(frameWidth, frameHeight, crop)
-    private val pageScroll = PageScroll(frameWidth, frameHeight, crop)
-    private val textureMatrix = region.textureMatrix()
-    private val quad: FloatBuffer = quadOf(UVCoords.fromRect(frameWidth, frameHeight, crop))
+    /** The window on the screen as it is now: its corners as the quad's texture coordinates, its page scroll. */
+    private var quad: FloatBuffer = quadOf(UVCoords.fromRect(frameWidth, frameHeight, windowFor(screenWidth, screenHeight)))
+    private var pageScroll = PageScroll(frameWidth, frameHeight, windowFor(screenWidth, screenHeight))
+
+    /** What the screen as it is now needs in the texture: its window and the one of the screen turned. */
+    private var neededRegion = regionFor(screenWidth, screenHeight)
+
+    /** What the texture holds, and the matrix onto it; meaningless while there is no texture. */
+    private var textureRegion = neededRegion
+    private var textureMatrix = textureRegion.textureMatrix()
 
     private var program = 0
     private var textureId = 0
@@ -86,11 +98,20 @@ class PictureWallpaperRenderer(
     override fun onSurfaceChanged(width: Int, height: Int) {
         screenWidth = width
         screenHeight = height
+        val window = windowFor(width, height)
+        quad = quadOf(UVCoords.fromRect(frameWidth, frameHeight, window))
+        pageScroll = PageScroll(frameWidth, frameHeight, window)
+        neededRegion = regionFor(width, height)
     }
 
     override fun onDrawFrame(): Boolean {
         GLES20.glClearColor(0f, 0f, 0f, 1f)
         GLES20.glClear(GLES20.GL_COLOR_BUFFER_BIT)
+        // A screen of other proportions than the texture was made for may need more of the picture.
+        if (textureId != 0 && neededRegion !in textureRegion) {
+            GLES20.glDeleteTextures(1, intArrayOf(textureId), 0)
+            textureId = 0
+        }
         // The texture waits for the surface's size: it decides how far to subsample.
         if (textureId == 0 && !failed) loadTexture()
         if (textureId == 0 || program == 0) return false
@@ -142,6 +163,8 @@ class PictureWallpaperRenderer(
             fail(result.error)
             return
         }
+        textureRegion = result.region
+        textureMatrix = textureRegion.textureMatrix()
         val ids = IntArray(1).also { GLES20.glGenTextures(1, it, 0) }
         textureId = ids[0]
         GLES20.glBindTexture(GLES20.GL_TEXTURE_2D, textureId)
@@ -157,12 +180,14 @@ class PictureWallpaperRenderer(
     /** The decoded picture, or null while [decodeOn] still has it: the frames until then draw nothing. */
     private fun decodedPicture(): Decoded? {
         val maxTextureSize = IntArray(1).also { GLES20.glGetIntegerv(GLES20.GL_MAX_TEXTURE_SIZE, it, 0) }[0]
-        val sample = region.sampleSize(crop, screenWidth, screenHeight, maxTextureSize.coerceAtLeast(MIN_TEXTURE_SIZE))
-        val elsewhere = decodeElsewhere ?: return decodeSafely(sample)
+        val region = neededRegion
+        val windows = windowsFor(screenWidth, screenHeight)
+        val sample = region.sampleSize(windows, screenWidth, screenHeight, maxTextureSize.coerceAtLeast(MIN_TEXTURE_SIZE))
+        val elsewhere = decodeElsewhere ?: return decodeSafely(region, sample)
         if (!awaitingDecode) {
             awaitingDecode = true
             elsewhere {
-                decoded.set(decodeSafely(sample))
+                decoded.set(decodeSafely(region, sample))
                 // Disposed of meanwhile: no frame will come for it.
                 if (disposed) decoded.getAndSet(null)?.bitmap?.recycle()
             }
@@ -172,21 +197,29 @@ class PictureWallpaperRenderer(
     }
 
     /** The bitmap, or why there is none; never throws. Any thread. */
-    private fun decodeSafely(sample: Int): Decoded = try {
-        Decoded(decode(sample), error = null)
+    private fun decodeSafely(region: PictureRegion, sample: Int): Decoded = try {
+        Decoded(decode(region, sample), error = null, region)
     } catch (e: Exception) {
-        Decoded(bitmap = null, e)
+        Decoded(bitmap = null, e, region)
     } catch (e: OutOfMemoryError) {
-        Decoded(bitmap = null, e)
+        Decoded(bitmap = null, e, region)
     }
+
+    private fun windowFor(width: Int, height: Int): CropRect = framing.forScreen(width, height, frameWidth, frameHeight)
+
+    /** The window on a screen of [width] x [height], and on the same screen turned. */
+    private fun windowsFor(width: Int, height: Int): List<CropRect> =
+        listOf(windowFor(width, height), windowFor(height, width))
+
+    private fun regionFor(width: Int, height: Int) = PictureRegion(frameWidth, frameHeight, windowsFor(width, height))
 
     private fun fail(error: Throwable?) {
         failed = true
         onFailed(error)
     }
 
-    /** The region at [sample]: decoded alone where the format allows, else cut from the whole picture. */
-    private fun decode(sample: Int): Bitmap? {
+    /** [region] at [sample]: decoded alone where the format allows, else cut from the whole picture. */
+    private fun decode(region: PictureRegion, sample: Int): Bitmap? {
         val options = BitmapFactory.Options().apply { inSampleSize = sample }
         val rect = Rect(region.left, region.top, region.right, region.bottom)
         val decoder = try {
@@ -221,8 +254,8 @@ class PictureWallpaperRenderer(
         return part
     }
 
-    /** A decoding's result: the bitmap, or nothing with the [error] if there was one. */
-    private class Decoded(val bitmap: Bitmap?, val error: Throwable?)
+    /** A decoding's result: the bitmap of [region], or nothing with the [error] if there was one. */
+    private class Decoded(val bitmap: Bitmap?, val error: Throwable?, val region: PictureRegion)
 
     private companion object {
         /** X, Y, U, V for each corner. */

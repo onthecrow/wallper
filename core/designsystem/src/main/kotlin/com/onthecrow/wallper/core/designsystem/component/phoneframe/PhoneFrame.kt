@@ -9,28 +9,42 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.RoundRect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.Constraints
+import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.DpSize
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
 /**
  * A phone drawn in outline around a wallpaper: the body, two volume buttons on the left, the power button on
  * the right and the camera cut-out. It fills its bounds with the body; the buttons stand out past its sides.
- * The cut-out keeps its size whatever the body's proportions; the buttons follow the body's height. Its
- * place around a screen of given proportions is [FrameBounds]; [PhoneFramedScreen] puts content in it.
+ * The cut-out keeps its size whatever the body's proportions; the buttons follow the body's height. Its place
+ * around a screen of given proportions is [FrameBounds]; [PhoneFramedScreen] puts content in it.
+ *
+ * The screen's corners are the device's own ([screen]), at the frame's scale; where Android doesn't say,
+ * [PhoneFrameDefaults.ScreenCornerRadius].
  */
 @Composable
 fun PhoneFrame(
     modifier: Modifier = Modifier,
     color: Color = MaterialTheme.colorScheme.primary,
+    screen: ScreenShape = ScreenShape.Unknown,
 ) {
     Layout(
         content = {
-            PhoneFrameBody(color)
+            PhoneFrameBody(color, screen)
             PhoneFrameButton(color)
             PhoneFrameButton(color)
             PhoneFrameButton(color)
@@ -64,10 +78,10 @@ fun PhoneFrame(
     }
 }
 
-/** The body: a see-through rounded rectangle with a thick outline. */
+/** The body: a see-through rounded rectangle with a thick outline, its inner corners the screen's. */
 @Composable
-private fun PhoneFrameBody(color: Color, modifier: Modifier = Modifier) {
-    Box(modifier.border(PhoneFrameDefaults.BorderWidth, color, RoundedCornerShape(PhoneFrameDefaults.CornerRadius)))
+private fun PhoneFrameBody(color: Color, screen: ScreenShape, modifier: Modifier = Modifier) {
+    Box(modifier.border(PhoneFrameDefaults.BorderWidth, color, BodyShape(screen)))
 }
 
 /** A side button: a rounded bar. */
@@ -82,11 +96,24 @@ private fun PhoneFrameNotch(color: Color, modifier: Modifier = Modifier) {
     Box(modifier.background(color, RoundedCornerShape(percent = 50)))
 }
 
+/** The body's outline: its outer corners round the screen's by the border's width. */
+private class BodyShape(private val screen: ScreenShape) : Shape {
+    override fun createOutline(size: Size, layoutDirection: LayoutDirection, density: Density): Outline {
+        val border = with(density) { PhoneFrameDefaults.BorderWidth.toPx() }
+        val radius = border + screen.screenCornerRadius(Size(size.width - 2 * border, size.height - 2 * border), density)
+        return Outline.Generic(Path().apply { addRoundRect(RoundRect(Rect(Offset.Zero, size), CornerRadius(radius))) })
+    }
+}
+
+/** The screen's corners in a frame whose screen is [screen] pixels: the device's, or the frame's own. */
+fun ScreenShape.screenCornerRadius(screen: Size, density: Density): Float =
+    cornerRadiusOn(screen, fallback = with(density) { PhoneFrameDefaults.ScreenCornerRadius.toPx() })
+
 object PhoneFrameDefaults {
     val BorderWidth = 8.dp
     val CornerRadius = 32.dp
 
-    /** The screen's own corners, inside the border. */
+    /** The screen's own corners, inside the border, where the device's are unknown. */
     val ScreenCornerRadius = CornerRadius - BorderWidth
 
     val ButtonThickness = 4.dp
