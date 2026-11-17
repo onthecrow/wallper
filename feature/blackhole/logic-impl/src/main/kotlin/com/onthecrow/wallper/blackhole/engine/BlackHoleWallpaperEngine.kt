@@ -439,7 +439,9 @@ internal class BlackHoleWallpaperEngine(
     }
 
     private fun draw(frameNanos: Long) {
-        gl.renderer.submit(scene.frame(frameNanos))
+        // A still frame can't fade in: it would be black until something changes.
+        val still = targetFps(frameNanos) == FramePacing.STILL
+        gl.renderer.submit(scene.frame(frameNanos, still))
         gl.requestRender()
         lastDrawnNanos = frameNanos
         drawnGyroPitchDeg = gyro.targetPitchDeg

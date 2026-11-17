@@ -3,6 +3,7 @@ package com.onthecrow.wallper.blackhole.renderer
 import android.content.res.AssetManager
 import android.opengl.GLES30
 import com.onthecrow.wallper.blackhole.physics.BlackHoleParams
+import com.onthecrow.wallper.blackhole.physics.FadeIn
 import com.onthecrow.wallper.blackhole.physics.FrameState
 import com.onthecrow.wallper.blackhole.physics.LensMath
 import com.onthecrow.wallper.blackhole.physics.LensTables
@@ -66,7 +67,7 @@ internal class BlackHoleRenderer(assets: AssetManager) : BlackHoleFrameRenderer 
 
     private var surfaceWidth = 0
     private var surfaceHeight = 0
-    private var fadeStartNanos = Long.MIN_VALUE
+    private val fade = FadeIn()
     private var frameCounter = 0
 
     private var starRotations = FloatArray(0)
@@ -189,7 +190,7 @@ internal class BlackHoleRenderer(assets: AssetManager) : BlackHoleFrameRenderer 
             clearOutput(outputFramebuffer)
             return false
         }
-        if (fadeStartNanos == Long.MIN_VALUE) fadeStartNanos = nowNanos
+        val fadeLevel = if (fadeIn) fade.level(nowNanos, frame.still) else 1.0
         frameCounter = (frameCounter + 1) % NOISE_FRAMES
 
         val timer = gpuTimer
@@ -201,7 +202,7 @@ internal class BlackHoleRenderer(assets: AssetManager) : BlackHoleFrameRenderer 
         val bloom = bloom.takeIf { post.bloomEnabled && debug.lens != LensMode.DIFF }
         val threshold = if (format.isHdr) post.bloomThreshold.toFloat() else minOf(post.bloomThreshold.toFloat(), LDR_THRESHOLD)
         bloom?.run(scene, programs.bloomDown, programs.bloomUp, threshold, post.bloomKnee.toFloat())
-        drawComposite(programs, scene, bloom, nowNanos, outputFramebuffer)
+        drawComposite(programs, scene, bloom, fadeLevel, outputFramebuffer)
 
         timer?.end()
         return true
@@ -365,7 +366,7 @@ internal class BlackHoleRenderer(assets: AssetManager) : BlackHoleFrameRenderer 
         programs: Programs,
         scene: RenderTarget,
         bloom: BloomChain?,
-        nowNanos: Long,
+        fadeLevel: Double,
         outputFramebuffer: Int,
     ) {
         GLES30.glBindFramebuffer(GLES30.GL_FRAMEBUFFER, outputFramebuffer)
@@ -384,8 +385,7 @@ internal class BlackHoleRenderer(assets: AssetManager) : BlackHoleFrameRenderer 
         program.setInt("uTonemapper", params.post.tonemapper.index)
         program.set("uWarmth", params.post.warmth)
         program.set("uGrain", params.post.grain)
-        val fade = if (fadeIn) ((nowNanos - fadeStartNanos) / FADE_NANOS.toDouble()).coerceIn(0.0, 1.0) else 1.0
-        program.set("uFade", fade * fade * (3 - 2 * fade))
+        program.set("uFade", fadeLevel)
         program.set("uNoiseFrame", frameCounter.toFloat())
         Gl.drawFullscreen()
     }
@@ -586,7 +586,6 @@ internal class BlackHoleRenderer(assets: AssetManager) : BlackHoleFrameRenderer 
         const val DIFF_SCALE = 10f
         const val LDR_THRESHOLD = 0.8f
         const val MAX_ANISOTROPY = 8f
-        const val FADE_NANOS = 800_000_000L
         const val NOISE_FRAMES = 64
     }
 }

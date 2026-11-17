@@ -25,6 +25,8 @@ data class FrameState(
     /** How far the recoil moves the hole, in half screen heights on both axes: the renderer scales x to the screen. */
     val recoilX: Double = 0.0,
     val recoilY: Double = 0.0,
+    /** No frame follows until something changes (heat, power save): it shows the picture whole, unfaded. */
+    val still: Boolean = false,
 )
 
 /**
@@ -102,7 +104,7 @@ class BlackHoleScene(params: BlackHoleParams = BlackHoleParams()) {
     /** Inputs are moving or settling: draw at the active frame rate. */
     fun isActive(nanos: Long): Boolean = nanos < activeUntilNanos
 
-    fun frame(nanos: Long): FrameState {
+    fun frame(nanos: Long, still: Boolean = false): FrameState {
         val dt = if (lastNanos == Long.MIN_VALUE) 0.0 else ((nanos - lastNanos) / 1e9).coerceIn(0.0, 0.25)
         lastNanos = nanos
         val input = params.input
@@ -146,6 +148,7 @@ class BlackHoleScene(params: BlackHoleParams = BlackHoleParams()) {
             azimuthDeg = Math.toDegrees(pose.azimuthRad).mod(360.0),
             recoilX = recoilX.value,
             recoilY = recoilY.value,
+            still = still,
         )
     }
 
