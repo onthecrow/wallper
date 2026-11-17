@@ -49,7 +49,11 @@ internal data class EngineSnapshot(
     val positionMs: Long,
     /** Duration of the (clipped) item, or a negative value when unknown. */
     val durationMs: Long,
-    /** Frames the decoder has output: rendered, dropped and skipped. Resets when the renderer is re-enabled. */
+    /**
+     * Frames the decoder is through with: rendered, dropped and skipped ones it has output, and the ones
+     * it was given but never asked to output (a clip's lead-in, [LeadInVideoRenderer]). Resets when the
+     * renderer is re-enabled.
+     */
     val decodedFrames: Long,
 ) {
     enum class State { IDLE, BUFFERING, READY, ENDED }

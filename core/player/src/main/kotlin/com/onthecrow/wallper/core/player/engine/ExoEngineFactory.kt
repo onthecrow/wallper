@@ -9,7 +9,11 @@ import androidx.media3.common.util.UnstableApi
 import com.onthecrow.wallper.core.player.PlayerMedia
 import com.onthecrow.wallper.core.player.createLeanExoPlayer
 
-/** Engines for [media]: lean, silent, clipped, living on [handler]'s thread. */
+/**
+ * Engines for [media]: lean, silent, clipped to end with its video ([loopEndUs]) and with the last frame
+ * it can show ([cutEndUs]), living on [handler]'s thread. A clip that starts into the file loops without
+ * a decoder flush, see [mediaItem].
+ */
 @UnstableApi
 internal class ExoEngineFactory(
     private val context: Context,
@@ -19,8 +23,19 @@ internal class ExoEngineFactory(
 
     private var nextId = 1
 
+    private val clipStartMs: Long = media.clipStartMs ?: 0
+
+    /** Read from the file once, on the player thread, with the first engine. */
+    private val clipEndUs: Long? by lazy(LazyThreadSafetyMode.NONE) {
+        val videoEndUs = videoTrackEndUs(media.path)
+        val endUs = loopEndUs(media.clipStartMs, media.clipEndMs, videoEndUs)
+        // A clip that ends with its video is cut by nothing: there are no frames after its end.
+        if (endUs == null || endUs == videoEndUs) return@lazy endUs
+        frameTimesAroundUs(media.path, endUs)?.let { cutEndUs(clipStartMs * 1_000, endUs, it) } ?: endUs
+    }
+
     override fun create(positionMs: Long, surface: Surface?, playWhenReady: Boolean): ManagedEngine {
-        val player = createLeanExoPlayer(context, handler.looper).apply {
+        val player = createLeanExoPlayer(context, handler.looper, clipStartMs).apply {
             setMediaItem(mediaItem())
             surface?.let(::setVideoSurface)
             if (positionMs > 0) seekTo(positionMs)
@@ -30,10 +45,21 @@ internal class ExoEngineFactory(
         return ExoPlayerEngine(nextId++, player)
     }
 
+    /**
+     * A clip that starts into the file is said to start on a key frame, whether it does or not. Media3
+     * would otherwise start every loop of it with a discontinuity: play the decoder out, flush it and
+     * decode again from the key frame before the start, holding the loop's last frame meanwhile and
+     * dropping the loop's first ones for being late. Said to start on a key frame, the clip loops in one
+     * decoder session, and the frames up to its start are the player's to keep off the screen: it is
+     * made with the clip's start for that ([LeadInVideoRenderer]).
+     */
     private fun mediaItem(): MediaItem {
         val clippingConfiguration = MediaItem.ClippingConfiguration.Builder().apply {
-            media.clipStartMs?.let { setStartPositionMs(it) }
-            media.clipEndMs?.let { setEndPositionMs(it) }
+            if (clipStartMs > 0) {
+                setStartPositionMs(clipStartMs)
+                setStartsAtKeyFrame(true)
+            }
+            clipEndUs?.let { setEndPositionUs(it) }
         }
             .build()
 

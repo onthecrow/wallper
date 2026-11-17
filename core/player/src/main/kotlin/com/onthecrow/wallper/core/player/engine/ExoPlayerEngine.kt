@@ -54,7 +54,8 @@ internal class ExoPlayerEngine(
     override fun snapshot(): EngineSnapshot {
         val counters = player.videoDecoderCounters?.apply { ensureUpdated() }
         val decodedFrames = counters?.let {
-            it.renderedOutputBufferCount.toLong() + it.droppedBufferCount + it.skippedOutputBufferCount
+            it.renderedOutputBufferCount.toLong() + it.droppedBufferCount + it.skippedOutputBufferCount +
+                it.skippedInputBufferCount
         } ?: 0L
         return EngineSnapshot(
             state = when (player.playbackState) {
