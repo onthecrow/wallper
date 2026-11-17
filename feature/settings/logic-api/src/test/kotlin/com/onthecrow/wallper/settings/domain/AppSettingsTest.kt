@@ -16,7 +16,8 @@ class AppSettingsTest {
     fun `changed settings round-trip`() {
         val settings = AppSettings(
             videoPlayback = VideoPlayback.ONCE,
-            pauseVideoToSaveBattery = false,
+            pauseVideoToSaveBattery = true,
+            scrollVideoWithPages = true,
             theme = ThemeMode.DARK,
             dynamicColor = false,
             seriesSwitch = SeriesSwitch.WARM_ENGINES,
