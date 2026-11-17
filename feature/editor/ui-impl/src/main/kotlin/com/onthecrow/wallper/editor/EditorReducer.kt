@@ -29,11 +29,18 @@ internal class EditorReducer @Inject constructor() : Reducer<EditorState, Editor
             EditorEvent.OnProcessingInfoDismiss -> state.copy(processingInfo = null)
             is EditorEvent.OnProcessingInfoSeenLoaded ->
                 state.copy(isProcessingInfoSeen = state.isProcessingInfoSeen || event.isSeen)
-            is EditorEvent.OnMediaPrepared -> state.copy(media = event.media, trim = event.media.initialTrim)
+            is EditorEvent.OnMediaPrepared ->
+                state.copy(media = event.media, trim = event.media.initialTrim, tint = event.media.initialTint)
             EditorEvent.OnResetClick -> state.copy(
                 trim = state.media?.initialTrim ?: state.trim,
                 isOptimised = false,
+                tint = state.media?.initialTint ?: state.tint,
             )
+            // There is nothing to tint until the media is there.
+            EditorEvent.OnTintClick -> state.copy(isTintOpen = !state.isTintOpen && state.media != null)
+            EditorEvent.OnTintClose -> state.copy(isTintOpen = false)
+            EditorEvent.OnTintToggle -> state.copy(tint = state.tint.copy(isOn = !state.tint.isOn))
+            is EditorEvent.OnTintColorChange -> state.copy(tint = TintChoice(isOn = true, color = event.color))
             EditorEvent.OnCropSnapped -> state
             // A failed save can be tried again; a successful one closes the editor.
             is EditorEvent.OnExportStatusChanged -> state.copy(
@@ -49,7 +56,7 @@ internal class EditorReducer @Inject constructor() : Reducer<EditorState, Editor
     private fun EditorState.requestSave(crop: CropRect): EditorState {
         val media = media ?: return this
         if (save != null) return this
-        return copy(save = SaveRequest(media, crop, trim, isOptimised))
+        return copy(save = SaveRequest(media, crop, trim, isOptimised, tint.tint))
     }
 
     /** Shown is seen: a later switch to optimised doesn't wait for it. */

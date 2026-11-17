@@ -160,7 +160,8 @@ internal class WallpaperEngineFactory @Inject constructor(
 
     /**
      * An optimised video as the GL engine takes one: its whole frame, a frame of one by one cropped to all
-     * of it, over the whole screen, never panned, played from end to end.
+     * of it, over the whole screen, never panned, played from end to end. Without its tint: the export put
+     * that into the frames already.
      */
     private fun WallpaperSpec.ProcessedVideo.asWholeFrame() = WallpaperSpec.Media(
         type = MediaType.VIDEO,

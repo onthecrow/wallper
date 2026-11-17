@@ -1,8 +1,10 @@
 package com.onthecrow.wallper.editor
 
+import com.onthecrow.wallper.core.designsystem.component.colorpicker.HsvColor
 import com.onthecrow.wallper.core.designsystem.component.trimbar.TrimBarDefaults.MIN_DURATION_MS
 import com.onthecrow.wallper.core.model.ClipRange
 import com.onthecrow.wallper.core.model.CropRect
+import com.onthecrow.wallper.core.model.Tint
 import com.onthecrow.wallper.core.mvi.State
 import com.onthecrow.wallper.editor.domain.model.ExportStatus
 import com.onthecrow.wallper.editor.domain.model.PreparedMedia
@@ -26,17 +28,47 @@ internal data class EditorState(
     val isProcessingInfoSeen: Boolean = false,
     /** The explanation on screen, null when it isn't. */
     val processingInfo: ProcessingInfo? = null,
+    /** The colour the wallpaper is seen through, and whether it is. */
+    val tint: TintChoice = TintChoice(),
+    /** The tint's picker and switch are on screen, in place of the trim bar and the save row. */
+    val isTintOpen: Boolean = false,
     /** The save under way, from its start until it fails; the editor closes once it succeeds. */
     val save: SaveRequest? = null,
     val exportStatus: ExportStatus? = null,
 ) : State {
-    /** Whether the trim or the original / optimised choice differs from what the editor opened with. */
-    val hasEdits: Boolean get() = media != null && (trim != media.initialTrim || isOptimised)
+    /** Whether the trim, the tint or the original / optimised choice differs from what the editor opened with. */
+    val hasEdits: Boolean
+        get() = media != null && (trim != media.initialTrim || isOptimised || tint.tint != media.edited?.tint)
 }
 
 /** A new wallpaper keeps the whole video until the user moves a handle; an edited one starts from its trim. */
 internal val PreparedMedia.initialTrim: ClipRange
     get() = edited?.clip ?: ClipRange(startMs = 0, endMs = mediaInfo.durationMs)
+
+/** A new wallpaper has no tint; an edited one starts from its own, the picker at its colour. */
+internal val PreparedMedia.initialTint: TintChoice
+    get() = edited?.tint?.let { TintChoice(isOn = true, color = HsvColor.fromArgb(it.argb)) } ?: TintChoice()
+
+/**
+ * The tint as the editor holds it: the picker keeps its [color] while the tint [isOn] or off, so switching
+ * it off and on again brings the same colour back.
+ */
+internal data class TintChoice(
+    val isOn: Boolean = false,
+    val color: HsvColor = DEFAULT_COLOR,
+) {
+    /** What the wallpaper gets: nothing while it is off, or as good as off, fully transparent. */
+    val tint: Tint? get() = if (isOn) Tint(color.toArgb()).orNull() else null
+
+    companion object {
+        /**
+         * What the first switch gives: black at 30 %, the picture a little darker, so that icons and widgets
+         * read better. Black has no hue: the picker's hue thumb starts at a blue, away from the area's thumb in
+         * its corner, and that is the tone a drag up the area's right side gives first.
+         */
+        val DEFAULT_COLOR = HsvColor(hue = 210f, saturation = 0f, value = 0f, alpha = 0.3f)
+    }
+}
 
 /**
  * The trim with its start moved in to [positionMs]; null unless the playhead is inside the kept part, past its
@@ -62,4 +94,5 @@ internal data class SaveRequest(
     val crop: CropRect,
     val trim: ClipRange,
     val isOptimised: Boolean,
+    val tint: Tint?,
 )

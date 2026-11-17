@@ -8,6 +8,7 @@ import androidx.media3.common.MimeTypes
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.common.util.Size
 import androidx.media3.effect.GlMatrixTransformation
+import androidx.media3.effect.RgbMatrix
 import androidx.media3.transformer.Composition
 import androidx.media3.transformer.EditedMediaItem
 import androidx.media3.transformer.Effects
@@ -18,6 +19,7 @@ import androidx.media3.transformer.Transformer
 import com.onthecrow.wallper.core.coroutines.DispatchersProvider
 import com.onthecrow.wallper.core.model.ClipRange
 import com.onthecrow.wallper.core.model.CropRect
+import com.onthecrow.wallper.core.model.Tint
 import com.onthecrow.wallper.editor.domain.model.ExportStatus
 import com.onthecrow.wallper.editor.domain.model.VideoExportException
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -45,12 +47,13 @@ internal class TransformerVideoExporter @Inject constructor(
         outputPath: String,
         crop: CropRect,
         clip: ClipRange,
+        tint: Tint?,
     ): Flow<ExportStatus> = callbackFlow {
         // Disk work: off the main thread, which only drives the Transformer.
         val item = withContext(dispatchersProvider.io) {
             // An edit of a saved wallpaper copies nothing into scratch storage, so its directory may be missing.
             File(outputPath).parentFile?.mkdirs()
-            getEditedMediaItemForVideo(inputPath, crop, clip)
+            getEditedMediaItemForVideo(inputPath, crop, clip, tint)
         }
         val transformer = getTransformer(
             onCompleted = {
@@ -127,11 +130,24 @@ internal class TransformerVideoExporter @Inject constructor(
         override fun getGlMatrixArray(presentationTimeUs: Long): FloatArray = matrix
     }
 
+    /**
+     * Puts [tint] into every frame. An SDR video is processed in its own gamma values, so the frames come
+     * out as the wallpaper's renderers and the editor's preview show the tint. Media3 folds it into the
+     * crop's shader: no pass of its own.
+     */
+    @OptIn(UnstableApi::class)
+    private class TintEffect(tint: Tint) : RgbMatrix {
+        private val matrix = TintMatrix(tint).toGlArray()
+
+        override fun getMatrix(presentationTimeUs: Long, useHdr: Boolean): FloatArray = matrix
+    }
+
     @OptIn(UnstableApi::class)
     private fun getEditedMediaItemForVideo(
         inputPath: String,
         crop: CropRect,
         clip: ClipRange,
+        tint: Tint?,
     ): EditedMediaItem {
         val videoMetadata = getVideoMetadata(inputPath)
         return EditedMediaItem.Builder(
@@ -150,7 +166,10 @@ internal class TransformerVideoExporter @Inject constructor(
             .setEffects(
                 Effects(
                     listOf(),
-                    listOf(CropTransformation(crop, videoMetadata.displayWidth, videoMetadata.displayHeight)),
+                    listOfNotNull(
+                        CropTransformation(crop, videoMetadata.displayWidth, videoMetadata.displayHeight),
+                        tint?.let(::TintEffect),
+                    ),
                 )
             )
             .build()

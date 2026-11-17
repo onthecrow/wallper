@@ -17,6 +17,7 @@ dependencies {
     implementation(projects.core.designsystem)
     implementation(projects.core.player)
     implementation(projects.core.haptics)
+    implementation(libs.androidx.activity.compose)
     implementation(libs.androidx.lifecycle.runtime.compose)
     implementation(libs.androidx.window)
     implementation(libs.hilt.lifecycle.viewmodel.compose)

@@ -1,0 +1,10 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Material Symbols layers. -->
+    <path
+        android:fillColor="#000000"
+        android:pathData="M4.03,14.85q-0.4-0.3-0.39-0.79t0.41-0.79q0.28-0.2 0.6-0.2t0.6,0.2L12,18.5l6.75-5.23q0.28-0.2 0.6-0.2t0.6,0.2q0.4,0.3 0.41,0.79t-0.39,0.79L13.23,20.1Q12.68,20.53 12,20.53T10.78,20.1L4.03,14.85Zm6.75,0.2L5.03,10.58Q4.25,9.98 4.25,9q0-0.98 0.78-1.57l5.75-4.48Q11.33,2.52 12,2.52t1.23,0.43l5.75,4.48Q19.75,8.02 19.75,9t-0.77,1.57l-5.75,4.47Q12.68,15.48 12,15.48t-1.22-0.43ZM12,13.45L17.75,9L12,4.55L6.25,9L12,13.45ZM12,9Z" />
+</vector>

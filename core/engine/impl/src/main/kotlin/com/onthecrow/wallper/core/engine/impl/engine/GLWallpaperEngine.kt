@@ -57,7 +57,7 @@ internal class GLWallpaperEngine(
 
     // The video size and rotation were stored with the wallpaper when it was created.
     private val renderParams = VideoRenderParams(
-        holder.surfaceFrame.width(), holder.surfaceFrame.height(), wallpaper.crop, wallpaper.mediaInfo,
+        holder.surfaceFrame.width(), holder.surfaceFrame.height(), wallpaper.crop, wallpaper.mediaInfo, wallpaper.tint,
     )
 
     private val player = playerFactory.create(

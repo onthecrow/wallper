@@ -7,6 +7,7 @@ import com.onthecrow.wallper.core.model.CropRect
 import com.onthecrow.wallper.core.model.MediaInfo
 import com.onthecrow.wallper.core.model.MediaType
 import com.onthecrow.wallper.core.model.SlideDuration
+import com.onthecrow.wallper.core.model.Tint
 import com.onthecrow.wallper.wallpapers.data.database.WallpaperEntity
 import com.onthecrow.wallper.wallpapers.data.database.WallpaperGroupItemEntity
 import com.onthecrow.wallper.wallpapers.domain.model.NewWallpaper
@@ -54,6 +55,7 @@ internal fun WallpaperEntity.toDomain(): Wallpaper? = when {
         path = processedPath,
         thumbnailPath = thumbnailPath,
         isActive = isActive,
+        tint = tint?.let(::Tint),
     )
     originalPath != null -> Wallpaper.Media(
         id = id,
@@ -64,6 +66,7 @@ internal fun WallpaperEntity.toDomain(): Wallpaper? = when {
         clip = ClipRange(clipStartMs, clipEndMs),
         mediaInfo = MediaInfo(mediaWidth, mediaHeight, mediaRotation, mediaDurationMs),
         isActive = isActive,
+        tint = tint?.let(::Tint),
     )
     else -> null
 }
@@ -88,6 +91,7 @@ internal fun NewWallpaper.toEntity(id: Int = 0, isActive: Boolean = false) = whe
         mediaRotation = mediaInfo.rotation,
         mediaDurationMs = mediaInfo.durationMs,
         isActive = isActive,
+        tint = tint?.argb,
     )
     is NewWallpaper.ProcessedVideo -> WallpaperEntity(
         id = id,
@@ -106,6 +110,7 @@ internal fun NewWallpaper.toEntity(id: Int = 0, isActive: Boolean = false) = whe
         mediaRotation = 0,
         mediaDurationMs = 0,
         isActive = isActive,
+        tint = tint?.argb,
     )
 }
 
@@ -118,8 +123,9 @@ internal fun Wallpaper.toSpec(): WallpaperSpec = when (this) {
         crop = crop,
         clip = clip,
         mediaInfo = mediaInfo,
+        tint = tint,
     )
-    is Wallpaper.ProcessedVideo -> WallpaperSpec.ProcessedVideo(path = path, thumbnailPath = thumbnailPath)
+    is Wallpaper.ProcessedVideo -> WallpaperSpec.ProcessedVideo(path = path, thumbnailPath = thumbnailPath, tint = tint)
     is Wallpaper.BuiltIn -> WallpaperSpec.BuiltIn(wallpaper)
     is Wallpaper.Group -> WallpaperSpec.Series(
         slides = members.filterNot { it is Wallpaper.Group }.map { it.toSpec() },

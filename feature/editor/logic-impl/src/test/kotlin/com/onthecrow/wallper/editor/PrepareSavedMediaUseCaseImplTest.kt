@@ -5,6 +5,7 @@ import com.onthecrow.wallper.core.model.ClipRange
 import com.onthecrow.wallper.core.model.CropRect
 import com.onthecrow.wallper.core.model.MediaInfo
 import com.onthecrow.wallper.core.model.MediaType
+import com.onthecrow.wallper.core.model.Tint
 import com.onthecrow.wallper.editor.domain.model.EditedWallpaper
 import com.onthecrow.wallper.editor.domain.model.PreparedMedia
 import com.onthecrow.wallper.wallpapers.domain.GetWallpaperUseCase
@@ -36,7 +37,7 @@ class PrepareSavedMediaUseCaseImplTest {
     )
 
     @Test
-    fun `a saved wallpaper is edited from its original, crop and trim`() = runTest(dispatcher) {
+    fun `a saved wallpaper is edited from its original, crop, trim and tint`() = runTest(dispatcher) {
         wallpaper = Wallpaper.Media(
             id = 3,
             type = MediaType.VIDEO,
@@ -46,6 +47,7 @@ class PrepareSavedMediaUseCaseImplTest {
             clip = ClipRange(500, 1500),
             mediaInfo = MediaInfo(1920, 1080, 90, 3000),
             isActive = true,
+            tint = Tint(0x4D000000),
         )
 
         val media = useCase(3).getOrThrow()
@@ -55,7 +57,13 @@ class PrepareSavedMediaUseCaseImplTest {
                 path = "originals/a",
                 type = MediaType.VIDEO,
                 mediaInfo = MediaInfo(1920, 1080, 90, 3000),
-                edited = EditedWallpaper(3, "thumbnails/a", CropRect(10, 20, 110, 220), ClipRange(500, 1500)),
+                edited = EditedWallpaper(
+                    id = 3,
+                    thumbnailPath = "thumbnails/a",
+                    crop = CropRect(10, 20, 110, 220),
+                    clip = ClipRange(500, 1500),
+                    tint = Tint(0x4D000000),
+                ),
             ),
             media,
         )
