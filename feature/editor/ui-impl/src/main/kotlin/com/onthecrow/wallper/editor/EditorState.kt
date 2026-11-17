@@ -10,6 +10,8 @@ import com.onthecrow.wallper.editor.domain.model.ExportStatus
 import com.onthecrow.wallper.editor.domain.model.PreparedMedia
 
 internal data class EditorState(
+    /** A new wallpaper, not one being edited: what the bar says. */
+    val isNew: Boolean = true,
     /** Null until the picked file is copied and inspected, or the saved wallpaper is read. */
     val media: PreparedMedia? = null,
     /** The part of the video the wallpaper keeps: all of it once it is prepared, `0..0` if its length is unknown. */

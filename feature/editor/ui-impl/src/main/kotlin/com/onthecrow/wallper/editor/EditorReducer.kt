@@ -42,6 +42,8 @@ internal class EditorReducer @Inject constructor() : Reducer<EditorState, Editor
             EditorEvent.OnTintToggle -> state.copy(tint = state.tint.copy(isOn = !state.tint.isOn))
             is EditorEvent.OnTintColorChange -> state.copy(tint = TintChoice(isOn = true, color = event.color))
             EditorEvent.OnCropSnapped -> state
+            // The ViewModel leaves the editor.
+            EditorEvent.OnCloseClick -> state
             // A failed save can be tried again; a successful one closes the editor. What the export of a
             // cancelled save still sends on its way out comes too late: the dialog stays closed.
             is EditorEvent.OnExportStatusChanged -> if (state.save == null && event.status !is ExportStatus.Error) {
