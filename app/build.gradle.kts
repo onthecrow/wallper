@@ -44,8 +44,8 @@ android {
 
     defaultConfig {
         applicationId = "com.onthecrow.wallper"
-        versionCode = 2
-        versionName = "1.0"
+        versionCode = 6
+        versionName = "2.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
