@@ -21,6 +21,15 @@ class WallpapersReducerTest {
     }
 
     @Test
+    fun `whether Wallper is the wallpaper is unknown until checked`() = runTest {
+        assertEquals(null, WallpapersState().isWallpaperSet)
+
+        val state = reducer.reduce(WallpapersState(), WallpapersEvent.OnWallpaperChecked(isSet = true))
+
+        assertEquals(true, state.isWallpaperSet)
+    }
+
+    @Test
     fun `load failure keeps the list and shows the error`() = runTest {
         val initial = WallpapersState(items = listOf(WallpaperItem(1, "a", false)))
 

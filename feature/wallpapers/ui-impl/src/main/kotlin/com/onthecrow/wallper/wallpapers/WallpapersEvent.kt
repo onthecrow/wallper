@@ -23,6 +23,8 @@ internal sealed interface WallpapersEvent : Event {
     data class OnBuiltInSettingsClick(val wallpaper: BuiltInWallpaper) : WallpapersEvent
     data class OnMediaPicked(val uri: String) : WallpapersEvent
     data object OnSettingsClick : WallpapersEvent
+    /** Back from the system's wallpaper picker, or from anywhere else the phone's wallpaper could have changed. */
+    data object OnResume : WallpapersEvent
 
     // Internal events
     /** [items] as listed; [seriesCandidates] is how many a new series could pick from. */
@@ -31,6 +33,7 @@ internal sealed interface WallpapersEvent : Event {
     /** [path] is null for a built-in this device can't render: none will come. */
     data class OnBuiltInPreviewLoaded(val wallpaper: BuiltInWallpaper, val path: String?) : WallpapersEvent
     data class OnSeriesPictureMade(val groupId: Int, val path: String) : WallpapersEvent
+    data class OnWallpaperChecked(val isSet: Boolean) : WallpapersEvent
 
     // One-off effects, handled by the screen
     data object OnUnsupportedMediaPicked : WallpapersEvent

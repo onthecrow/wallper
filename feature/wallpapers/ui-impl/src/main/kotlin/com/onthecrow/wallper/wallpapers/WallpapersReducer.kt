@@ -13,6 +13,7 @@ internal class WallpapersReducer @Inject constructor() : Reducer<WallpapersState
                 offersSeries = event.seriesCandidates >= Wallpaper.Group.MIN_MEMBERS,
             )
             is WallpapersEvent.OnWallpapersLoadFailed -> state.copy(error = event.message)
+            is WallpapersEvent.OnWallpaperChecked -> state.copy(isWallpaperSet = event.isSet)
             is WallpapersEvent.OnDeleteClick -> state.copy(deleteCandidate = event.id)
             is WallpapersEvent.OnDeleteConfirm,
             WallpapersEvent.OnDeleteDismiss -> state.copy(deleteCandidate = null)
