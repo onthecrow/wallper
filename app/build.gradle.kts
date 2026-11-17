@@ -86,6 +86,7 @@ dependencies {
     implementation(projects.core.diagnostics)
     implementation(projects.core.designsystem)
     implementation(projects.core.engine.impl)
+    implementation(projects.core.haptics)
     implementation(projects.core.navigation.impl)
     implementation(projects.core.resources)
     implementation(projects.core.storage)

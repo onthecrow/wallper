@@ -3,6 +3,7 @@
     <string name="editor_pause">Pause</string>
     <string name="editor_set_trim_start">Start here</string>
     <string name="editor_set_trim_end">End here</string>
+    <string name="editor_reset">Undo all changes</string>
     <string name="editor_original">Original</string>
     <string name="editor_optimised">Optimised</string>
     <string name="editor_processing_info">What are original and optimised?</string>

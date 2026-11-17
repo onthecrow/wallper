@@ -1,6 +1,7 @@
 package com.onthecrow.wallper.editor
 
 import androidx.lifecycle.viewModelScope
+import com.onthecrow.wallper.core.haptics.Haptics
 import com.onthecrow.wallper.core.mvi.BaseViewModel
 import com.onthecrow.wallper.core.navigation.Navigator
 import com.onthecrow.wallper.editor.domain.DiscardPreparedMediaUseCase
@@ -33,6 +34,7 @@ internal class EditorViewModel @AssistedInject constructor(
     private val discardPreparedMediaUseCase: DiscardPreparedMediaUseCase,
     private val processingInfoMemory: ProcessingInfoMemory,
     private val navigator: Navigator,
+    private val haptics: Haptics,
 ) : BaseViewModel<EditorEvent, EditorState, EditorReducer>(EditorState(), reducer) {
 
     @AssistedFactory
@@ -49,6 +51,7 @@ internal class EditorViewModel @AssistedInject constructor(
                 // A failed export can be saved again; a file that can't be read or played can't.
                 EditorEvent.OnErrorDismiss -> if (isMediaBroken) navigator.navigateBack()
                 is EditorEvent.OnPreviewFailed -> isMediaBroken = true
+                EditorEvent.OnCropSnapped -> haptics.tick()
                 else -> Unit
             }
         }.launchIn(viewModelScope)

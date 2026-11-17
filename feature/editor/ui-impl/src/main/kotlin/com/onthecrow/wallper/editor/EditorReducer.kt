@@ -1,6 +1,5 @@
 package com.onthecrow.wallper.editor
 
-import com.onthecrow.wallper.core.model.ClipRange
 import com.onthecrow.wallper.core.model.CropRect
 import com.onthecrow.wallper.core.mvi.Reducer
 import com.onthecrow.wallper.editor.domain.model.ExportStatus
@@ -30,11 +29,12 @@ internal class EditorReducer @Inject constructor() : Reducer<EditorState, Editor
             EditorEvent.OnProcessingInfoDismiss -> state.copy(processingInfo = null)
             is EditorEvent.OnProcessingInfoSeenLoaded ->
                 state.copy(isProcessingInfoSeen = state.isProcessingInfoSeen || event.isSeen)
-            // A new wallpaper keeps the whole video until the user moves a handle; an edited one starts from its trim.
-            is EditorEvent.OnMediaPrepared -> state.copy(
-                media = event.media,
-                trim = event.media.edited?.clip ?: ClipRange(startMs = 0, endMs = event.media.mediaInfo.durationMs),
+            is EditorEvent.OnMediaPrepared -> state.copy(media = event.media, trim = event.media.initialTrim)
+            EditorEvent.OnResetClick -> state.copy(
+                trim = state.media?.initialTrim ?: state.trim,
+                isOptimised = false,
             )
+            EditorEvent.OnCropSnapped -> state
             // A failed save can be tried again; a successful one closes the editor.
             is EditorEvent.OnExportStatusChanged -> state.copy(
                 exportStatus = event.status,

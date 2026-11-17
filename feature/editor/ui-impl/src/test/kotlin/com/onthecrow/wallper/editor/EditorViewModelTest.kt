@@ -3,6 +3,7 @@ package com.onthecrow.wallper.editor
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.ViewModelStore
+import com.onthecrow.wallper.core.haptics.Haptics
 import com.onthecrow.wallper.core.model.ClipRange
 import com.onthecrow.wallper.core.model.CropRect
 import com.onthecrow.wallper.core.model.MediaInfo
@@ -55,6 +56,7 @@ class EditorViewModelTest {
     private val memory = FakeProcessingInfoMemory()
     private var backNavigations = 0
     private var discards = 0
+    private var ticks = 0
 
     @BeforeTest
     fun setUp() = Dispatchers.setMain(dispatcher)
@@ -82,11 +84,24 @@ class EditorViewModelTest {
         },
         discardPreparedMediaUseCase = { discards++ },
         processingInfoMemory = memory,
+        haptics = object : Haptics {
+            override fun tick() { ticks++ }
+        },
         navigator = object : Navigator {
             override fun navigate(destination: Destination) = Unit
             override fun navigateBack() { backNavigations++ }
         },
     )
+
+    @Test
+    fun `the picture snapping level ticks`() = runTest(dispatcher) {
+        val viewModel = createViewModel()
+
+        viewModel.onEvent(EditorEvent.OnCropSnapped)
+        viewModel.onEvent(EditorEvent.OnCropSnapped)
+
+        assertEquals(2, ticks)
+    }
 
     @Test
     fun `picked media is prepared on start`() = runTest(dispatcher) {

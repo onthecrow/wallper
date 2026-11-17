@@ -54,3 +54,10 @@ internal val MIGRATION_3_4 = object : Migration(3, 4) {
         connection.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_wallpapers_built_in` ON `wallpapers` (`built_in`)")
     }
 }
+
+/** v5: `crop_rotation` turns the crop; the rows so far aren't turned. */
+internal val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(connection: SQLiteConnection) {
+        connection.execSQL("ALTER TABLE `wallpapers` ADD COLUMN `crop_rotation` REAL NOT NULL DEFAULT 0")
+    }
+}

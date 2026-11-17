@@ -27,6 +27,8 @@ internal data class WallpaperEntity(
     @ColumnInfo(name = "crop_top") val cropTop: Int,
     @ColumnInfo(name = "crop_right") val cropRight: Int,
     @ColumnInfo(name = "crop_bottom") val cropBottom: Int,
+    /** [com.onthecrow.wallper.core.model.CropRect.rotation], in degrees; since v5. */
+    @ColumnInfo(name = "crop_rotation", defaultValue = "0") val cropRotation: Float = 0f,
     @ColumnInfo(name = "clip_start_ms") val clipStartMs: Long,
     @ColumnInfo(name = "clip_end_ms") val clipEndMs: Long,
     @ColumnInfo(name = "media_width") val mediaWidth: Int,
