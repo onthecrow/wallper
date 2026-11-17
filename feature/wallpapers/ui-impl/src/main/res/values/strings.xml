@@ -11,6 +11,7 @@
     <string name="add_media_description">From a video or photo in your gallery</string>
     <string name="add_series">New series</string>
     <string name="add_series_description">From the wallpapers you already have, shown one after another</string>
+    <string name="add_series_unavailable">A series needs at least two wallpapers. Add another one first.</string>
     <string name="delete_group_text">The wallpapers in it stay.</string>
     <string name="back">Back</string>
     <string name="group_pick_title">Choose wallpapers</string>
