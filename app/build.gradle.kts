@@ -44,7 +44,7 @@ android {
 
     defaultConfig {
         applicationId = "com.onthecrow.wallper"
-        versionCode = 6
+        versionCode = 7
         versionName = "2.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
