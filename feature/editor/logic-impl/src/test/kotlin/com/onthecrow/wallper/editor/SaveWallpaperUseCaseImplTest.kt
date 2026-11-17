@@ -16,12 +16,14 @@ import com.onthecrow.wallper.wallpapers.domain.ActivateWallpaperUseCase
 import com.onthecrow.wallper.wallpapers.domain.AddWallpaperUseCase
 import com.onthecrow.wallper.wallpapers.domain.UpdateWallpaperUseCase
 import com.onthecrow.wallper.wallpapers.domain.model.NewWallpaper
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.toList
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.runTest
 import kotlin.test.Test
@@ -40,6 +42,9 @@ class SaveWallpaperUseCaseImplTest {
     private val exportedTints = mutableListOf<Tint?>()
     private var exportResult: List<ExportStatus> = listOf(ExportStatus.InProgress(50), ExportStatus.Success)
     private var saveError: Exception? = null
+
+    /** Holds the add up until it completes. */
+    private var addGate: CompletableDeferred<Unit>? = null
     private val activated = mutableListOf<Int>()
     private val appSettings = MutableStateFlow(AppSettings())
 
@@ -60,6 +65,7 @@ class SaveWallpaperUseCaseImplTest {
         },
         addWallpaperUseCase = object : AddWallpaperUseCase {
             override suspend fun invoke(wallpaper: NewWallpaper): Int {
+                addGate?.await()
                 saveError?.let { throw it }
                 added += wallpaper
                 return NEW_ID
@@ -117,6 +123,23 @@ class SaveWallpaperUseCaseImplTest {
         assertEquals(listOf("editor/media" to "editor/processed.mp4"), exports)
         assertEquals(NewWallpaper.ProcessedVideo(FakeMediaStorage.PROCESSED, FakeMediaStorage.THUMBNAIL), added.single())
         assertEquals(listOf(FakeMediaStorage.THUMBNAIL, FakeMediaStorage.PROCESSED), storage.persisted)
+    }
+
+    @Test
+    fun `a save the export has finished runs to its end when the editor stops waiting for it`() = runTest(dispatcher) {
+        val gate = CompletableDeferred<Unit>()
+        addGate = gate
+        val saving = launch { useCase(video, crop, clip, process = true, tint = null).toList() }
+
+        // The export is done and the wallpaper is being added when the user cancels.
+        saving.cancel()
+        gate.complete(Unit)
+        saving.join()
+
+        assertEquals(NewWallpaper.ProcessedVideo(FakeMediaStorage.PROCESSED, FakeMediaStorage.THUMBNAIL), added.single())
+        assertEquals(listOf(NEW_ID), activated)
+        assertEquals(listOf(FakeMediaStorage.THUMBNAIL, FakeMediaStorage.PROCESSED), storage.persisted)
+        assertTrue(storage.deleted.none { it in storage.persisted })
     }
 
     @Test

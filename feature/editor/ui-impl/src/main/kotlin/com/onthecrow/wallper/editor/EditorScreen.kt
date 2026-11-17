@@ -18,7 +18,6 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -26,7 +25,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.selection.toggleable
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material3.Button
@@ -36,7 +34,6 @@ import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.IconButtonDefaults
-import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -67,8 +64,6 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.onthecrow.wallper.core.designsystem.component.colorpicker.ColorPicker
 import com.onthecrow.wallper.core.designsystem.component.colorpicker.ColorPickerDefaults
 import com.onthecrow.wallper.core.designsystem.component.colorpicker.HsvColor
@@ -89,6 +84,7 @@ import com.onthecrow.wallper.editor.preview.rememberEditorPlayer
 import com.onthecrow.wallper.editor.preview.rememberVideoFrames
 import com.onthecrow.wallper.editor.ui.R
 import com.onthecrow.wallper.editor.view.ErrorDialog
+import com.onthecrow.wallper.editor.view.ExportProgressDialog
 import com.onthecrow.wallper.editor.view.OptimisedToggle
 import com.onthecrow.wallper.editor.view.ProcessingInfoDialog
 
@@ -274,7 +270,10 @@ internal fun EditorScreen(
                 )
             }
             when (val status = state.exportStatus) {
-                is ExportStatus.InProgress -> ExportProgressDialog(status)
+                is ExportStatus.InProgress -> ExportProgressDialog(
+                    status = status,
+                    onCancel = { onEvent(EditorEvent.OnExportCancel) },
+                )
                 is ExportStatus.Error -> ErrorDialog(
                     error = status.error,
                     onDismiss = { onEvent(EditorEvent.OnErrorDismiss) },
@@ -585,27 +584,6 @@ private fun SetTrimBoundaryButton(
     }
 }
 
-@Composable
-private fun ExportProgressDialog(status: ExportStatus.InProgress) {
-    Dialog(
-        onDismissRequest = { },
-        DialogProperties(
-            dismissOnBackPress = false,
-            dismissOnClickOutside = false,
-        )
-    ) {
-        LazyColumn(
-            modifier = Modifier.padding(16.dp),
-            contentPadding = PaddingValues(vertical = 8.dp),
-        ) {
-            item {
-                LinearProgressIndicator(
-                    progress = { status.progress.toFloat() / 100f },
-                )
-            }
-        }
-    }
-}
 
 @Preview
 @Composable

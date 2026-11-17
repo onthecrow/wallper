@@ -13,4 +13,10 @@
     <string name="editor_processing_info_title">Original or optimised</string>
     <string name="editor_original_description">Wallper keeps your video as it is and crops it while it plays. You can edit the wallpaper later.</string>
     <string name="editor_optimised_description">Wallper saves only the part you picked, already cropped and trimmed. It takes less space and is easier on the battery, but you can\'t edit it later, only delete it.</string>
+    <string name="editor_export_title">Optimising video</string>
+    <string name="editor_export_percent">%d%%</string>
+    <string name="editor_export_estimating">Estimating time left…</string>
+    <string name="editor_export_almost_done">Almost done</string>
+    <string name="editor_export_seconds_left">About %d s left</string>
+    <string name="editor_export_minutes_left">About %d min left</string>
 </resources>

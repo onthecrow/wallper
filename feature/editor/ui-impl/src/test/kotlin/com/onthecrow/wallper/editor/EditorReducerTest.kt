@@ -136,6 +136,7 @@ class EditorReducerTest {
     fun `toggle, prepared media and export status land in the state`() = runTest {
         var state = reducer.reduce(EditorState(isProcessingInfoSeen = true), EditorEvent.OnOptimisedToggle)
         state = reducer.reduce(state, EditorEvent.OnMediaPrepared(media))
+        state = reducer.reduce(state, EditorEvent.OnSaveClick(crop))
         state = reducer.reduce(state, EditorEvent.OnExportStatusChanged(ExportStatus.InProgress(40)))
 
         assertEquals(true, state.isOptimised)
@@ -349,5 +350,29 @@ class EditorReducerTest {
         val saved = reducer.reduce(saving, EditorEvent.OnExportStatusChanged(ExportStatus.Success))
         assertEquals(saving.save, saved.save)
         assertSame(saved, reducer.reduce(saved, EditorEvent.OnSaveClick(crop)))
+    }
+
+    @Test
+    fun `a cancelled export closes its dialog for good and the save can start again`() = runTest {
+        val saving = reducer.reduce(prepared.copy(isOptimised = true), EditorEvent.OnSaveClick(crop))
+        val exporting = reducer.reduce(saving, EditorEvent.OnExportStatusChanged(ExportStatus.InProgress(30)))
+
+        val cancelled = reducer.reduce(exporting, EditorEvent.OnExportCancel)
+        assertNull(cancelled.save)
+        assertNull(cancelled.exportStatus)
+
+        // What the export sent before it stopped.
+        assertSame(cancelled, reducer.reduce(cancelled, EditorEvent.OnExportStatusChanged(ExportStatus.InProgress(31))))
+        assertSame(cancelled, reducer.reduce(cancelled, EditorEvent.OnExportStatusChanged(ExportStatus.Success)))
+        assertEquals(saving.save, reducer.reduce(cancelled, EditorEvent.OnSaveClick(crop)).save)
+    }
+
+    @Test
+    fun `only an export under way can be cancelled`() = runTest {
+        val saving = reducer.reduce(prepared, EditorEvent.OnSaveClick(crop))
+        val saved = reducer.reduce(saving, EditorEvent.OnExportStatusChanged(ExportStatus.Success))
+
+        assertSame(saving, reducer.reduce(saving, EditorEvent.OnExportCancel))
+        assertSame(saved, reducer.reduce(saved, EditorEvent.OnExportCancel))
     }
 }

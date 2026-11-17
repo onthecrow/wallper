@@ -15,12 +15,14 @@ import com.onthecrow.wallper.wallpapers.domain.ActivateWallpaperUseCase
 import com.onthecrow.wallper.wallpapers.domain.AddWallpaperUseCase
 import com.onthecrow.wallper.wallpapers.domain.UpdateWallpaperUseCase
 import com.onthecrow.wallper.wallpapers.domain.model.NewWallpaper
+import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.emitAll
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.onEach
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 
 internal class SaveWallpaperUseCaseImpl @Inject constructor(
@@ -51,7 +53,11 @@ internal class SaveWallpaperUseCaseImpl @Inject constructor(
 
         emitAll(
             export.onEach { status ->
-                if (status is ExportStatus.Success) save(media, crop, clip, tint, isProcessed = processed != null)
+                // Once the export is done the save runs to its end, even if the editor stops waiting for it
+                // (its Cancel, just then): stopped halfway, it could leave a wallpaper whose files are gone.
+                if (status is ExportStatus.Success) {
+                    withContext(NonCancellable) { save(media, crop, clip, tint, isProcessed = processed != null) }
+                }
             }
         )
     }.flowOn(dispatchersProvider.io)
