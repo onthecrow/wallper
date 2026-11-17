@@ -1,6 +1,7 @@
 package com.onthecrow.wallper.settings
 
 import android.content.Intent
+import com.onthecrow.wallper.core.model.SeriesSwitch
 import com.onthecrow.wallper.core.model.VideoPlayback
 import com.onthecrow.wallper.core.mvi.Event
 import com.onthecrow.wallper.settings.domain.AppSettings
@@ -21,6 +22,8 @@ internal sealed interface SettingsEvent : Event {
     data class OnThemeSelect(val theme: ThemeMode) : SettingsEvent
     data class OnDynamicColorChange(val enabled: Boolean) : SettingsEvent
     data class OnShareUsageAndCrashDataChange(val enabled: Boolean) : SettingsEvent
+    data object OnSeriesSwitchClick : SettingsEvent
+    data class OnSeriesSwitchSelect(val switch: SeriesSwitch) : SettingsEvent
     data object OnDialogDismiss : SettingsEvent
     data object OnSendReportClick : SettingsEvent
 

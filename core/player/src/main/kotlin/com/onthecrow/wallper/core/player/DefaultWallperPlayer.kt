@@ -16,6 +16,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import timber.log.Timber
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
@@ -25,17 +26,20 @@ import java.util.concurrent.TimeUnit
 internal class DefaultWallperPlayer(
     context: Context,
     media: PlayerMedia,
+    keepsStandby: Boolean,
 ) : WallperPlayer {
 
     private val thread = HandlerThread("WallperPlayer").apply { start() }
     private val handler = Handler(thread.looper)
-    private val scope = CoroutineScope(SupervisorJob() + handler.asCoroutineDispatcher("WallperPlayer"))
+    private val dispatcher = handler.asCoroutineDispatcher("WallperPlayer")
+    private val scope = CoroutineScope(SupervisorJob() + dispatcher)
     private val playWhenReady = MutableStateFlow(false)
 
     private val supervisor = EngineSupervisor(
         factory = ExoEngineFactory(context, media, handler),
         clock = SystemClock::elapsedRealtime,
         log = { Timber.tag(TAG).d(it) },
+        keepsStandby = keepsStandby,
     )
 
     override val state: StateFlow<WallperPlayerState> get() = supervisor.state
@@ -65,6 +69,9 @@ internal class DefaultWallperPlayer(
     override fun seekToStart() {
         handler.post { supervisor.seekToStart() }
     }
+
+    override suspend fun awaitPrepared(timeoutMs: Long): Boolean =
+        withContext(dispatcher) { supervisor.awaitPrepared(timeoutMs) }
 
     override fun release() {
         onPlayerThread(RELEASE_TIMEOUT_MS) {

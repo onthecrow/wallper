@@ -29,6 +29,9 @@ import kotlinx.coroutines.withTimeoutOrNull
  * up with [WallperPlayerState.Failed]. The stalled engine is replaced by a new standby at the switch.
  * A clip that doesn't loop and reaches its end isn't a stall: it stays there, [WallperPlayerState.Ended].
  *
+ * Without [keepsStandby] there is one engine, one decoder, and the standby is made only once a stall
+ * needs it: the switch then takes as long as a decoder takes to start.
+ *
  * Runs on the player thread, as every ExoPlayer call must; nothing here is thread-safe.
  */
 internal class EngineSupervisor(
@@ -37,6 +40,7 @@ internal class EngineSupervisor(
     private val log: (String) -> Unit = {},
     private val pausedReleaseMs: Long = PAUSED_RELEASE_MS,
     private val standbyReadyTimeoutMs: Long = STANDBY_READY_TIMEOUT_MS,
+    private val keepsStandby: Boolean = true,
 ) {
     private val _state = MutableStateFlow<WallperPlayerState>(WallperPlayerState.Idle)
     val state: StateFlow<WallperPlayerState> = _state.asStateFlow()
@@ -75,6 +79,12 @@ internal class EngineSupervisor(
     fun seekToStart() {
         resumePositionMs = 0
         active?.seekTo(0)
+    }
+
+    /** True once the active engine has a frame decoded, false if it fails first, isn't there or takes over [timeoutMs]. */
+    suspend fun awaitPrepared(timeoutMs: Long): Boolean {
+        val engine = active ?: return false
+        return awaitReady(engine, timeoutMs)
     }
 
     fun releaseAll() {
@@ -130,7 +140,7 @@ internal class EngineSupervisor(
     private fun createEngines(): ManagedEngine {
         val engine = factory.create(resumePositionMs, surface, playWhenReady = false).apply { setLooping(looping) }
         active = engine
-        createStandby()
+        if (keepsStandby) createStandby()
         return engine
     }
 
@@ -163,13 +173,17 @@ internal class EngineSupervisor(
         next.seekTo(positionMs)
         next.play()
         active = next
-        createStandby()
+        // The standby is the active engine now: without a new one, nothing may still point at it as a spare.
+        if (keepsStandby) createStandby() else standby = null
         log("Switched from engine #${from.id} to #${next.id} at $positionMs ms")
         return next
     }
 
     /** True once [engine] is ready; false if it fails or takes too long. An error wins over readiness. */
-    private suspend fun awaitReady(engine: ManagedEngine): Boolean = withTimeoutOrNull(standbyReadyTimeoutMs) {
+    private suspend fun awaitReady(
+        engine: ManagedEngine,
+        timeoutMs: Long = standbyReadyTimeoutMs,
+    ): Boolean = withTimeoutOrNull(timeoutMs) {
         combine(engine.isReady, engine.error) { ready, errorCode ->
             when {
                 errorCode != null -> false

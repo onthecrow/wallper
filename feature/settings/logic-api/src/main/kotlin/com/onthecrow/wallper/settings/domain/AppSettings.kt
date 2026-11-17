@@ -1,5 +1,6 @@
 package com.onthecrow.wallper.settings.domain
 
+import com.onthecrow.wallper.core.model.SeriesSwitch
 import com.onthecrow.wallper.core.model.VideoPlayback
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.SerializationException
@@ -26,6 +27,11 @@ data class AppSettings(
     val dynamicColor: Boolean = true,
     /** Let Firebase collect usage statistics (Analytics) and crash reports (Crashlytics); only release builds have it. */
     val shareUsageAndCrashData: Boolean = true,
+    /**
+     * How a series changes its slides: on the GL thread its slides share, release builds included, unless a
+     * debuggable build picks another way in its debug settings.
+     */
+    val seriesSwitch: SeriesSwitch = SeriesSwitch.SHARED_GL,
 ) {
     /** Only what differs from the defaults. */
     fun encode(): String = json.encodeToString(serializer(), this)

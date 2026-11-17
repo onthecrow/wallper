@@ -13,6 +13,8 @@ internal data class SettingsState(
     val dialog: SettingsDialog? = null,
     /** A report is being written: its row waits for it. */
     val isReportInProgress: Boolean = false,
+    /** A debuggable build: it shows what is only tried out. */
+    val isDebugBuild: Boolean = false,
 ) : State
 
-internal enum class SettingsDialog { PLAYBACK, THEME }
+internal enum class SettingsDialog { PLAYBACK, THEME, SERIES_SWITCH }

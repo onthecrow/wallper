@@ -8,6 +8,12 @@ abstract class WallpaperEngine {
     abstract fun pause()
     abstract fun resume()
     abstract fun release()
+
+    /**
+     * For an engine made off screen ([SlideStart]): the window is free now, take it and put the picture
+     * there, paused or not. The slide that had the window has let go of it.
+     */
+    open fun show() {}
     open fun onSurfaceChanged(width: Int, height: Int) {}
     open fun onSurfaceDestroyed() {}
 

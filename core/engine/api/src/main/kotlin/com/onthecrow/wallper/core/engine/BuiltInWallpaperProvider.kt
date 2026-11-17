@@ -29,6 +29,21 @@ interface BuiltInWallpaperProvider {
         host: EngineHost,
     ): WallpaperEngine
 
+    /** The OpenGL ES version [createSlide]'s renderer needs, 2 or 3: slides may share one context. */
+    val glesVersion: Int get() = 2
+
+    /**
+     * The wallpaper as a slide a series prepares ahead: made off screen on [slide]'s GL host, shown later.
+     * Null if it can only be made on the window, with [createEngine]. Called on the main thread.
+     */
+    fun createSlide(
+        context: Context,
+        surfaceHolder: () -> SurfaceHolder,
+        isPreview: Boolean,
+        host: EngineHost,
+        slide: SlideStart,
+    ): WallpaperEngine? = null
+
     /** What the system tints its UI with. Called off the main thread. */
     @RequiresApi(Build.VERSION_CODES.O_MR1)
     fun colors(): WallpaperColors

@@ -5,6 +5,7 @@ import com.onthecrow.wallper.core.coroutines.DispatchersProvider
 import com.onthecrow.wallper.core.engine.LiveWallpaperController
 import com.onthecrow.wallper.core.model.BuiltInWallpaper
 import com.onthecrow.wallper.core.navigation.Destination
+import com.onthecrow.wallper.core.model.SeriesSwitch
 import com.onthecrow.wallper.core.model.VideoPlayback
 import com.onthecrow.wallper.core.navigation.Navigator
 import com.onthecrow.wallper.settings.domain.AppSettings
@@ -31,6 +32,7 @@ import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 import java.io.IOException
 
@@ -44,6 +46,7 @@ class SettingsViewModelTest {
     private val storage = MutableStateFlow<List<WallpaperStorage>>(emptyList())
     private var reportResult = Result.success("cache/reports/wallper-report.txt")
     private var reports = 0
+    private var isDebuggable = false
 
     @BeforeTest
     fun setUp() = Dispatchers.setMain(dispatcher)
@@ -66,6 +69,7 @@ class SettingsViewModelTest {
         },
         navigator = navigator,
         dispatchersProvider = TestDispatchers(dispatcher),
+        debugBuild = { isDebuggable },
     )
 
     @Test
@@ -80,6 +84,7 @@ class SettingsViewModelTest {
         viewModel.onEvent(SettingsEvent.OnShareUsageAndCrashDataChange(false))
         viewModel.onEvent(SettingsEvent.OnPlaybackSelect(VideoPlayback.ONCE))
         viewModel.onEvent(SettingsEvent.OnThemeSelect(ThemeMode.DARK))
+        viewModel.onEvent(SettingsEvent.OnSeriesSwitchSelect(SeriesSwitch.WARM_ENGINES))
 
         val expected = AppSettings(
             videoPlayback = VideoPlayback.ONCE,
@@ -90,9 +95,18 @@ class SettingsViewModelTest {
             theme = ThemeMode.DARK,
             dynamicColor = false,
             shareUsageAndCrashData = false,
+            seriesSwitch = SeriesSwitch.WARM_ENGINES,
         )
         assertEquals(expected, appSettings.value)
         assertEquals(expected, viewModel.state.value.settings)
+    }
+
+    @Test
+    fun `only a debuggable build shows what is tried out`() = runTest(dispatcher) {
+        assertFalse(createViewModel().state.value.isDebugBuild)
+
+        isDebuggable = true
+        assertTrue(createViewModel().state.value.isDebugBuild)
     }
 
     @Test

@@ -13,6 +13,7 @@ import com.onthecrow.wallper.blackhole.data.BlackHoleSettingsStore
 import com.onthecrow.wallper.blackhole.data.LensTablesRepository
 import com.onthecrow.wallper.core.engine.BuiltInWallpaperProvider
 import com.onthecrow.wallper.core.engine.EngineHost
+import com.onthecrow.wallper.core.engine.SlideStart
 import com.onthecrow.wallper.core.engine.WallpaperEngine
 import com.onthecrow.wallper.core.model.BuiltInWallpaper
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -43,6 +44,18 @@ internal class BlackHoleWallpaperProvider @Inject constructor(
         host: EngineHost,
     ): WallpaperEngine = BlackHoleWallpaperEngine(
         context, surfaceHolder, isPreview, host, settingsStore, tablesRepository, autoQuality,
+    )
+
+    override val glesVersion = 3
+
+    override fun createSlide(
+        context: Context,
+        surfaceHolder: () -> SurfaceHolder,
+        isPreview: Boolean,
+        host: EngineHost,
+        slide: SlideStart,
+    ): WallpaperEngine = BlackHoleWallpaperEngine(
+        context, surfaceHolder, isPreview, host, settingsStore, tablesRepository, autoQuality, slide,
     )
 
     /** Almost black with a warm amber accent, dark theme friendly (BLACKHOLE_TZ.md §11.4). */

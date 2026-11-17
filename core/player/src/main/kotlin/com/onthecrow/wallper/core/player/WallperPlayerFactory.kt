@@ -10,5 +10,10 @@ class WallperPlayerFactory @Inject constructor(
     @param:ApplicationContext private val context: Context,
 ) {
     @OptIn(UnstableApi::class)
-    fun create(media: PlayerMedia): WallperPlayer = DefaultWallperPlayer(context, media)
+    /**
+     * @param keepsStandby false for a player with a single decoder: it makes its spare one only when a
+     * stall needs it, so it recovers later by as long as a decoder takes to start.
+     */
+    fun create(media: PlayerMedia, keepsStandby: Boolean = true): WallperPlayer =
+        DefaultWallperPlayer(context, media, keepsStandby)
 }

@@ -56,6 +56,7 @@ import androidx.core.app.ShareCompat
 import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import com.onthecrow.wallper.core.designsystem.theme.LocalThemeRevealState
+import com.onthecrow.wallper.core.model.SeriesSwitch
 import com.onthecrow.wallper.core.model.VideoPlayback
 import com.onthecrow.wallper.settings.domain.AppSettings
 import com.onthecrow.wallper.settings.domain.ThemeMode
@@ -147,6 +148,7 @@ internal fun SettingsScreen(
                 AppearanceSection(state.settings, onEvent)
                 PrivacySection(state.settings, onEvent)
                 HelpSection(state.isReportInProgress, onEvent)
+                if (state.isDebugBuild) DebugSection(state.settings, onEvent)
                 Spacer(modifier = Modifier.weight(1f))
                 SignatureFooter(
                     modifier = Modifier
@@ -190,6 +192,15 @@ internal fun SettingsScreen(
                     onEvent(SettingsEvent.OnThemeSelect(theme))
                 }
             },
+            onDismiss = { onEvent(SettingsEvent.OnDialogDismiss) },
+        )
+        SettingsDialog.SERIES_SWITCH -> ChoiceDialog(
+            title = stringResource(R.string.settings_series_switch),
+            options = SeriesSwitch.entries,
+            selected = state.settings.seriesSwitch,
+            label = { stringResource(it.labelRes) },
+            description = { stringResource(it.descriptionRes) },
+            onSelect = { switch, _ -> onEvent(SettingsEvent.OnSeriesSwitchSelect(switch)) },
             onDismiss = { onEvent(SettingsEvent.OnDialogDismiss) },
         )
         null -> Unit
@@ -271,6 +282,17 @@ private fun HelpSection(isReportInProgress: Boolean, onEvent: (SettingsEvent) ->
     )
 }
 
+/** What is only tried out, in a debuggable build: nothing here is translated. */
+@Composable
+private fun DebugSection(settings: AppSettings, onEvent: (SettingsEvent) -> Unit) {
+    SectionHeader(text = stringResource(R.string.settings_section_debug))
+    ClickableItem(
+        title = stringResource(R.string.settings_series_switch),
+        summary = stringResource(settings.seriesSwitch.labelRes),
+        onClick = { onEvent(SettingsEvent.OnSeriesSwitchClick) },
+    )
+}
+
 @Composable
 private fun PrivacySection(settings: AppSettings, onEvent: (SettingsEvent) -> Unit) {
     SectionHeader(text = stringResource(R.string.settings_section_privacy))
@@ -306,6 +328,20 @@ private val VideoPlayback.descriptionRes: Int
         VideoPlayback.LOOP -> R.string.settings_playback_loop_description
         VideoPlayback.RESTART -> R.string.settings_playback_restart_description
         VideoPlayback.ONCE -> R.string.settings_playback_once_description
+    }
+
+private val SeriesSwitch.labelRes: Int
+    get() = when (this) {
+        SeriesSwitch.CUT -> R.string.settings_series_switch_cut
+        SeriesSwitch.SHARED_GL -> R.string.settings_series_switch_shared_gl
+        SeriesSwitch.WARM_ENGINES -> R.string.settings_series_switch_warm_engines
+    }
+
+private val SeriesSwitch.descriptionRes: Int
+    get() = when (this) {
+        SeriesSwitch.CUT -> R.string.settings_series_switch_cut_description
+        SeriesSwitch.SHARED_GL -> R.string.settings_series_switch_shared_gl_description
+        SeriesSwitch.WARM_ENGINES -> R.string.settings_series_switch_warm_engines_description
     }
 
 private val ThemeMode.labelRes: Int

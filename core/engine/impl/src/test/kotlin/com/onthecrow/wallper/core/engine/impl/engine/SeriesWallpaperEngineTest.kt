@@ -4,7 +4,9 @@ import com.onthecrow.wallper.core.engine.EngineHost
 import com.onthecrow.wallper.core.engine.WallpaperEngine
 import com.onthecrow.wallper.core.engine.WallpaperSpec
 import com.onthecrow.wallper.core.model.SlideDuration
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.plus
 import kotlinx.coroutines.test.TestScope
@@ -16,6 +18,8 @@ import kotlin.test.assertEquals
 import kotlin.test.assertFalse
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class SeriesWallpaperEngineTest {
@@ -32,15 +36,23 @@ class SeriesWallpaperEngineTest {
         }
     }
 
-    private fun TestScope.series(duration: SlideDuration = SlideDuration(60_000)) = SeriesWallpaperEngine(
-        slides = slides,
+    /** A series that cuts, as released: every test up to the stage's own ones runs through [CutStage]. */
+    private fun TestScope.series(duration: SlideDuration = SlideDuration(60_000)) = series(duration) { hostOf ->
+        CutStage(slides, hostOf) { slide, slideHost -> FakeEngine(slide, slideHost).also(engines::add) }
+    }
+
+    private fun TestScope.series(
+        duration: SlideDuration = SlideDuration(60_000),
+        newStage: (hostOf: (slide: Int) -> EngineHost) -> SlideStage,
+    ) = SeriesWallpaperEngine(
+        slideCount = slides.size,
         slideDuration = duration,
         screenOffs = screenOffs,
         isScreenOn = { screenOn },
         scope = backgroundScope + UnconfinedTestDispatcher(testScheduler),
         timeSource = testScheduler.timeSource,
         host = host,
-        createSlide = { slide, slideHost -> FakeEngine(slide, slideHost).also(engines::add) },
+        newStage = newStage,
     )
 
     private val shown get() = engines.last()
@@ -77,6 +89,22 @@ class SeriesWallpaperEngineTest {
 
         advanceTimeBy(1_001)
         assertEquals(slides[1], shown.slide)
+    }
+
+    @Test
+    fun `a slide whose time ran out as the wallpaper hid changes once it shows, and no more while hidden`() = runTest {
+        val series = series()
+        // The clock is at the slide's end, and its timer hasn't run yet.
+        advanceTimeBy(60_000)
+        series.pause()
+
+        series.resume()
+        assertEquals(slides[1], shown.slide)
+
+        series.pause()
+        advanceTimeBy(600_000)
+        assertEquals(slides[1], shown.slide)
+        assertEquals(2, engines.size)
     }
 
     @Test
@@ -193,6 +221,113 @@ class SeriesWallpaperEngineTest {
 
         series.release()
         assertTrue(engines[0].released)
+    }
+
+    @Test
+    fun `the stage prepares the next slide its lead before the switch`() = runTest {
+        val stage = FakeStage(lead = 2.seconds)
+        series { stage }
+        assertEquals(listOf("switch 0"), stage.calls)
+
+        advanceTimeBy(57_999)
+        assertEquals(listOf("switch 0"), stage.calls)
+
+        advanceTimeBy(2)
+        assertEquals(listOf("switch 0", "prepare 1"), stage.calls)
+
+        advanceTimeBy(2_000)
+        assertEquals(listOf("switch 0", "prepare 1", "switch 1"), stage.calls)
+    }
+
+    @Test
+    fun `a slide that gets ready late only keeps the one on screen longer`() = runTest {
+        val stage = FakeStage(lead = 2.seconds, prepareTakes = 5.seconds)
+        series { stage }
+
+        advanceTimeBy(62_999)
+        assertEquals(listOf("switch 0", "prepare 1"), stage.calls)
+
+        advanceTimeBy(2)
+        assertEquals(listOf("switch 0", "prepare 1", "switch 1"), stage.calls)
+    }
+
+    @Test
+    fun `hiding the wallpaper lets the prepared slide go, and showing it prepares again`() = runTest {
+        val stage = FakeStage(lead = 2.seconds)
+        val series = series { stage }
+        advanceTimeBy(59_000)
+
+        series.pause()
+        advanceTimeBy(600_000)
+        assertEquals(listOf("switch 0", "prepare 1", "pause", "drop"), stage.calls)
+
+        series.resume()
+        assertEquals(listOf("switch 0", "prepare 1", "pause", "drop", "resume", "prepare 1"), stage.calls)
+
+        advanceTimeBy(1_001)
+        assertEquals("switch 1", stage.calls.last())
+    }
+
+    @Test
+    fun `hiding the wallpaper while a slide gets ready cancels that`() = runTest {
+        val stage = FakeStage(lead = 2.seconds, prepareTakes = 5.seconds)
+        val series = series { stage }
+        advanceTimeBy(59_000)
+
+        series.pause()
+
+        assertEquals(1, stage.cancelledPrepares)
+    }
+
+    @Test
+    fun `on wake nothing is prepared ahead`() = runTest {
+        val stage = FakeStage(lead = 2.seconds)
+        val series = series(SlideDuration.ON_WAKE) { stage }
+        advanceTimeBy(3_600_000)
+
+        series.pause()
+        screenOff()
+
+        assertEquals(listOf("switch 0", "pause", "drop", "switch 1"), stage.calls)
+    }
+
+    /** Records what the series asks of its stage. */
+    private class FakeStage(
+        override val lead: Duration,
+        private val prepareTakes: Duration = Duration.ZERO,
+    ) : SlideStage() {
+        val calls = mutableListOf<String>()
+        var cancelledPrepares = 0
+
+        override suspend fun prepare(slide: Int) {
+            calls += "prepare $slide"
+            try {
+                delay(prepareTakes)
+            } catch (e: CancellationException) {
+                cancelledPrepares++
+                throw e
+            }
+        }
+
+        override fun switchTo(slide: Int) {
+            calls += "switch $slide"
+        }
+
+        override fun dropPrepared() {
+            calls += "drop"
+        }
+
+        override fun pause() {
+            calls += "pause"
+        }
+
+        override fun resume() {
+            calls += "resume"
+        }
+
+        override fun release() {
+            calls += "release"
+        }
     }
 
     private class FakeEngine(val slide: WallpaperSpec, val host: EngineHost) : WallpaperEngine() {

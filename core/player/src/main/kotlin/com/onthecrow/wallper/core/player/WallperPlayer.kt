@@ -36,6 +36,12 @@ interface WallperPlayer {
     /** Moves to the start of the clip: right away while playing, otherwise for the next [play]. */
     fun seekToStart()
 
+    /**
+     * Waits until the first frame is decoded, with or without a surface, for [timeoutMs] at most.
+     * False if the decoder failed first, the time ran out, or a long pause has freed the decoder.
+     */
+    suspend fun awaitPrepared(timeoutMs: Long): Boolean
+
     /** Blocks the caller for at most a second. */
     fun release()
 }

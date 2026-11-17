@@ -34,6 +34,9 @@ internal class OpenGLExternalTexture(
 
     private var lastFrameTimestampNs = 0L
 
+    /** A frame has been latched: drawing shows the video, not an empty texture. */
+    val hasFrame: Boolean get() = lastFrameTimestampNs != 0L
+
     init {
         Matrix.setIdentityM(mTexMatrix, 0)
         Matrix.setIdentityM(mMVPMatrix, 0)
@@ -133,6 +136,10 @@ internal class OpenGLExternalTexture(
 
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4)
         GLErrorUtils.checkGlError("glDrawArrays")
+
+        // Left enabled, they would point a renderer sharing this context at this buffer.
+        GLES20.glDisableVertexAttribArray(aPositionHandle)
+        GLES20.glDisableVertexAttribArray(aTextureCoordHandler)
     }
 
     companion object {

@@ -17,6 +17,7 @@ import com.onthecrow.wallper.core.engine.WallpaperEngine
 import com.onthecrow.wallper.core.engine.WallpaperSettingsSource
 import com.onthecrow.wallper.core.engine.WallpaperSpec
 import com.onthecrow.wallper.core.engine.impl.engine.WallpaperEngineFactory
+import com.onthecrow.wallper.core.model.SeriesSwitch
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -142,6 +143,9 @@ class WallperWallpaperService : WallpaperService() {
         /** The user's «Move with home screen pages»; off, every wallpaper is told there are no pages. */
         private var scrollsWithPages = true
 
+        /** How a series changes its slides; a series' engine is made anew when it changes. */
+        private var seriesSwitch = SeriesSwitch.CUT
+
         init {
             activeWallpaperSource.activations
                 .onEach { retryRequested = true }
@@ -152,6 +156,19 @@ class WallperWallpaperService : WallpaperService() {
                 .onEach { scrolls ->
                     scrollsWithPages = scrolls
                     dispatchOffsets()
+                }
+                .launchIn(engineScope)
+            wallpaperSettings.settings
+                .map { it.seriesSwitch }
+                .distinctUntilChanged()
+                .onEach { switch ->
+                    if (switch == seriesSwitch) return@onEach
+                    seriesSwitch = switch
+                    // Also the series made before the settings were read, with the cut.
+                    if (currentWallpaper is WallpaperSpec.Series) {
+                        failedWallpaper = null
+                        createEngine()
+                    }
                 }
                 .launchIn(engineScope)
         }
@@ -260,7 +277,7 @@ class WallperWallpaperService : WallpaperService() {
             }
             val shownWallpaper = wallpaper?.takeIf { it != failedWallpaper }
             wallpaperEngine = wallpaperEngineFactory
-                .create(baseContext, { surfaceHolder }, shownWallpaper, isPreview, this)
+                .create(baseContext, { surfaceHolder }, shownWallpaper, isPreview, this, seriesSwitch)
                 .also { if (!isVisible) it.pause() }
             // From the page the launcher is on, not from the middle until the next swipe.
             dispatchOffsets()

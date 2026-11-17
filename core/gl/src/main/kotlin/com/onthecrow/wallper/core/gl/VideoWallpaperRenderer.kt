@@ -40,6 +40,9 @@ class VideoWallpaperRenderer(
     @Volatile
     var pageOffset: Float? = null
 
+    /** A video frame is in the texture: before the first one a draw shows nothing. */
+    override val hasPicture: Boolean get() = texture?.hasFrame == true
+
     override fun onSurfaceCreated() {
         Timber.d("onSurfaceCreated")
         GLES20.glDisable(GLES20.GL_DEPTH_TEST)

@@ -37,9 +37,11 @@ import com.onthecrow.wallper.blackhole.renderer.BlackHoleGlRenderer
 import com.onthecrow.wallper.blackhole.renderer.BlackHoleRenderer
 import com.onthecrow.wallper.core.diagnostics.Diagnostics
 import com.onthecrow.wallper.core.engine.EngineHost
+import com.onthecrow.wallper.core.engine.SlideStart
 import com.onthecrow.wallper.core.engine.WallpaperEngine
-import com.onthecrow.wallper.core.gl.RestartableGl
-import com.onthecrow.wallper.core.gl.WallpaperGLThread
+import com.onthecrow.wallper.core.gl.GlClient
+import com.onthecrow.wallper.core.gl.GlLink
+import com.onthecrow.wallper.core.gl.OwnGl
 import kotlinx.coroutines.CoroutineExceptionHandler
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
@@ -58,6 +60,10 @@ import kotlin.math.abs
  * Hidden, it does no work at all: no frames, no gyroscope, no GL heartbeat, and new lens tables wait
  * until it shows again. Only listeners that cost nothing until they fire stay registered.
  *
+ * As a series' [slide] it starts hidden, on the GL host it is given, and warms up: it loads its lens tables
+ * and draws off screen until the first frame with the picture, which builds the shaders. From then on it
+ * is ready to [show], and it appears whole, without the fade from black.
+ *
  * Everything except the [WallpaperEngine] overrides runs on the callback thread.
  */
 internal class BlackHoleWallpaperEngine(
@@ -68,6 +74,7 @@ internal class BlackHoleWallpaperEngine(
     private val settingsStore: BlackHoleSettingsStore,
     private val tablesRepository: LensTablesRepository,
     private val autoQuality: AutoQualityMemory,
+    private val slide: SlideStart? = null,
 ) : WallpaperEngine() {
 
     private val holder = surfaceHolder()
@@ -98,7 +105,10 @@ internal class BlackHoleWallpaperEngine(
     private val rotationQuaternion = FloatArray(4)
     private var tablesKey: LensTableKey? = null
     private var tablesJob: Job? = null
-    private var visible = true
+    private var visible = slide == null
+
+    /** A slide made off screen, until its first picture: hidden, yet it loads its tables and draws for it. */
+    private var warming = slide != null
     private var powerSave = powerManager?.isPowerSaveMode == true
     private var thermal = ThermalLevel.NORMAL
     private var lastDrawnNanos = Long.MIN_VALUE
@@ -117,6 +127,10 @@ internal class BlackHoleWallpaperEngine(
     private var appliedFrameRate = -1
     @Volatile
     private var released = false
+
+    /** A slide's window went on to the next slide: its frame rate is that one's to ask for. */
+    @Volatile
+    private var windowHandedOver = false
     private val choreographer: Choreographer by lazy { Choreographer.getInstance() } // the callback looper's
     private val frameCallback = Choreographer.FrameCallback(::onVsync)
 
@@ -142,18 +156,7 @@ internal class BlackHoleWallpaperEngine(
         null
     }
 
-    private val gl = RestartableGl(
-        holder = holder,
-        handler = handler,
-        onGiveUp = host::showPlaceholder,
-        afterRestart = {
-            // A new renderer starts without tables; nothing keeps a CPU copy of them.
-            reloadTables()
-            stillDrawn = false
-            wake()
-        },
-        newSession = { Gl(currentLevel()) },
-    )
+    private val gl: GlLink<BlackHoleGlRenderer> = (slide?.gl ?: OwnGl(holder)).open(handler, Renderers())
 
     init {
         Timber.tag(TAG).d("created, preview=$isPreview")
@@ -169,7 +172,7 @@ internal class BlackHoleWallpaperEngine(
                 powerManager?.addThermalStatusListener({ handler.post(it) }, listener)
                 powerManager?.currentThermalStatus?.let(::onThermalStatus)
             }
-            onVisible(true)
+            if (warming) warmUp() else onVisible(true)
         }
         scope.launch { settingsStore.settings.collect(::onSettings) }
     }
@@ -180,6 +183,14 @@ internal class BlackHoleWallpaperEngine(
 
     override fun resume() {
         handler.post { onVisible(true) }
+    }
+
+    override fun show() {
+        handler.post {
+            // The frame warmed up with is as old as the warm-up: the disk would jump to where it is now.
+            draw(System.nanoTime())
+            gl.show()
+        }
     }
 
     override fun onSurfaceChanged(width: Int, height: Int) {
@@ -193,6 +204,11 @@ internal class BlackHoleWallpaperEngine(
     // The system frees the window right after this returns: wait for the EGL surface to go.
     override fun onSurfaceDestroyed() {
         gl.onSurfaceDestroyed(SURFACE_DESTROY_WAIT_MS)
+        if (slide != null) {
+            // Now, not when this engine is released: by then the next slide may have asked for its own rate.
+            windowHandedOver = true
+            setFrameRate(NO_FRAME_RATE)
+        }
     }
 
     override fun onOffsetsChanged(xOffset: Float, xOffsetStep: Float) {
@@ -220,6 +236,8 @@ internal class BlackHoleWallpaperEngine(
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                 powerManager?.removeThermalStatusListener(thermalListener as PowerManager.OnThermalStatusChangedListener)
             }
+            // Slides that share a GL thread hand no window over: the next one may never say what rate it wants.
+            if (slide != null) applyFrameRate(NO_FRAME_RATE)
         }
         // Runs after the teardown above on the callback thread, and waits for both.
         gl.release(STOP_TIMEOUT_MS)
@@ -264,9 +282,8 @@ internal class BlackHoleWallpaperEngine(
             applyQuality()
             updateGpuTiming()
         }
-        val current = gl.current
         val nextParams = params
-        current.thread.post { current.renderer.setParams(nextParams) }
+        gl.post { it.renderer.setParams(nextParams) }
         updateGyro()
         loadTables()
         stillDrawn = false
@@ -309,8 +326,7 @@ internal class BlackHoleWallpaperEngine(
     /** The GPU timer runs only while Auto measures: its queries cost a little on every frame. */
     private fun updateGpuTiming() {
         val timing = isMeasuringGpu()
-        val current = gl.current
-        current.thread.post { current.renderer.onGpuTimeMs = if (timing) gpuTimeCallback else null }
+        gl.post { it.renderer.onGpuTimeMs = if (timing) gpuTimeCallback else null }
     }
 
     private fun onNoGpuTimer() {
@@ -324,10 +340,9 @@ internal class BlackHoleWallpaperEngine(
     private fun applyQuality() {
         val level = currentLevel()
         reportQuality(level)
-        val current = gl.current
         // New shader defines: the next frame compiles them.
         gl.expectSlowFrame()
-        current.thread.post { current.renderer.setQuality(level) }
+        gl.post { it.renderer.setQuality(level) }
         loadTables()
     }
 
@@ -349,18 +364,25 @@ internal class BlackHoleWallpaperEngine(
      * next frame: a hidden wallpaper leaves that to [onVisible]. The GPU keeps the old ones until then.
      */
     private fun loadTables() {
-        if (!visible) return
+        if (!visible && !warming) return
         val key = lensTableKey(params, currentLevel())
         if (key == tablesKey) return
         tablesKey = key
         tablesJob?.cancel()
         tablesJob = scope.launch {
             val loaded = tablesRepository.get(key)
-            val current = gl.current
-            current.thread.post { current.renderer.setTables(loaded) }
+            gl.post { it.renderer.setTables(loaded) }
             stillDrawn = false
-            wake()
+            // Hidden, no frame is coming: a slide that warms up draws the one that has its picture.
+            if (visible) wake() else if (warming) draw(System.nanoTime())
         }
+    }
+
+    /** A slide made off screen: no frame loop and no gyroscope yet, only what the first picture needs. */
+    private fun warmUp() {
+        loadTables()
+        // Without the tables this frame is black, but it builds the shaders meanwhile.
+        draw(System.nanoTime())
     }
 
     private fun reloadTables() {
@@ -417,9 +439,8 @@ internal class BlackHoleWallpaperEngine(
     }
 
     private fun draw(frameNanos: Long) {
-        val current = gl.current
-        current.glRenderer.submit(scene.frame(frameNanos))
-        current.thread.requestRender()
+        gl.renderer.submit(scene.frame(frameNanos))
+        gl.requestRender()
         lastDrawnNanos = frameNanos
         drawnGyroPitchDeg = gyro.targetPitchDeg
         drawnGyroYawDeg = gyro.targetYawDeg
@@ -440,8 +461,14 @@ internal class BlackHoleWallpaperEngine(
     )
 
     private fun applyFrameRate(target: Int) {
-        if (target == appliedFrameRate || Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
+        if (target == appliedFrameRate || windowHandedOver) return
         appliedFrameRate = target
+        setFrameRate(target)
+    }
+
+    /** Any thread. */
+    private fun setFrameRate(target: Int) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
         runCatching {
             holder.surface.setFrameRate(target.toFloat(), Surface.FRAME_RATE_COMPATIBILITY_DEFAULT)
         }
@@ -494,23 +521,38 @@ internal class BlackHoleWallpaperEngine(
         }
     }
 
-    /** One GL thread with its own renderer: a restart never shares GL state with an abandoned thread. */
-    private inner class Gl(level: QualityLevel) : RestartableGl.Session {
-        val renderer = BlackHoleRenderer(context.assets).apply {
-            setQuality(level)
-            setParams(params)
-            onTablesLost = { handler.post { if (gl.isCurrent(this@Gl)) reloadTables() } }
-            onGpuTimeMs = if (isMeasuringGpu()) gpuTimeCallback else null
-            onNoGpuTimer = { handler.post { onNoGpuTimer() } }
+    /** What the GL side asks of this engine: a renderer of its own for each GL thread, as the engine is set now. */
+    private inner class Renderers : GlClient<BlackHoleGlRenderer> {
+        override val glesVersion = 3
+
+        override fun newRenderer(): BlackHoleGlRenderer {
+            lateinit var glRenderer: BlackHoleGlRenderer
+            val renderer = BlackHoleRenderer(context.assets).apply {
+                // A slide takes over from another picture: it comes whole, not out of black.
+                fadeIn = slide == null
+                setQuality(currentLevel())
+                setParams(params)
+                onTablesLost = { handler.post { if (gl.isCurrent(glRenderer)) reloadTables() } }
+                onGpuTimeMs = if (isMeasuringGpu()) gpuTimeCallback else null
+                onNoGpuTimer = { handler.post { onNoGpuTimer() } }
+            }
+            glRenderer = BlackHoleGlRenderer(renderer) { error -> gl.fail(glRenderer, error) }
+            return glRenderer
         }
-        val glRenderer = BlackHoleGlRenderer(renderer) { error -> gl.fail(this@Gl, error) }
-        override val thread: WallpaperGLThread = WallpaperGLThread(
-            surfaceHolder = holder,
-            renderer = glRenderer,
-            renderGuardListener = { stall -> gl.restart(this@Gl, "unrecoverable $stall") },
-            glesVersion = 3,
-            onInitFailed = { error -> gl.fail(this@Gl, error) },
-        )
+
+        override fun afterRestart() {
+            // A new renderer starts without tables; nothing keeps a CPU copy of them.
+            reloadTables()
+            stillDrawn = false
+            wake()
+        }
+
+        override fun onFirstPicture() {
+            warming = false
+            slide?.onReady?.invoke()
+        }
+
+        override fun onGiveUp(reason: String, error: Throwable?) = host.showPlaceholder(reason, error)
     }
 
     private companion object {
@@ -521,5 +563,8 @@ internal class BlackHoleWallpaperEngine(
         const val STILL_WAKE_DEG = 0.03
         const val STOP_TIMEOUT_MS = 1_500L
         const val SURFACE_DESTROY_WAIT_MS = 1_000L
+
+        /** `Surface.setFrameRate`'s «no preference». */
+        const val NO_FRAME_RATE = 0
     }
 }
