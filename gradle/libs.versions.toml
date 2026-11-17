@@ -24,7 +24,7 @@ timber = "5.0.1"
 nimbus = "0.1.1"
 # The blur under the list's bar. 1.7.2 is built on Compose 1.10: later ones bring Compose 1.12.
 haze = "1.7.2"
-serialization = "1.9.0"
+serialization = "1.13.0"
 coroutines = "1.10.2"
 media3 = "1.8.0"
 splashScreen = "1.2.0"
