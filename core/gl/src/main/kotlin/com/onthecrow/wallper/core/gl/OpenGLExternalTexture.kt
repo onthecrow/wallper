@@ -65,17 +65,19 @@ internal class OpenGLExternalTexture(
     }
 
     /**
-     * Latches the newest queued image. Called on every draw, even without a frame callback: a SurfaceTexture
-     * stops calling onFrameAvailable while a frame sits unlatched, and this re-arms it.
+     * Latches the newest queued image, passing over any that waited before it ([NewestFrame]). Called on
+     * every draw, even without a frame callback: a SurfaceTexture may stop calling onFrameAvailable while a
+     * frame sits unlatched, and this re-arms it.
      *
      * @return true if the image differs from the previously latched one.
      */
     fun latch(): Boolean {
-        surfaceTexture.updateTexImage()
-        val timestampNs = surfaceTexture.timestamp
-        val isNewFrame = timestampNs != 0L && timestampNs != lastFrameTimestampNs
-        lastFrameTimestampNs = timestampNs
-        return isNewFrame
+        val previousNs = lastFrameTimestampNs
+        lastFrameTimestampNs = NewestFrame.latch(previousNs) {
+            surfaceTexture.updateTexImage()
+            surfaceTexture.timestamp
+        }
+        return lastFrameTimestampNs != 0L && lastFrameTimestampNs != previousNs
     }
 
     /**

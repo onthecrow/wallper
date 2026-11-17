@@ -2,6 +2,7 @@ package com.onthecrow.wallper.core.engine.impl.engine
 
 import android.os.Handler
 import android.os.HandlerThread
+import android.view.Choreographer
 import android.view.Surface
 import android.view.SurfaceHolder
 import com.onthecrow.wallper.core.engine.EngineHost
@@ -37,7 +38,8 @@ import timber.log.Timber
  * on its own. The player replaces its decoder behind that surface; the GL side repairs EGL inside the GL
  * thread, and a broken or hung GL thread is recreated by its [GlLink] without touching the player. The crop pans
  * with the launcher's pages ([VideoWallpaperRenderer.pageOffset]); with the user's setting off the
- * service reports no pages.
+ * service reports no pages. A video frame and a page offset each ask for a frame; [VideoFramePacer] makes
+ * one of them per display refresh.
  *
  * As a series' [slide] it starts hidden, on the GL host it is given and on a single decoder: the paused
  * player puts the clip's first frame into the texture, and once that is drawn the slide is ready to [show].
@@ -77,14 +79,18 @@ internal class GLWallpaperEngine(
 
     private val playback = VideoPlaybackControl(player, settings, savingPower, screenOffs, scope, visible.value)
 
-    /** The launcher's page offset, null without pages. */
-    private val launcherOffset = MutableStateFlow<Float?>(null)
-
-    /** What the renderer pans with; kept here for a renderer made after a GL restart. */
+    /** The launcher's page offset the renderer pans with, null without pages; kept here for a renderer made after a GL restart. */
     @Volatile
     private var pageOffset: Float? = null
 
     private val gl: GlLink<VideoWallpaperRenderer> = (slide?.gl ?: OwnGl(holder)).open(callbackHandler, Renderers())
+
+    private val pacer: VideoFramePacer =
+        VideoFramePacer(awaitVsync = { callbackHandler.post(awaitVsync) }, draw = { gl.requestRender() })
+    private val vsyncCallback: Choreographer.FrameCallback = Choreographer.FrameCallback { pacer.onVsync() }
+
+    /** A Choreographer belongs to a thread with a looper: here the callback thread's. */
+    private val awaitVsync: Runnable = Runnable { Choreographer.getInstance().postFrameCallback(vsyncCallback) }
 
     @Volatile
     private var released = false
@@ -97,14 +103,6 @@ internal class GLWallpaperEngine(
             host.showPlaceholder("The video player failed")
         }
         scope.launch { framesExpected.collect(gl::setFramesExpected) }
-        scope.launch {
-            launcherOffset.collect { offset ->
-                pageOffset = offset
-                gl.renderer.pageOffset = offset
-                // A paused video gets no new frames to draw the move with.
-                gl.requestRender()
-            }
-        }
     }
 
     override fun pause() {
@@ -124,8 +122,14 @@ internal class GLWallpaperEngine(
 
     override fun show() = gl.show()
 
+    /** On the main thread, and from there straight to the renderer: a thread in between only makes the picture later. */
     override fun onOffsetsChanged(xOffset: Float, xOffsetStep: Float) {
-        launcherOffset.value = xOffset.takeIf { xOffsetStep > 0f }
+        val offset = xOffset.takeIf { xOffsetStep > 0f }
+        if (offset == pageOffset) return
+        pageOffset = offset
+        gl.renderer.pageOffset = offset
+        // Its own frame: a paused video gets no new frames to draw the move with.
+        pacer.onOffset()
     }
 
     override fun onSurfaceChanged(width: Int, height: Int) = gl.onSurfaceChanged(width, height)
@@ -150,7 +154,7 @@ internal class GLWallpaperEngine(
                 renderParams = renderParams,
                 callbackHandler = callbackHandler,
                 listener = object : VideoWallpaperRenderer.Listener {
-                    override fun onFrameAvailable() = gl.requestRender()
+                    override fun onFrameAvailable() = pacer.onVideoFrame()
 
                     override fun onVideoSurfaceCreated(surface: Surface) {
                         if (gl.isCurrent(renderer) && !released) player.setVideoSurface(surface)
